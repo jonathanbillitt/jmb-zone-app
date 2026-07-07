@@ -255,6 +255,16 @@
     </div>
     <div class="card">
       <div class="ctlrow">
+        <button id="btnExport">Export settings</button>
+        <button id="btnImport">Import settings…</button>
+        <input type="file" id="impFile" accept=".json,application/json" class="hidden">
+      </div>
+      <div class="mini">Everything: ID, curve, apply mode, all port patch +
+      looks + effects, and this phone's scenes — one shareable file.</div>
+      <div class="mini" id="impStatus"></div>
+    </div>
+    <div class="card">
+      <div class="ctlrow">
         <button id="btnRefresh">Refresh</button>
         <button id="btnPin">Change PIN…</button>
         <button id="btnDisc" class="danger">Disconnect</button>
@@ -877,6 +887,10 @@ function buildCols(){
       pushColour();
     };
     el.addEventListener("pointerdown",ev=>{
+      // Every new grab re-stomps the targets (FX=0 + manual): an effect
+      // re-armed from another tab since the last touch dies right here —
+      // the active tab owns the output, full stop.
+      Object.keys(colEngaged).forEach(k=>delete colEngaged[k]);
       el.setPointerCapture(ev.pointerId); drag(ev);
       const mv=e2=>drag(e2);
       const up=()=>{ el.removeEventListener("pointermove",mv);
@@ -1051,6 +1065,59 @@ $("btnCidApply").onclick=()=>{ setupTouched=Date.now();
   send("CID="+Math.max(0,Math.min(9999,+$("setCid").value||0))); };
 $("setCurve").onchange=e=>{ setupTouched=Date.now(); send("CURVE="+ +e.target.value); };
 $("setAmode").onchange=e=>{ setupTouched=Date.now(); send("AMODE="+ +e.target.value); };
+// ---------- settings export / import ----------
+$("btnExport").onclick=()=>{
+  const data={ app:"jmb-zone", ver:1, exported:new Date().toISOString(),
+    device:(dev&&dev.name)||"",
+    cid:+(kv.CID||0), curve:+(kv.CRV||0), amode:+(kv.AM||0),
+    ports:ports.map(m=>({a:m.A??1,h:m.H??0,pe:m.PE??0,m:m.M??0,
+                         r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
+                         x:m.X??0,s:m.S??128})),
+    scenes:loadScenes() };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="jmb-zone-"+(kv.CID||"0")+"-settings.json";
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  $("impStatus").textContent="Exported "+a.download;
+};
+$("btnImport").onclick=()=>$("impFile").click();
+$("impFile").addEventListener("change",async ev=>{
+  const f=ev.target.files[0]; ev.target.value="";
+  if(!f) return;
+  let data;
+  try{ data=JSON.parse(await f.text()); }
+  catch(e){ $("impStatus").textContent="Not a valid settings file."; return; }
+  if(data.app!=="jmb-zone"||!Array.isArray(data.ports)){
+    $("impStatus").textContent="Not a JMB Zone settings file."; return; }
+  const nsc=Array.isArray(data.scenes)?data.scenes.length:0;
+  if(!confirm(`Apply "${f.name}" to this controller?\n`+
+              `${data.ports.length} ports`+(nsc?`, ${nsc} scenes`:"")+
+              ` — overwrites current settings.`)) return;
+  const q=["CID="+(data.cid||0),"CURVE="+(data.curve||0),
+           "AMODE="+(data.amode||0)];
+  data.ports.slice(0,ports.length).forEach((t,i)=>{
+    const p=i+1;
+    q.push(`P${p}.ADDR=${t.a??1}`,`P${p}.HEAD=${t.h??0}`,
+           `P${p}.PERS=${t.pe??0}`,
+           `P${p}.RGB=${t.r??0},${t.g??0},${t.b??0}`,
+           `P${p}.DIM=${t.d??100}`,`P${p}.FX=${t.x??0}`,
+           `P${p}.FXS=${t.s??128}`,`P${p}.MAN=${t.m?1:0}`);
+    // hold inbound refresh off these fields while the queue drains
+    for(const k of ["R","G","B","D","X","S","ADDR","HEAD","PERS","MAN"])
+      hot[p+"."+k]=Date.now()+4000;
+  });
+  for(let i=0;i<q.length;i++){
+    await send(q[i]);
+    await sleep(60);                    // pace the radio, ~40 msgs ≈ 2.5s
+    $("impStatus").textContent=`Applying… ${i+1}/${q.length}`;
+  }
+  if(nsc){ saveScenes(data.scenes); renderScenes(); }
+  await send("GET");
+  $("impStatus").textContent="Settings applied ✓";
+});
+
 $("btnRefresh").onclick=()=>send("GET");
 $("btnDisc").onclick=()=>{ const d0=dev; dev=null; if(d0&&d0.gatt.connected) d0.gatt.disconnect(); };
 $("btnPin").onclick=()=>{
