@@ -126,6 +126,39 @@
          border:1px solid var(--line); font-size:12.5px; cursor:pointer;
          color:var(--dim); }
   .tgt.sel { background:#123a5e; border-color:var(--acc); color:var(--acc); }
+
+  /* ── glow-up ── */
+  body { background:radial-gradient(1200px 600px at 50% -120px,#151d2a,var(--bg)); }
+  .card { background:linear-gradient(180deg,#1a2029,#141920);
+          box-shadow:0 10px 26px rgba(0,0,0,.38); }
+  header { backdrop-filter:blur(8px); background:rgba(22,27,35,.92); }
+  button.primary { background:linear-gradient(135deg,#5ab2ff,#3b7cf0);
+                   border-color:transparent; }
+  .tab { animation:fadeUp .22s ease; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px);}
+                      to{opacity:1;transform:none;} }
+  .badge.fault { animation:pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50%{opacity:.5;} }
+  nav button.active .ico { text-shadow:0 0 12px var(--acc); }
+  .swatch, #swBig { transition:box-shadow .25s; }
+
+  /* rotary wheels (dimmer / fx speed) */
+  .wheels { justify-content:space-evenly; }
+  .wheelbox { position:relative; width:106px; user-select:none;
+              touch-action:none; cursor:pointer; }
+  .wheelbox svg { display:block; width:100%; }
+  .wtrack { fill:none; stroke:var(--card2); stroke-width:9; }
+  .wfill  { fill:none; stroke:#f2f5f8; stroke-width:9; stroke-linecap:round;
+            filter:drop-shadow(0 0 5px rgba(255,255,255,.30));
+            transition:stroke-dasharray .10s linear; }
+  .wticks line { stroke:#39434f; stroke-width:1.6; }
+  .wticks { transition:transform .12s ease-out; }
+  .wval { position:absolute; top:37%; left:0; right:0; text-align:center;
+          font-size:15px; font-weight:700; font-variant-numeric:tabular-nums;
+          pointer-events:none; }
+  .wlab { position:absolute; top:56%; left:0; right:0; text-align:center;
+          font-size:9.5px; color:var(--dim); letter-spacing:1.5px;
+          pointer-events:none; }
 </style>
 </head>
 <body>
@@ -445,13 +478,16 @@ function renderControl(){
     setIf(p,"PERS",el=>el.value=m.PE);
     setIf(p,"MAN", el=>el.checked=m.M===1);
     setIf(p,"X",   el=>el.value=m.X??0);
-    setIf(p,"S",   el=>{ el.value=m.S??128; $("vS"+p).textContent=m.S??128; });
-    for(const c of ["R","G","B","D"]){
-      const v=c==="D"?m.D:m[c];
-      setIf(p,c,el=>{ el.value=v; $("v"+c+p).textContent=v; });
+    for(const c of ["R","G","B"]){
+      setIf(p,c,el=>{ el.value=m[c]; $("v"+c+p).textContent=m[c]; });
     }
-    $("sw"+p).style.background=
-      `rgb(${(m.R??0)*2.55},${(m.G??0)*2.55},${(m.B??0)*2.55})`;
+    const fresh=k=>Date.now()-(hot[p+"."+k]||0)>=HOT_MS;
+    if(wheels[p+".D"] && fresh("D")) wheels[p+".D"].set(m.D??100);
+    if(wheels[p+".S"] && fresh("S")) wheels[p+".S"].set(m.S??128);
+    const cr=(m.R??0)*2.55, cg=(m.G??0)*2.55, cb=(m.B??0)*2.55;
+    const sw=$("sw"+p);
+    sw.style.background=`rgb(${cr},${cg},${cb})`;
+    sw.style.boxShadow=(cr+cg+cb>40)?`0 0 14px rgba(${cr},${cg},${cb},.55)`:"none";
   });
 }
 function buildCard(p){
@@ -476,10 +512,6 @@ function buildCard(p){
       <div class="row"><label>Effect</label>
         <select id="x${p}" style="width:148px">${FX_NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join("")}</select>
       </div>
-      <div class="row w"><label>Speed</label>
-        <input type="range" id="s${p}" min="0" max="255">
-        <span class="val" id="vS${p}">128</span>
-      </div>
       <div class="row"><label>Manual</label>
         <label class="toggle"><input type="checkbox" id="man${p}"><span></span></label>
         <span class="mini" style="margin:0">live DMX outranks manual + effects</span>
@@ -487,7 +519,10 @@ function buildCard(p){
       <div class="row r"><label>Red</label><input type="range" id="r${p}" min="0" max="100"><span class="val" id="vR${p}">0</span></div>
       <div class="row g"><label>Green</label><input type="range" id="g${p}" min="0" max="100"><span class="val" id="vG${p}">0</span></div>
       <div class="row b"><label>Blue</label><input type="range" id="b${p}" min="0" max="100"><span class="val" id="vB${p}">0</span></div>
-      <div class="row w"><label>Dim</label><input type="range" id="d${p}" min="0" max="100"><span class="val" id="vD${p}">100</span></div>
+      <div class="row wheels">
+        <div class="wheelbox" id="wd${p}"></div>
+        <div class="wheelbox" id="ws${p}"></div>
+      </div>
     </div>`;
   const touch=k=>{ hot[p+"."+k]=Date.now(); };
   d.querySelector("#addr"+p).addEventListener("change",e=>{
@@ -504,26 +539,78 @@ function buildCard(p){
   d.querySelector("#x"+p).addEventListener("change",e=>{
     touch("X"); send(`P${p}.FX=${+e.target.value}`);
   });
-  d.querySelector("#s"+p).addEventListener("input",e=>{
-    touch("S"); $("vS"+p).textContent=e.target.value;
-    sendThrottled(p+".FXS",`P${p}.FXS=${+e.target.value}`);
-  });
   d.querySelector("#man"+p).addEventListener("change",e=>{
     touch("MAN"); send(`P${p}.MAN=${e.target.checked?1:0}`);
   });
-  for(const [id,field] of [["r","R"],["g","G"],["b","B"],["d","DIM"]]){
+  for(const [id,field] of [["r","R"],["g","G"],["b","B"]]){
     d.querySelector("#"+id+p).addEventListener("input",e=>{
-      const key=field==="DIM"?"D":field;
-      touch(key);
-      $("v"+key+p).textContent=e.target.value;
-      if(key!=="D"){
-        const cur={R:+$("r"+p).value,G:+$("g"+p).value,B:+$("b"+p).value};
-        $("sw"+p).style.background=`rgb(${cur.R*2.55},${cur.G*2.55},${cur.B*2.55})`;
-      }
+      touch(field);
+      $("v"+field+p).textContent=e.target.value;
+      const cur={R:+$("r"+p).value,G:+$("g"+p).value,B:+$("b"+p).value};
+      $("sw"+p).style.background=`rgb(${cur.R*2.55},${cur.G*2.55},${cur.B*2.55})`;
       sendThrottled(p+"."+field,`P${p}.${field}=${e.target.value}`);
     });
   }
+  wheels[p+".D"]=makeWheel(d.querySelector("#wd"+p),{
+    label:"DIMMER", min:0, max:100, value:100, fmt:v=>v+"%",
+    onInput:v=>{ touch("D"); sendThrottled(p+".DIM",`P${p}.DIM=${v}`); }});
+  wheels[p+".S"]=makeWheel(d.querySelector("#ws"+p),{
+    label:"FX SPEED", min:0, max:255, value:128, fmt:v=>String(v),
+    onInput:v=>{ touch("S"); sendThrottled(p+".FXS",`P${p}.FXS=${v}`); }});
   return d;
+}
+
+// ---------- rotary wheel control ----------
+// A 270° encoder-style dial: arc fill for the value, a tick ring that spins
+// with it, glow on the fill. Drag anywhere on the dial — the angle is the
+// value; the dead 90° gap sits at the bottom.
+const wheels={};
+function makeWheel(host,{label,min=0,max=100,value=min,fmt=v=>v,onInput}){
+  const R=38, C=2*Math.PI*R, SWEEP=0.75;
+  let ticks="";
+  for(let i=0;i<24;i++){
+    const a=i/24*2*Math.PI;
+    ticks+=`<line x1="${50+Math.cos(a)*26}" y1="${50+Math.sin(a)*26}"
+                  x2="${50+Math.cos(a)*31}" y2="${50+Math.sin(a)*31}"/>`;
+  }
+  host.innerHTML=`<svg viewBox="0 0 100 100">
+    <circle class="wtrack" cx="50" cy="50" r="${R}"
+      stroke-dasharray="${C*SWEEP} ${C}" transform="rotate(135 50 50)"/>
+    <circle class="wfill" cx="50" cy="50" r="${R}"
+      stroke-dasharray="0 ${C}" transform="rotate(135 50 50)"/>
+    <g class="wticks" style="transform-origin:50% 50%">${ticks}</g>
+  </svg><div class="wval"></div><div class="wlab">${label}</div>`;
+  const fill=host.querySelector(".wfill"),
+        tg  =host.querySelector(".wticks"),
+        val =host.querySelector(".wval");
+  let cur=value;
+  const paint=()=>{
+    const f=(cur-min)/(max-min);
+    fill.setAttribute("stroke-dasharray",`${C*SWEEP*f} ${C}`);
+    tg.style.transform=`rotate(${f*270}deg)`;
+    val.textContent=fmt(Math.round(cur));
+  };
+  const fromEvent=ev=>{
+    const r=host.getBoundingClientRect();
+    const dx=ev.clientX-(r.left+r.width/2),
+          dy=ev.clientY-(r.top+r.width/2);
+    let va=((Math.atan2(dy,dx)*180/Math.PI)-135+360)%360;   // 0 at sweep start
+    if(va>270) va=(va>315)?0:270;                           // snap the dead gap
+    cur=min+va/270*(max-min);
+    paint();
+    if(onInput) onInput(Math.round(cur));
+  };
+  host.addEventListener("pointerdown",ev=>{
+    host.setPointerCapture(ev.pointerId);
+    fromEvent(ev);
+    const mv=e=>fromEvent(e);
+    const up=()=>{ host.removeEventListener("pointermove",mv);
+                   host.removeEventListener("pointerup",up); };
+    host.addEventListener("pointermove",mv);
+    host.addEventListener("pointerup",up);
+  });
+  paint();
+  return { set:v=>{ cur=v; paint(); } };
 }
 
 // ---------- Scenes tab ----------
@@ -682,8 +769,11 @@ function paintCols(){
   });
   const[r,g,b]=currentRGB();
   const sw=$("swBig");
-  if(sw) sw.style.background=
-    `rgb(${r*col.dim/100},${g*col.dim/100},${b*col.dim/100})`;
+  if(sw){
+    const dr=r*col.dim/100, dg=g*col.dim/100, db=b*col.dim/100;
+    sw.style.background=`rgb(${dr},${dg},${db})`;
+    sw.style.boxShadow=`0 0 22px rgba(${dr},${dg},${db},.55)`;
+  }
 }
 function renderColourTargets(n){
   const root=$("colTargets"); root.innerHTML="";
