@@ -108,6 +108,24 @@
   .scene b { flex:1; font-weight:600; font-size:14px; }
   .scene input { width:56px; background:var(--card2); color:var(--text);
                  border:1px solid var(--line); border-radius:7px; padding:6px; }
+  /* Colour tab — MagicQ-style vertical picker columns */
+  .cols { display:flex; gap:10px; margin-top:14px; }
+  .colwrap { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .colcol { position:relative; width:100%; max-width:58px; height:300px;
+            border-radius:10px; border:1px solid var(--line); touch-action:none;
+            cursor:pointer; }
+  .colthumb { position:absolute; left:-3px; right:-3px; height:5px;
+              background:#fff; border:1px solid #000; border-radius:3px;
+              pointer-events:none; }
+  .colwrap span { font-size:11px; color:var(--dim); }
+  .colwrap .cv { font-size:11px; color:var(--text);
+                 font-variant-numeric:tabular-nums; }
+  #swBig { height:44px; border-radius:10px; border:1px solid var(--line);
+           margin-top:12px; }
+  .tgt { padding:5px 13px; border-radius:999px; background:var(--card2);
+         border:1px solid var(--line); font-size:12.5px; cursor:pointer;
+         color:var(--dim); }
+  .tgt.sel { background:#123a5e; border-color:var(--acc); color:var(--acc); }
 </style>
 </head>
 <body>
@@ -132,6 +150,17 @@
   </div>
 
   <div id="tab-control" class="tab hidden"><div id="ports"></div></div>
+
+  <div id="tab-colour" class="tab hidden">
+    <div class="card">
+      <div class="ctlrow" id="colTargets"></div>
+      <div id="swBig"></div>
+      <div class="cols" id="colCols"></div>
+      <div class="mini">Hue/Sat and Kelvin are two ways of choosing — the last
+      column you touch wins. ΔUV tints green (+) or magenta (−). Applies as
+      manual colour to the selected ports.</div>
+    </div>
+  </div>
 
   <div id="tab-scenes" class="tab hidden">
     <div class="card">
@@ -192,6 +221,7 @@
 
 <nav id="nav" class="hidden">
   <button data-tab="control" class="active"><span class="ico">🎚</span>Control</button>
+  <button data-tab="colour"><span class="ico">🎨</span>Colour</button>
   <button data-tab="scenes"><span class="ico">🎬</span>Scenes</button>
   <button data-tab="ports"><span class="ico">🔌</span>Ports</button>
   <button data-tab="diag"><span class="ico">📈</span>Diag</button>
@@ -348,29 +378,39 @@ $("pinGo").onclick=tryPin;
 $("pinInput").addEventListener("keydown",e=>{ if(e.key==="Enter") tryPin(); });
 
 // ---------- state ----------
+// The controller chunks its state across several notifies when it outgrows
+// the MTU (8-port does): the first chunk starts "JMB;" (header + leading
+// ports), continuations start "JMB+;" and carry further port records. Every
+// chunk parses standalone; ports merge by number.
 function onState(str){
-  if(!str.startsWith("JMB;")) return;
+  const cont = str.startsWith("JMB+;");
+  if(!str.startsWith("JMB;") && !cont) return;
   if(!authed){ authed=true; hideOverlay(); showApp(); }
-  kv={}; const pstr={};
+  const pstr={};
   for(const part of str.split(";")){
     const i=part.indexOf("=");
     if(i<0) continue;
     const k=part.slice(0,i), v=part.slice(i+1);
     if(/^P\d+$/.test(k)) pstr[k]=v; else kv[k]=v;
   }
-  setChip("chipDmx","DMX", kv.DMX==="1"?"live":"none", kv.DMX==="1"?"ok":"bad");
-  setChip("chipFps","fps", kv.FPS??"—");
-  setChip("chipCid","ID",  kv.CID??"—");
   const n=+(kv.PORTS||0);
-  ports=[];
-  for(let p=1;p<=n;p++){
+  while(ports.length<n) ports.push({});
+  ports.length=n;
+  for(const k in pstr){
+    const idx=+k.slice(1)-1;
+    if(idx<0||idx>=n) continue;
     const m={};
-    for(const f of (pstr["P"+p]||"").split(",")){
+    for(const f of pstr[k].split(",")){
       const mm=f.match(/^([A-Z]+)(-?[0-9A-F]+)$/i);
       if(mm) m[mm[1]] = mm[1]==="F" ? parseInt(mm[2],16) : +mm[2];
     }
-    ports.push(m);
+    ports[idx]=m;
   }
+  setChip("chipDmx","DMX", kv.DMX==="1"?"live":"none", kv.DMX==="1"?"ok":"bad");
+  setChip("chipFps","fps", kv.FPS??"—");
+  setChip("chipCid","ID",  kv.CID??"—");
+  if(n) $("title").textContent=(dev&&dev.name||"JMB Zone")+" · "+n+"-port";
+  if(n && n!==colPortsN){ renderColourTargets(n); colPortsN=n; }
   renderControl(); renderPortInfo(); renderDiag(); renderSetup();
 }
 function setChip(id,label,val,cls){
@@ -539,6 +579,129 @@ function recallScene(sc){
   fadeTimer=setInterval(step,120); step();
 }
 renderScenes();
+
+// ---------- Colour tab (MagicQ-style picker) ----------
+// Five interacting columns: Dim, Hue, Sat, Kelvin, ΔUV. Hue/Sat and Kelvin
+// are alternative colour models — the last one touched wins (col.mode);
+// ΔUV tints either result green(+)/magenta(−). Output = manual R/G/B + DIM
+// to the selected target ports.
+const col={dim:100,hue:20,sat:100,kel:5600,duv:0,mode:"hs"};
+let colTgt="all", colPortsN=0; const colManSent={};
+function hsv255(h,s,v){
+  h=((h%360)+360)%360;
+  const c=v*s, x=c*(1-Math.abs((h/60)%2-1)), m=v-c;
+  let r,g,b;
+  if(h<60){r=c;g=x;b=0;}else if(h<120){r=x;g=c;b=0;}
+  else if(h<180){r=0;g=c;b=x;}else if(h<240){r=0;g=x;b=c;}
+  else if(h<300){r=x;g=0;b=c;}else{r=c;g=0;b=x;}
+  return [(r+m)*255,(g+m)*255,(b+m)*255];
+}
+function kelvin2rgb(k){                       // Tanner Helland approximation
+  k/=100; let r,g,b;
+  r = k<=66 ? 255 : 329.7*Math.pow(k-60,-0.1332);
+  g = k<=66 ? 99.47*Math.log(k)-161.12 : 288.12*Math.pow(k-60,-0.0755);
+  b = k>=66 ? 255 : (k<=19 ? 0 : 138.52*Math.log(k-10)-305.04);
+  return [r,g,b].map(v=>Math.max(0,Math.min(255,v)));
+}
+function currentRGB(){
+  let rgb = col.mode==="hs" ? hsv255(col.hue,col.sat/100,1)
+                            : kelvin2rgb(col.kel);
+  const d=col.duv/100;                        // + green, − magenta
+  rgb=[rgb[0]*(1-0.13*d), rgb[1]*(1+0.32*d), rgb[2]*(1-0.13*d)];
+  return rgb.map(v=>Math.max(0,Math.min(255,Math.round(v))));
+}
+function colTargetList(){
+  return colTgt==="all" ? ports.map((_,i)=>i+1) : [+colTgt];
+}
+function pushColour(){
+  const [r,g,b]=currentRGB();
+  const pr=Math.round(r/2.55), pg=Math.round(g/2.55), pb=Math.round(b/2.55);
+  colTargetList().forEach(p=>{
+    for(const k of ["R","G","B","D"]) hot[p+"."+k]=Date.now();
+    if(!colManSent[p]){ send(`P${p}.MAN=1`); colManSent[p]=true; }
+    sendThrottled(p+".R",`P${p}.R=${pr}`);
+    sendThrottled(p+".G",`P${p}.G=${pg}`);
+    sendThrottled(p+".B",`P${p}.B=${pb}`);
+    sendThrottled(p+".DIM",`P${p}.DIM=${col.dim}`);
+  });
+  paintCols();
+}
+const COLS=[
+  {id:"dim", label:"Dim",  min:0,max:100,  get:()=>col.dim, set:v=>col.dim=Math.round(v),
+   fmt:v=>Math.round(v)+"%",
+   bg:()=>{const[r,g,b]=currentRGB();return`linear-gradient(to top,#000,rgb(${r},${g},${b}))`;}},
+  {id:"hue", label:"Hue",  min:0,max:360,  get:()=>col.hue,
+   set:v=>{col.hue=Math.round(v);col.mode="hs";}, fmt:v=>Math.round(v)+"°",
+   bg:()=>"linear-gradient(to top,red,#ff0,#0f0,#0ff,#00f,#f0f,red)"},
+  {id:"sat", label:"Sat",  min:0,max:100,  get:()=>col.sat,
+   set:v=>{col.sat=Math.round(v);col.mode="hs";}, fmt:v=>Math.round(v)+"%",
+   bg:()=>{const[r,g,b]=hsv255(col.hue,1,1);return`linear-gradient(to top,#fff,rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)}))`;}},
+  {id:"kel", label:"Kelvin",min:1800,max:10000, get:()=>col.kel,
+   set:v=>{col.kel=Math.round(v/50)*50;col.mode="ct";}, fmt:v=>Math.round(v)+"K",
+   bg:()=>"linear-gradient(to top,#ff7c1f,#ffd9a3,#ffffff,#c9dcff)"},
+  {id:"duv", label:"ΔUV",  min:-100,max:100, get:()=>col.duv,
+   set:v=>col.duv=Math.round(v), fmt:v=>(v>0?"+":"")+Math.round(v),
+   bg:()=>"linear-gradient(to top,#e26fe2,#ffffff,#57d977)"},
+];
+function buildCols(){
+  const root=$("colCols"); root.innerHTML="";
+  COLS.forEach(c=>{
+    const w=document.createElement("div");
+    w.className="colwrap";
+    w.innerHTML=`<span>${c.label}</span>
+      <div class="colcol" id="cc_${c.id}"><div class="colthumb"></div></div>
+      <span class="cv" id="cv_${c.id}"></span>`;
+    root.appendChild(w);
+    const el=w.querySelector(".colcol");
+    const drag=ev=>{
+      const r=el.getBoundingClientRect();
+      let f=1-(ev.clientY-r.top)/r.height;
+      f=Math.max(0,Math.min(1,f));
+      c.set(c.min+f*(c.max-c.min));
+      pushColour();
+    };
+    el.addEventListener("pointerdown",ev=>{
+      el.setPointerCapture(ev.pointerId); drag(ev);
+      const mv=e2=>drag(e2);
+      const up=()=>{ el.removeEventListener("pointermove",mv);
+                     el.removeEventListener("pointerup",up); };
+      el.addEventListener("pointermove",mv);
+      el.addEventListener("pointerup",up);
+    });
+  });
+  paintCols();
+}
+function paintCols(){
+  COLS.forEach(c=>{
+    const el=$("cc_"+c.id); if(!el) return;
+    el.style.background=c.bg();
+    const f=(c.get()-c.min)/(c.max-c.min);
+    el.querySelector(".colthumb").style.top=
+      `calc(${(1-f)*100}% - 3px)`;
+    $("cv_"+c.id).textContent=c.fmt(c.get());
+  });
+  const[r,g,b]=currentRGB();
+  const sw=$("swBig");
+  if(sw) sw.style.background=
+    `rgb(${r*col.dim/100},${g*col.dim/100},${b*col.dim/100})`;
+}
+function renderColourTargets(n){
+  const root=$("colTargets"); root.innerHTML="";
+  const mk=(val,label)=>{
+    const b=document.createElement("button");
+    b.className="tgt"+(colTgt===val?" sel":"");
+    b.textContent=label;
+    b.onclick=()=>{ colTgt=val;
+      root.querySelectorAll(".tgt").forEach(x=>x.classList.remove("sel"));
+      b.classList.add("sel");
+      Object.keys(colManSent).forEach(k=>delete colManSent[k]);
+    };
+    root.appendChild(b);
+  };
+  mk("all","All");
+  for(let p=1;p<=n;p++) mk(String(p),"P"+p);
+}
+buildCols();
 
 // ---------- Ports tab ----------
 function renderPortInfo(){
