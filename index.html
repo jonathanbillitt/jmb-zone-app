@@ -761,6 +761,11 @@ function rgb2cct(rgb){                         // McCamy CCT + signed Duv
   const n=(x-0.3320)/(0.1858-y);
   let cct=449*n*n*n+3525*n*n+6823.3*n+5520.33;
   if(!isFinite(cct)) cct=6500;
+  // McCamy is only valid near the blackbody locus: saturated blues/violets
+  // fall out of range and compute a bogus LOW value (bench: "a bit blue
+  // reads 2000K"). Blue-corner chromaticities are genuinely ultra-cool —
+  // peg them at the top instead.
+  if(x<0.27 && y<0.25) cct=25000;
   cct=Math.max(1000,Math.min(25000,cct));
   const [u,v]=xy2uv(x,y),[up,vp]=planckUV(cct);
   const duv=Math.hypot(u-up,v-vp)*Math.sign(v-vp);
@@ -841,8 +846,8 @@ const COLS=[
    bg:()=>{const h=rgb2hsv(col.base),hh=h.s>0.02?h.h:col._h;
            const[r,g,b]=hsv255(hh,1,1);
            return`linear-gradient(to top,#fff,rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)}))`;}},
-  {id:"kel", label:"Kelvin",min:2000,max:8000,
-   get:()=>Math.max(2000,Math.min(8000,rgb2cct(col.base).cct)),
+  {id:"kel", label:"Kelvin",min:2000,max:10000,
+   get:()=>Math.max(2000,Math.min(10000,rgb2cct(col.base).cct)),
    set:v=>{col.base=kelvin2rgb(Math.round(v/50)*50);},   // trim survives
    fmt:v=>Math.round(v)+"K",
    bg:()=>"linear-gradient(to top,#ff7c1f,#ffd9a3,#ffffff,#c9dcff)"},
