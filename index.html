@@ -162,34 +162,87 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const $=id=>document.getElementById(id);
 
 // ---------- BLE plumbing ----------
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+function hello(html){ $("hello").classList.remove("hidden"); $("hello").innerHTML=html; }
+
+// GATT setup with retries. Android caches a device's GATT layout and serves
+// it stale after the controller has been reflashed — getPrimaryService then
+// throws NotFound even though the service is live (connecting once with nRF
+// Connect "fixes" it by forcing a fresh discovery). Retrying with settle
+// delays recovers most of these; the rest get an honest error message.
+async function gattSetup(){
+  let lastErr = null;
+  for(let i=0;i<4;i++){
+    try{
+      const gatt = await dev.gatt.connect();
+      await sleep(200*(i+1));                    // let discovery settle
+      const svc  = await gatt.getPrimaryService(SVC);
+      cmdChar    = await svc.getCharacteristic(CMD);
+      stateChar  = await svc.getCharacteristic(STATE);
+      await stateChar.startNotifications();
+      stateChar.addEventListener("characteristicvaluechanged",
+                                 ev=>onState(dec.decode(ev.target.value)));
+      return;
+    }catch(e){
+      lastErr = e;
+      try{ dev.gatt.disconnect(); }catch(_){}
+      await sleep(500);
+    }
+  }
+  throw lastErr || new Error("unknown");
+}
+
 async function connect(){
   try{
     dev = await navigator.bluetooth.requestDevice({
       filters:[{services:[SVC]}], optionalServices:[SVC]});
   }catch(e){ return; }                       // user cancelled the chooser
   dev.addEventListener("gattserverdisconnected", onDisconnected);
-  const gatt = await dev.gatt.connect();
-  const svc  = await gatt.getPrimaryService(SVC);
-  cmdChar    = await svc.getCharacteristic(CMD);
-  stateChar  = await svc.getCharacteristic(STATE);
-  await stateChar.startNotifications();
-  stateChar.addEventListener("characteristicvaluechanged",
-                             ev=>onState(dec.decode(ev.target.value)));
+  $("btnConnect").disabled = true;
+  hello("<b>Connecting…</b>");
+  try{
+    await gattSetup();
+  }catch(e){
+    $("btnConnect").disabled = false;
+    hello("<b>Couldn't reach the controller.</b>"+
+      "<div class='mini'>("+(e && e.message || e)+")<br>"+
+      "Android may be holding a stale Bluetooth cache from a firmware "+
+      "update. Toggle the phone's Bluetooth OFF and ON, then Connect "+
+      "again. Still stuck? Connect once with nRF Connect, disconnect, "+
+      "and retry here.</div>");
+    return;
+  }
+  $("btnConnect").disabled = false;
   $("title").textContent = dev.name || "JMB Zone";
   $("btnConnect").classList.add("hidden");
+  $("hello").classList.add("hidden");
   authed=false;
   askPin();
 }
 
-function onDisconnected(){
+async function onDisconnected(){
   authed=false; cmdChar=null;
-  $("btnConnect").classList.remove("hidden");
+  hideOverlay();
   $("chips").classList.add("hidden");
   $("tools").classList.add("hidden");
-  $("hello").classList.remove("hidden");
-  $("hello").innerHTML="<b>Disconnected.</b><div class='mini'>Tap Connect to rejoin.</div>";
+  // One quiet self-heal attempt before giving the user the bad news —
+  // Android drops BLE links casually (screen off, distance blips).
+  if(dev){
+    hello("<b>Link dropped — reconnecting…</b>");
+    try{
+      await sleep(800);
+      await gattSetup();
+      hello("");
+      $("hello").classList.add("hidden");
+      askPin();                               // auth resets on reconnect
+      const saved=localStorage.getItem("jmb_pin");
+      if(saved){ $("pinInput").value=saved; tryPin(); }   // auto re-auth
+      return;
+    }catch(_){}
+  }
+  $("btnConnect").classList.remove("hidden");
+  hello("<b>Disconnected.</b><div class='mini'>Tap Connect to rejoin.</div>");
   $("ports").innerHTML="";
-  hideOverlay();
 }
 
 async function send(s){
