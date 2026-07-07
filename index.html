@@ -215,6 +215,17 @@
       <table id="diagDmx"></table>
     </div>
     <div class="card">
+      <div class="ctlrow">
+        <b style="flex:1">Universe</b>
+        <button id="btnUniv">Show levels</button>
+      </div>
+      <div id="univWrap" class="hidden">
+        <canvas id="univCanvas" style="width:100%;border-radius:10px;
+          border:1px solid var(--line);margin-top:10px;touch-action:none"></canvas>
+        <div class="mini" id="univSel">tap a cell for channel + level</div>
+      </div>
+    </div>
+    <div class="card">
       <b>Port bus</b>
       <table id="diagBus"></table>
     </div>
@@ -300,6 +311,11 @@ document.querySelectorAll("#nav button").forEach(btn=>{
     btn.classList.add("active");
     document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
     $("tab-"+btn.dataset.tab).classList.remove("hidden");
+    if(btn.dataset.tab==="colour"){
+      Object.keys(colEngaged).forEach(k=>delete colEngaged[k]);
+      seedColour();                     // arrive showing the port's real state
+    }
+    if(btn.dataset.tab!=="diag") univStop();   // no polling off-tab
   };
 });
 function showApp(){
@@ -416,6 +432,7 @@ $("pinInput").addEventListener("keydown",e=>{ if(e.key==="Enter") tryPin(); });
 // ports), continuations start "JMB+;" and carry further port records. Every
 // chunk parses standalone; ports merge by number.
 function onState(str){
+  if(str.startsWith("JMBU;")){ onUniv(str); return; }
   const cont = str.startsWith("JMB+;");
   if(!str.startsWith("JMB;") && !cont) return;
   if(!authed){ authed=true; hideOverlay(); showApp(); }
@@ -667,13 +684,15 @@ function recallScene(sc){
 }
 renderScenes();
 
-// ---------- Colour tab (MagicQ-style picker) ----------
-// Five interacting columns: Dim, Hue, Sat, Kelvin, ΔUV. Hue/Sat and Kelvin
-// are alternative colour models — the last one touched wins (col.mode);
-// ΔUV tints either result green(+)/magenta(−). Output = manual R/G/B + DIM
-// to the selected target ports.
-const col={dim:100,hue:20,sat:100,kel:5600,duv:0,mode:"hs"};
-let colTgt="all", colPortsN=0; const colManSent={};
+// ---------- Colour tab (MagicQ-style picker, unified colour model) ----------
+// ONE source of truth: col.rgb. Every column is a mathematical projection of
+// it — Hue/Sat via HSV, Kelvin/ΔUV via chromaticity (RGB → xy → CCT with
+// McCamy's approximation; ΔUV = signed distance from the Planckian locus).
+// Moving ANY fader rebuilds col.rgb and every other fader follows: select
+// cyan and the Kelvin column slams to the top, because cyan's correlated
+// colour temperature really is up there.
+const col={rgb:[255,214,170], dim:100, _h:30};
+let colTgt="all", colPortsN=0; const colEngaged={};
 function hsv255(h,s,v){
   h=((h%360)+360)%360;
   const c=v*s, x=c*(1-Math.abs((h/60)%2-1)), m=v-c;
@@ -683,6 +702,18 @@ function hsv255(h,s,v){
   else if(h<300){r=x;g=0;b=c;}else{r=c;g=0;b=x;}
   return [(r+m)*255,(g+m)*255,(b+m)*255];
 }
+function rgb2hsv(rgb){
+  const r=rgb[0]/255,g=rgb[1]/255,b=rgb[2]/255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;
+  let h=0;
+  if(d>1e-6){
+    if(mx===r) h=60*(((g-b)/d)%6);
+    else if(mx===g) h=60*((b-r)/d+2);
+    else h=60*((r-g)/d+4);
+    if(h<0)h+=360;
+  }
+  return {h, s:mx?d/mx:0, v:mx};
+}
 function kelvin2rgb(k){                       // Tanner Helland approximation
   k/=100; let r,g,b;
   r = k<=66 ? 255 : 329.7*Math.pow(k-60,-0.1332);
@@ -690,13 +721,42 @@ function kelvin2rgb(k){                       // Tanner Helland approximation
   b = k>=66 ? 255 : (k<=19 ? 0 : 138.52*Math.log(k-10)-305.04);
   return [r,g,b].map(v=>Math.max(0,Math.min(255,v)));
 }
-function currentRGB(){
-  let rgb = col.mode==="hs" ? hsv255(col.hue,col.sat/100,1)
-                            : kelvin2rgb(col.kel);
-  const d=col.duv/100;                        // + green, − magenta
-  rgb=[rgb[0]*(1-0.13*d), rgb[1]*(1+0.32*d), rgb[2]*(1-0.13*d)];
-  return rgb.map(v=>Math.max(0,Math.min(255,Math.round(v))));
+// --- chromaticity science ---
+function srgb2lin(c){c/=255;return c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4);}
+function rgb2xy(rgb){
+  const R=srgb2lin(rgb[0]),G=srgb2lin(rgb[1]),B=srgb2lin(rgb[2]);
+  const X=0.4124*R+0.3576*G+0.1805*B,
+        Y=0.2126*R+0.7152*G+0.0722*B,
+        Z=0.0193*R+0.1192*G+0.9505*B,
+        S=(X+Y+Z)||1e-9;
+  return [X/S,Y/S];
 }
+function xy2uv(x,y){const d=(-2*x+12*y+3);return [4*x/d,6*y/d];}
+function planckUV(T){                          // Krystek locus approximation
+  const T2=T*T;
+  return [
+    (0.860117757+1.54118254e-4*T+1.28641212e-7*T2)/
+      (1+8.42420235e-4*T+7.08145163e-7*T2),
+    (0.317398726+4.22806245e-5*T+4.20481691e-8*T2)/
+      (1+2.89741816e-5*T+1.61456053e-7*T2)];
+}
+function rgb2cct(rgb){                         // McCamy CCT + signed Duv
+  const [x,y]=rgb2xy(rgb);
+  const n=(x-0.3320)/(0.1858-y);
+  let cct=449*n*n*n+3525*n*n+6823.3*n+5520.33;
+  if(!isFinite(cct)) cct=6500;
+  cct=Math.max(1000,Math.min(25000,cct));
+  const [u,v]=xy2uv(x,y),[up,vp]=planckUV(cct);
+  const duv=Math.hypot(u-up,v-vp)*Math.sign(v-vp);
+  return {cct,duv};
+}
+const DUV_UI=3333;                             // fader ±100 ↔ Duv ±0.03
+function tintRGB(rgb,duvUI){                   // + green / − magenta
+  const d=duvUI/100;
+  return [rgb[0]*(1-0.13*d),rgb[1]*(1+0.32*d),rgb[2]*(1-0.13*d)]
+    .map(v=>Math.max(0,Math.min(255,v)));
+}
+function currentRGB(){ return col.rgb.map(v=>Math.round(v)); }
 function colTargetList(){
   return colTgt==="all" ? ports.map((_,i)=>i+1) : [+colTgt];
 }
@@ -704,30 +764,60 @@ function pushColour(){
   const [r,g,b]=currentRGB();
   const pr=Math.round(r/2.55), pg=Math.round(g/2.55), pb=Math.round(b/2.55);
   colTargetList().forEach(p=>{
-    for(const k of ["R","G","B","D"]) hot[p+"."+k]=Date.now();
-    if(!colManSent[p]){ send(`P${p}.MAN=1`); colManSent[p]=true; }
-    sendThrottled(p+".R",`P${p}.R=${pr}`);
-    sendThrottled(p+".G",`P${p}.G=${pg}`);
-    sendThrottled(p+".B",`P${p}.B=${pb}`);
+    for(const k of ["R","G","B","D","X"]) hot[p+"."+k]=Date.now();
+    if(!colEngaged[p]){                        // stomp: picker owns the port —
+      send(`P${p}.FX=0`);                      // kill any running effect and
+      send(`P${p}.MAN=1`);                     // take manual control
+      colEngaged[p]=true;
+    }
+    sendThrottled(p+".RGB",`P${p}.RGB=${pr},${pg},${pb}`);
     sendThrottled(p+".DIM",`P${p}.DIM=${col.dim}`);
   });
   paintCols();
 }
+// Seed the picker from what the target port is actually set to, so the
+// faders "accurately refer" to reality when you arrive.
+function seedColour(){
+  const t=colTargetList()[0];
+  const m=t?ports[t-1]:null;
+  if(m && (m.R||m.G||m.B)){
+    col.rgb=[(m.R??0)*2.55,(m.G??0)*2.55,(m.B??0)*2.55];
+    col.dim=m.D??100;
+    const hsv=rgb2hsv(col.rgb);
+    if(hsv.s>0.02) col._h=hsv.h;
+  }
+  paintCols();
+}
 const COLS=[
-  {id:"dim", label:"Dim",  min:0,max:100,  get:()=>col.dim, set:v=>col.dim=Math.round(v),
+  {id:"dim", label:"Dim",  min:0,max:100,
+   get:()=>col.dim, set:v=>col.dim=Math.round(v),
    fmt:v=>Math.round(v)+"%",
    bg:()=>{const[r,g,b]=currentRGB();return`linear-gradient(to top,#000,rgb(${r},${g},${b}))`;}},
-  {id:"hue", label:"Hue",  min:0,max:360,  get:()=>col.hue,
-   set:v=>{col.hue=Math.round(v);col.mode="hs";}, fmt:v=>Math.round(v)+"°",
+  {id:"hue", label:"Hue",  min:0,max:360,
+   get:()=>{const h=rgb2hsv(col.rgb);return h.s>0.02?h.h:col._h;},
+   set:v=>{const s=Math.max(rgb2hsv(col.rgb).s,0.05);
+           col._h=v; col.rgb=hsv255(v,s,1);},
+   fmt:v=>Math.round(v)+"°",
    bg:()=>"linear-gradient(to top,red,#ff0,#0f0,#0ff,#00f,#f0f,red)"},
-  {id:"sat", label:"Sat",  min:0,max:100,  get:()=>col.sat,
-   set:v=>{col.sat=Math.round(v);col.mode="hs";}, fmt:v=>Math.round(v)+"%",
-   bg:()=>{const[r,g,b]=hsv255(col.hue,1,1);return`linear-gradient(to top,#fff,rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)}))`;}},
-  {id:"kel", label:"Kelvin",min:1800,max:10000, get:()=>col.kel,
-   set:v=>{col.kel=Math.round(v/50)*50;col.mode="ct";}, fmt:v=>Math.round(v)+"K",
+  {id:"sat", label:"Sat",  min:0,max:100,
+   get:()=>rgb2hsv(col.rgb).s*100,
+   set:v=>{const h=rgb2hsv(col.rgb),hh=h.s>0.02?h.h:col._h;
+           col.rgb=hsv255(hh,v/100,1);},
+   fmt:v=>Math.round(v)+"%",
+   bg:()=>{const h=rgb2hsv(col.rgb),hh=h.s>0.02?h.h:col._h;
+           const[r,g,b]=hsv255(hh,1,1);
+           return`linear-gradient(to top,#fff,rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)}))`;}},
+  {id:"kel", label:"Kelvin",min:2000,max:8000,
+   get:()=>Math.max(2000,Math.min(8000,rgb2cct(col.rgb).cct)),
+   set:v=>{const duv=Math.max(-100,Math.min(100,rgb2cct(col.rgb).duv*DUV_UI));
+           col.rgb=tintRGB(kelvin2rgb(Math.round(v/50)*50),duv);},
+   fmt:v=>Math.round(v)+"K",
    bg:()=>"linear-gradient(to top,#ff7c1f,#ffd9a3,#ffffff,#c9dcff)"},
-  {id:"duv", label:"ΔUV",  min:-100,max:100, get:()=>col.duv,
-   set:v=>col.duv=Math.round(v), fmt:v=>(v>0?"+":"")+Math.round(v),
+  {id:"duv", label:"ΔUV",  min:-100,max:100,
+   get:()=>Math.max(-100,Math.min(100,rgb2cct(col.rgb).duv*DUV_UI)),
+   set:v=>{const cct=rgb2cct(col.rgb).cct;
+           col.rgb=tintRGB(kelvin2rgb(cct),v);},
+   fmt:v=>(v>0?"+":"")+Math.round(v),
    bg:()=>"linear-gradient(to top,#e26fe2,#ffffff,#57d977)"},
 ];
 function buildCols(){
@@ -784,7 +874,8 @@ function renderColourTargets(n){
     b.onclick=()=>{ colTgt=val;
       root.querySelectorAll(".tgt").forEach(x=>x.classList.remove("sel"));
       b.classList.add("sel");
-      Object.keys(colManSent).forEach(k=>delete colManSent[k]);
+      Object.keys(colEngaged).forEach(k=>delete colEngaged[k]);
+      seedColour();                     // faders show the new target's truth
     };
     root.appendChild(b);
   };
@@ -834,6 +925,68 @@ function renderDiag(){
   });
   $("diagBus").innerHTML=rows;
 }
+
+// ---------- Universe viewer (Diag sub-view) ----------
+// 32×16 heatmap of all 512 channels, fed by "JMBU;O=<first>;<hex>" chunks
+// requested with UNIV while the view is open (~1s cadence). Tap for values.
+const univ=new Uint8Array(513);
+let univTimer=null, univSelCh=0;
+function univStop(){ if(univTimer){ clearInterval(univTimer); univTimer=null; } }
+$("btnUniv").onclick=()=>{
+  const w=$("univWrap");
+  if(w.classList.contains("hidden")){
+    w.classList.remove("hidden");
+    $("btnUniv").textContent="Hide";
+    send("UNIV");
+    univTimer=setInterval(()=>{ if(cmdChar) send("UNIV"); },1000);
+  }else{
+    w.classList.add("hidden");
+    $("btnUniv").textContent="Show levels";
+    univStop();
+  }
+};
+function onUniv(str){                        // "JMBU;O=1;<128 hex chars>"
+  const m=str.match(/^JMBU;O=(\d+);([0-9A-Fa-f]+)/);
+  if(!m) return;
+  const base=+m[1], hex=m[2];
+  for(let i=0;i*2+1<hex.length && base+i<=512;i++)
+    univ[base+i]=parseInt(hex.substr(i*2,2),16);
+  drawUniv();
+}
+function drawUniv(){
+  const cv=$("univCanvas");
+  if(!cv || $("univWrap").classList.contains("hidden")) return;
+  const COLSN=32, ROWS=16;
+  const W=cv.clientWidth||320, H=Math.round(W*ROWS/COLSN);
+  if(cv.width!==W){ cv.width=W; cv.height=H; }
+  const ctx=cv.getContext("2d"), cw=W/COLSN, chh=H/ROWS;
+  for(let ch=1;ch<=512;ch++){
+    const i=ch-1, x=(i%COLSN)*cw, y=Math.floor(i/COLSN)*chh, v=univ[ch];
+    if(v===0) ctx.fillStyle="#10151d";
+    else{
+      const f=v/255;                          // black → amber → white
+      const r=Math.round(80+175*f), g=Math.round(40+170*f),
+            b=Math.round(20+90*f*f);
+      ctx.fillStyle=`rgb(${r},${g},${b})`;
+    }
+    ctx.fillRect(x+0.5,y+0.5,cw-1,chh-1);
+    if(ch===univSelCh){
+      ctx.strokeStyle="#4da3ff"; ctx.lineWidth=1.5;
+      ctx.strokeRect(x+0.75,y+0.75,cw-1.5,chh-1.5);
+    }
+  }
+}
+$("univCanvas").addEventListener("pointerdown",ev=>{
+  const cv=$("univCanvas"), r=cv.getBoundingClientRect();
+  const cx=Math.floor((ev.clientX-r.left)/r.width*32),
+        cy=Math.floor((ev.clientY-r.top)/r.height*16);
+  const ch=cy*32+cx+1;
+  if(ch>=1&&ch<=512){
+    univSelCh=ch;
+    $("univSel").textContent=`ch ${ch} = ${univ[ch]} (${Math.round(univ[ch]/2.55)}%)`;
+    drawUniv();
+  }
+});
 
 // ---------- Setup tab ----------
 let setupTouched=0;
