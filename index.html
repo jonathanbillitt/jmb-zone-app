@@ -146,6 +146,8 @@ const SVC   = "a1b20001-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const CMD   = "a1b20002-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const STATE = "a1b20003-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const PERS_NAMES = ["RGB 8-bit","RGB 16-bit","CW/WW 8-bit","CW/WW 16-bit"];
+const FX_NAMES = ["Off","Candle","Fire","Fireworks","Water","Siren","Laser",
+                  "Club","Lightning","Rainbow","Aurora","Sunset","TV Sim","Strobe"];
 const CURVES = ["Lin","Soft 1.6","Thtr 2.2"];
 const AMODES = ["Same","Seq","Offset"];
 const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
@@ -286,6 +288,7 @@ function renderPorts(){
     setIf(p,"ADDR", m.A, el=>el.value=m.A);
     setIf(p,"PERS", m.PE, el=>el.value=m.PE);
     setIf(p,"MAN",  m.M,  el=>el.checked=m.M===1);
+    setIf(p,"X",    m.X,  el=>el.value=m.X??0);
     for(const c of ["R","G","B","D"]){
       const v = c==="D"?m.D:m[c];
       setIf(p,c, v, el=>{ el.value=v; $(("v"+c)+p).textContent=v; });
@@ -317,6 +320,10 @@ function buildCard(p){
         <label style="width:auto">Mode</label>
         <select id="pers${p}">${PERS_NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join("")}</select>
       </div>
+      <div class="row"><label>Effect</label>
+        <select id="x${p}" style="width:150px">${FX_NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join("")}</select>
+        <span class="mini" style="margin:0">runs whenever DMX is absent</span>
+      </div>
       <div class="row"><label>Manual</label>
         <label class="toggle"><input type="checkbox" id="man${p}"><span></span></label>
         <span class="mini" style="margin:0">live DMX always outranks manual</span>
@@ -334,6 +341,9 @@ function buildCard(p){
   });
   d.querySelector("#pers"+p).addEventListener("change",e=>{
     touch("PERS"); send(`P${p}.PERS=${+e.target.value}`);
+  });
+  d.querySelector("#x"+p).addEventListener("change",e=>{
+    touch("X"); send(`P${p}.FX=${+e.target.value}`);
   });
   d.querySelector("#man"+p).addEventListener("change",e=>{
     touch("MAN"); send(`P${p}.MAN=${e.target.checked?1:0}`);
