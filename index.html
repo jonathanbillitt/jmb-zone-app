@@ -189,6 +189,7 @@
       <div class="ctlrow" id="colTargets"></div>
       <div id="swBig"></div>
       <div class="cols" id="colCols"></div>
+      <div class="mini" id="cctMix" style="text-align:center"></div>
       <div class="mini">Hue/Sat and Kelvin are two ways of choosing — the last
       column you touch wins. ΔUV tints green (+) or magenta (−). Applies as
       manual colour to the selected ports.</div>
@@ -691,7 +692,12 @@ renderScenes();
 // Moving ANY fader rebuilds col.rgb and every other fader follows: select
 // cyan and the Kelvin column slams to the top, because cyan's correlated
 // colour temperature really is up there.
-const col={rgb:[255,214,170], dim:100, _h:30};
+// col.base = the chroma at FULL brightness (Dim is the only brightness
+// control); col.duv = an INDEPENDENT green/magenta trim centred on 0 —
+// set a colour temperature, then pull lime out or push magenta in without
+// the other faders moving. Hue/Sat grabs redefine the chroma outright, so
+// they reset the trim; Kelvin moves keep it.
+const col={base:[255,214,170], duv:0, dim:100, _h:30};
 let colTgt="all", colPortsN=0; const colEngaged={};
 function hsv255(h,s,v){
   h=((h%360)+360)%360;
@@ -750,41 +756,59 @@ function rgb2cct(rgb){                         // McCamy CCT + signed Duv
   const duv=Math.hypot(u-up,v-vp)*Math.sign(v-vp);
   return {cct,duv};
 }
-const DUV_UI=3333;                             // fader ±100 ↔ Duv ±0.03
 function tintRGB(rgb,duvUI){                   // + green / − magenta
   const d=duvUI/100;
   return [rgb[0]*(1-0.13*d),rgb[1]*(1+0.32*d),rgb[2]*(1-0.13*d)]
     .map(v=>Math.max(0,Math.min(255,v)));
 }
-function currentRGB(){ return col.rgb.map(v=>Math.round(v)); }
+function currentRGB(){ return tintRGB(col.base,col.duv).map(v=>Math.round(v)); }
 function colTargetList(){
   return colTgt==="all" ? ports.map((_,i)=>i+1) : [+colTgt];
 }
 function pushColour(){
   const [r,g,b]=currentRGB();
   const pr=Math.round(r/2.55), pg=Math.round(g/2.55), pb=Math.round(b/2.55);
+  const mix=cctMixOf(col.base);
   colTargetList().forEach(p=>{
+    const pe=ports[p-1]&&ports[p-1].PE;
     for(const k of ["R","G","B","D","X"]) hot[p+"."+k]=Date.now();
     if(!colEngaged[p]){                        // stomp: picker owns the port —
       send(`P${p}.FX=0`);                      // kill any running effect and
       send(`P${p}.MAN=1`);                     // take manual control
       colEngaged[p]=true;
     }
-    sendThrottled(p+".RGB",`P${p}.RGB=${pr},${pg},${pb}`);
+    if(pe===2||pe===3)                         // CW/WW port: G=cool, R=warm
+      sendThrottled(p+".RGB",`P${p}.RGB=${mix.ww},${mix.cw},0`);
+    else
+      sendThrottled(p+".RGB",`P${p}.RGB=${pr},${pg},${pb}`);
     sendThrottled(p+".DIM",`P${p}.DIM=${col.dim}`);
   });
   paintCols();
 }
-// Seed the picker from what the target port is actually set to, so the
-// faders "accurately refer" to reality when you arrive.
+// Seed the picker from what the target port is actually set to. The port's
+// slider LEVELS carry brightness inside the RGB — fold that into the Dim
+// fader (value × port dim) and normalise the chroma to full, so Dim is the
+// one and only brightness control from here on.
 function seedColour(){
   const t=colTargetList()[0];
   const m=t?ports[t-1]:null;
-  if(m && (m.R||m.G||m.B)){
-    col.rgb=[(m.R??0)*2.55,(m.G??0)*2.55,(m.B??0)*2.55];
-    col.dim=m.D??100;
-    const hsv=rgb2hsv(col.rgb);
-    if(hsv.s>0.02) col._h=hsv.h;
+  if(m){
+    const pe=m.PE;
+    if(pe===2||pe===3){                 // CW/WW port: derive CCT from the mix
+      const ww=m.R??0, cw=m.G??0, tot=ww+cw;
+      if(tot>0){
+        col.base=kelvin2rgb(2700+(cw/tot)*3800);
+        col.dim=Math.round((m.D??100)*Math.max(ww,cw)/100);
+      }
+      col.duv=0;
+    } else if(m.R||m.G||m.B){
+      const rgbIn=[(m.R??0)*2.55,(m.G??0)*2.55,(m.B??0)*2.55];
+      const hsv=rgb2hsv(rgbIn);
+      if(hsv.s>0.02) col._h=hsv.h;
+      col.base=hsv255(hsv.s>0.02?hsv.h:col._h, hsv.s, 1);
+      col.dim=Math.round((m.D??100)*hsv.v);
+      col.duv=0;                        // trim can't be recovered from RGB
+    }
   }
   paintCols();
 }
@@ -793,33 +817,48 @@ const COLS=[
    get:()=>col.dim, set:v=>col.dim=Math.round(v),
    fmt:v=>Math.round(v)+"%",
    bg:()=>{const[r,g,b]=currentRGB();return`linear-gradient(to top,#000,rgb(${r},${g},${b}))`;}},
-  {id:"hue", label:"Hue",  min:0,max:360,
-   get:()=>{const h=rgb2hsv(col.rgb);return h.s>0.02?h.h:col._h;},
-   set:v=>{const s=Math.max(rgb2hsv(col.rgb).s,0.05);
-           col._h=v; col.rgb=hsv255(v,s,1);},
+  {id:"hue", label:"Hue",  min:0,max:360, rgbOnly:true,
+   get:()=>{const h=rgb2hsv(col.base);return h.s>0.02?h.h:col._h;},
+   set:v=>{const s=Math.max(rgb2hsv(col.base).s,0.05);
+           col._h=v; col.base=hsv255(v,s,1); col.duv=0;},
    fmt:v=>Math.round(v)+"°",
    bg:()=>"linear-gradient(to top,red,#ff0,#0f0,#0ff,#00f,#f0f,red)"},
-  {id:"sat", label:"Sat",  min:0,max:100,
-   get:()=>rgb2hsv(col.rgb).s*100,
-   set:v=>{const h=rgb2hsv(col.rgb),hh=h.s>0.02?h.h:col._h;
-           col.rgb=hsv255(hh,v/100,1);},
+  {id:"sat", label:"Sat",  min:0,max:100, rgbOnly:true,
+   get:()=>rgb2hsv(col.base).s*100,
+   set:v=>{const h=rgb2hsv(col.base),hh=h.s>0.02?h.h:col._h;
+           col.base=hsv255(hh,v/100,1); col.duv=0;},
    fmt:v=>Math.round(v)+"%",
-   bg:()=>{const h=rgb2hsv(col.rgb),hh=h.s>0.02?h.h:col._h;
+   bg:()=>{const h=rgb2hsv(col.base),hh=h.s>0.02?h.h:col._h;
            const[r,g,b]=hsv255(hh,1,1);
            return`linear-gradient(to top,#fff,rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)}))`;}},
   {id:"kel", label:"Kelvin",min:2000,max:8000,
-   get:()=>Math.max(2000,Math.min(8000,rgb2cct(col.rgb).cct)),
-   set:v=>{const duv=Math.max(-100,Math.min(100,rgb2cct(col.rgb).duv*DUV_UI));
-           col.rgb=tintRGB(kelvin2rgb(Math.round(v/50)*50),duv);},
+   get:()=>Math.max(2000,Math.min(8000,rgb2cct(col.base).cct)),
+   set:v=>{col.base=kelvin2rgb(Math.round(v/50)*50);},   // trim survives
    fmt:v=>Math.round(v)+"K",
    bg:()=>"linear-gradient(to top,#ff7c1f,#ffd9a3,#ffffff,#c9dcff)"},
-  {id:"duv", label:"ΔUV",  min:-100,max:100,
-   get:()=>Math.max(-100,Math.min(100,rgb2cct(col.rgb).duv*DUV_UI)),
-   set:v=>{const cct=rgb2cct(col.rgb).cct;
-           col.rgb=tintRGB(kelvin2rgb(cct),v);},
+  {id:"duv", label:"ΔUV",  min:-100,max:100, rgbOnly:true,
+   // Independent green/magenta TRIM, centred at 0 — set a colour
+   // temperature, then pull lime out / push magenta in; nothing else moves.
+   get:()=>col.duv,
+   set:v=>col.duv=Math.round(v),
    fmt:v=>(v>0?"+":"")+Math.round(v),
-   bg:()=>"linear-gradient(to top,#e26fe2,#ffffff,#57d977)"},
+   bg:()=>{const lo=tintRGB(col.base,-100),hi=tintRGB(col.base,100);
+           return`linear-gradient(to top,rgb(${lo.map(Math.round)}),rgb(${col.base.map(Math.round)}),rgb(${hi.map(Math.round)}))`;}},
 ];
+// True when every selected target is a CW/WW (CCT) personality — the picker
+// then shows Dim + Kelvin only and drives the warm/cool mix.
+function targetsAllCct(){
+  const l=colTargetList();
+  return l.length>0 && l.every(p=>{
+    const pe=ports[p-1]&&ports[p-1].PE;
+    return pe===2||pe===3;
+  });
+}
+function cctMixOf(base){                       // fixture range 2700-6500K
+  const k=Math.max(2700,Math.min(6500,rgb2cct(base).cct));
+  const f=(k-2700)/3800;                       // 0=warm … 1=cool
+  return {k, cw:Math.round(f*100), ww:Math.round((1-f)*100)};
+}
 function buildCols(){
   const root=$("colCols"); root.innerHTML="";
   COLS.forEach(c=>{
@@ -849,14 +888,25 @@ function buildCols(){
   paintCols();
 }
 function paintCols(){
+  const cctMode=targetsAllCct();
   COLS.forEach(c=>{
     const el=$("cc_"+c.id); if(!el) return;
+    // CW/WW targets: hue/sat/ΔUV mean nothing to two whites — hide them and
+    // the picker becomes Dim + Kelvin (warm ↔ cool).
+    el.parentElement.style.display=(c.rgbOnly&&cctMode)?"none":"";
     el.style.background=c.bg();
-    const f=(c.get()-c.min)/(c.max-c.min);
+    const f=Math.max(0,Math.min(1,(c.get()-c.min)/(c.max-c.min)));
     el.querySelector(".colthumb").style.top=
       `calc(${(1-f)*100}% - 3px)`;
     $("cv_"+c.id).textContent=c.fmt(c.get());
   });
+  const mixEl=$("cctMix");
+  if(mixEl){
+    if(cctMode){
+      const m=cctMixOf(col.base);
+      mixEl.textContent=`WW ${m.ww}% · CW ${m.cw}% · ${Math.round(m.k)}K`;
+    } else mixEl.textContent="";
+  }
   const[r,g,b]=currentRGB();
   const sw=$("swBig");
   if(sw){
