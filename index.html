@@ -2,16 +2,16 @@
 <!-- =========================================================================
   JMB Zone — companion app (Web Bluetooth, single file)
 
-  Works in Chrome/Edge on Android, Windows, macOS, Linux (NOT iOS Safari —
-  use the Bluefy browser there). Open the file directly or serve it; Web
-  Bluetooth needs HTTPS or a file:// / localhost origin.
+  Chrome/Edge on Android + desktop (iOS: use the Bluefy browser).
+  Tabs: Control · Scenes · Ports · Diag · Setup.
 
   Protocol (ble_control.cpp):
     service a1b20001-…  cmd a1b20002-… (write)  state a1b20003-… (notify/read)
-    auth:   "PIN=xxxx"           → state notify = accepted, silence = wrong
-    cmds:   GET | CID=n | NEWPIN=xxxx | Pn.ADDR/PERS/MAN/R/G/B/DIM=v
-    state:  JMB;FW=…;PORTS=4;CID=1;DMX=1;FPS=33;CRV=0;AM=1;
-            P1=A1,PE0,M0,R0,G0,B0,D100,O1,F00;…
+    auth:  "PIN=xxxx" → state notify = accepted, silence = wrong
+    cmds:  GET | CID=n | CURVE=n | AMODE=n | NEWPIN=x |
+           Pn.ADDR/HEAD/PERS/MAN/R/G/B/DIM/FX/FXS=v
+    state: JMB;FW;PORTS;CID;DMX;FPS;CRV;AM;SL;SC;ASC;ERR;RDM;ANS;
+           Pn=A,PE,M,R,G,B,D,O,F,X,S,H,IA,IB,T,RX,CE;…
 ========================================================================== -->
 <html lang="en">
 <head>
@@ -26,27 +26,29 @@
   }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   body { margin:0; background:var(--bg); color:var(--text);
-         font:15px/1.45 system-ui,Segoe UI,Roboto,sans-serif; }
-  header { display:flex; align-items:center; gap:12px; padding:14px 16px;
+         font:15px/1.45 system-ui,Segoe UI,Roboto,sans-serif;
+         padding-bottom:64px; }
+  header { display:flex; align-items:center; gap:12px; padding:12px 16px;
            background:var(--card); border-bottom:1px solid var(--line);
            position:sticky; top:0; z-index:5; }
-  header .logo { width:34px; height:34px; border:2.5px solid var(--acc);
+  header .logo { width:32px; height:32px; border:2.5px solid var(--acc);
                  border-radius:6px; display:flex; align-items:flex-end;
                  justify-content:center; gap:2px; padding:4px; }
   header .logo i { display:block; width:4px; background:var(--acc);
                    border-radius:1px; }
-  h1 { font-size:17px; margin:0; flex:1; font-weight:600; }
+  h1 { font-size:16px; margin:0; flex:1; font-weight:600; }
   button { background:var(--card2); color:var(--text); border:1px solid var(--line);
            border-radius:8px; padding:9px 14px; font-size:14px; cursor:pointer; }
   button.primary { background:var(--acc); border-color:var(--acc); color:#04121f;
                    font-weight:600; }
+  button.danger { border-color:#5c2e31; color:var(--bad); }
   button:disabled { opacity:.45; cursor:default; }
-  #chips { display:flex; flex-wrap:wrap; gap:8px; padding:12px 16px 0; }
+  #chips { display:flex; flex-wrap:wrap; gap:7px; padding:10px 16px 0; }
   .chip { background:var(--card); border:1px solid var(--line); border-radius:999px;
-          padding:4px 12px; font-size:12.5px; color:var(--dim); }
+          padding:3px 11px; font-size:12px; color:var(--dim); }
   .chip b { color:var(--text); font-weight:600; }
   .chip.ok b { color:var(--ok); } .chip.bad b { color:var(--bad); }
-  main { padding:12px 16px 40px; max-width:720px; margin:0 auto; }
+  main { padding:10px 16px 24px; max-width:720px; margin:0 auto; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px;
           padding:14px 16px; margin-top:12px; }
   .port-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
@@ -57,18 +59,19 @@
   .badge.fault{ background:#3d2f14; color:var(--warn); }
   .swatch { width:26px; height:26px; border-radius:7px; border:1px solid var(--line); }
   .rows { display:flex; flex-direction:column; gap:9px; }
-  .row { display:flex; align-items:center; gap:10px; }
+  .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .row label { width:52px; color:var(--dim); font-size:12.5px; flex-shrink:0; }
-  .row input[type=range] { flex:1; accent-color:var(--acc); height:26px; }
+  .row input[type=range] { flex:1; min-width:120px; accent-color:var(--acc); height:26px; }
   .row.r input[type=range] { accent-color:var(--r); }
   .row.g input[type=range] { accent-color:var(--g); }
   .row.b input[type=range] { accent-color:var(--b); }
+  .row.w input[type=range] { accent-color:#f5f5f5; }   /* dim + speed: white */
   .row .val { width:38px; text-align:right; font-variant-numeric:tabular-nums;
               color:var(--dim); font-size:12.5px; }
-  .row input[type=number], .row select {
+  .row input[type=number], .row select, .row input[type=text] {
       background:var(--card2); color:var(--text); border:1px solid var(--line);
-      border-radius:7px; padding:6px 8px; font-size:14px; width:86px; }
-  .row select { width:150px; }
+      border-radius:7px; padding:6px 8px; font-size:14px; width:82px; }
+  .row select { width:148px; }
   .toggle { position:relative; width:44px; height:24px; flex-shrink:0; }
   .toggle input { opacity:0; width:0; height:0; }
   .toggle span { position:absolute; inset:0; background:var(--card2);
@@ -78,6 +81,16 @@
                  transition:.15s; }
   .toggle input:checked + span { background:#123a5e; border-color:var(--acc); }
   .toggle input:checked + span::after { left:22px; background:var(--acc); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--dim); font-weight:500; font-size:12px; }
+  td.num { font-variant-numeric:tabular-nums; }
+  nav { position:fixed; bottom:0; left:0; right:0; display:flex; z-index:6;
+        background:var(--card); border-top:1px solid var(--line); }
+  nav button { flex:1; border:none; border-radius:0; background:none;
+               color:var(--dim); font-size:12px; padding:9px 0 10px; }
+  nav button.active { color:var(--acc); font-weight:600; }
+  nav button .ico { display:block; font-size:17px; margin-bottom:1px; }
   #overlay { position:fixed; inset:0; background:rgba(5,8,12,.82); display:flex;
              align-items:center; justify-content:center; z-index:10; }
   #overlay .box { background:var(--card); border:1px solid var(--line);
@@ -87,16 +100,20 @@
                    text-align:center; letter-spacing:6px; background:var(--card2);
                    color:var(--text); border:1px solid var(--line); border-radius:9px; }
   #overlay .err { color:var(--bad); font-size:13px; min-height:18px; margin-top:8px; }
-  .mini { color:var(--dim); font-size:12px; margin-top:10px; }
+  .mini { color:var(--dim); font-size:12px; margin-top:8px; }
   .ctlrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   .hidden { display:none !important; }
-  footer { text-align:center; color:var(--dim); font-size:11.5px; padding:8px 0 24px; }
+  .scene { display:flex; align-items:center; gap:8px; padding:9px 0;
+           border-bottom:1px solid var(--line); }
+  .scene b { flex:1; font-weight:600; font-size:14px; }
+  .scene input { width:56px; background:var(--card2); color:var(--text);
+                 border:1px solid var(--line); border-radius:7px; padding:6px; }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo"><i style="height:8px"></i><i style="height:14px"></i><i style="height:20px"></i></div>
+  <div class="logo"><i style="height:7px"></i><i style="height:12px"></i><i style="height:18px"></i></div>
   <h1 id="title">JMB Zone</h1>
   <button id="btnConnect" class="primary">Connect</button>
 </header>
@@ -105,30 +122,81 @@
   <span class="chip" id="chipDmx">DMX <b>—</b></span>
   <span class="chip" id="chipFps">fps <b>—</b></span>
   <span class="chip" id="chipCid">ID <b>—</b></span>
-  <span class="chip" id="chipCurve">curve <b>—</b></span>
-  <span class="chip" id="chipAm">apply <b>—</b></span>
-  <span class="chip" id="chipFw">fw <b>—</b></span>
 </div>
 
 <main>
   <div id="hello" class="card">
     <b>Not connected.</b>
-    <div class="mini">Tap Connect and pick your controller (advertised as
-    “JMB Zone #ID-XXXX”). Needs Chrome or Edge — on iPhone use the Bluefy
-    browser. Bluetooth must be on.</div>
+    <div class="mini">Tap Connect and pick your controller (“JMB Zone #ID-XXXX”).
+    Chrome/Edge only — on iPhone use the Bluefy browser. Bluetooth on.</div>
   </div>
-  <div id="ports"></div>
-  <div id="tools" class="card hidden">
-    <div class="ctlrow">
-      <button id="btnRefresh">Refresh</button>
-      <button id="btnCid">Set controller ID…</button>
-      <button id="btnPin">Change PIN…</button>
-      <button id="btnDisc">Disconnect</button>
+
+  <div id="tab-control" class="tab hidden"><div id="ports"></div></div>
+
+  <div id="tab-scenes" class="tab hidden">
+    <div class="card">
+      <div class="ctlrow">
+        <button id="btnSaveScene" class="primary">Save current as scene…</button>
+      </div>
+      <div class="mini">Recall sends manual colours to every port; the fade box
+      is seconds of crossfade (0 = snap). Effects switch at the start of the
+      fade. Scenes live in this phone's browser.</div>
+      <div id="sceneList"></div>
+    </div>
+  </div>
+
+  <div id="tab-ports" class="tab hidden"><div id="portInfo"></div></div>
+
+  <div id="tab-diag" class="tab hidden">
+    <div class="card">
+      <b>DMX line</b>
+      <table id="diagDmx"></table>
+    </div>
+    <div class="card">
+      <b>Port bus</b>
+      <table id="diagBus"></table>
+    </div>
+  </div>
+
+  <div id="tab-setup" class="tab hidden">
+    <div class="card">
+      <div class="rows">
+        <div class="row"><label>ID</label>
+          <input type="number" id="setCid" min="0" max="9999">
+          <button id="btnCidApply">Apply</button>
+          <span class="mini" style="margin:0">on screens, BLE name (next boot), RDM label</span>
+        </div>
+        <div class="row"><label>Curve</label>
+          <select id="setCurve" style="width:130px">
+            <option value="0">Linear</option><option value="1">Soft 1.6</option>
+            <option value="2">Theatre 2.2</option></select>
+        </div>
+        <div class="row"><label>Apply</label>
+          <select id="setAmode" style="width:130px">
+            <option value="0">Same</option><option value="1">Seq</option>
+            <option value="2">Offset</option></select>
+          <span class="mini" style="margin:0">how base addresses fan out</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ctlrow">
+        <button id="btnRefresh">Refresh</button>
+        <button id="btnPin">Change PIN…</button>
+        <button id="btnDisc" class="danger">Disconnect</button>
+      </div>
+      <div class="mini" id="fwLine"></div>
     </div>
   </div>
 </main>
 
-<footer>JMB Zone companion · Web Bluetooth</footer>
+<nav id="nav" class="hidden">
+  <button data-tab="control" class="active"><span class="ico">🎚</span>Control</button>
+  <button data-tab="scenes"><span class="ico">🎬</span>Scenes</button>
+  <button data-tab="ports"><span class="ico">🔌</span>Ports</button>
+  <button data-tab="diag"><span class="ico">📈</span>Diag</button>
+  <button data-tab="setup"><span class="ico">⚙️</span>Setup</button>
+</nav>
 
 <div id="overlay" class="hidden">
   <div class="box">
@@ -145,98 +213,99 @@
 const SVC   = "a1b20001-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const CMD   = "a1b20002-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const STATE = "a1b20003-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
-const PERS_NAMES = ["RGB 8-bit","RGB 16-bit","CW/WW 8-bit","CW/WW 16-bit",
-                    "FX 10ch"];
-const FX_NAMES = ["Off","Candle","Fire","Fireworks","Water","Siren","Laser",
-                  "Club","Lightning","Rainbow","Aurora","Sunset","TV Sim","Strobe"];
-const CURVES = ["Lin","Soft 1.6","Thtr 2.2"];
+const PERS_NAMES = ["RGB 8-bit","RGB 16-bit","CW/WW 8-bit","CW/WW 16-bit","FX 10ch"];
+const FX_NAMES = ["Off","Candle","Fire","Fireworks","Water","Siren","Laser","Club",
+                  "Lightning","Rainbow","Aurora","Sunset","TV Sim","Strobe","Police"];
+const CURVES = ["Linear","Soft 1.6","Theatre 2.2"];
 const AMODES = ["Same","Seq","Offset"];
 const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
                 [0x10,"GROUND"],[0x20,"LINK"],[0x40,"24V"],[0x80,"LATCHED"]];
 
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
-let ports=[];            // last parsed per-port state
-const hot={};            // "1.R" -> timestamp while user is dragging (skip inbound)
+let ports=[], kv={};
+const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
 const enc=new TextEncoder(), dec=new TextDecoder();
 const $=id=>document.getElementById(id);
-
-// ---------- BLE plumbing ----------
-const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function hello(html){ $("hello").classList.remove("hidden"); $("hello").innerHTML=html; }
 
-// GATT setup with retries. Android caches a device's GATT layout and serves
-// it stale after the controller has been reflashed — getPrimaryService then
-// throws NotFound even though the service is live (connecting once with nRF
-// Connect "fixes" it by forcing a fresh discovery). Retrying with settle
-// delays recovers most of these; the rest get an honest error message.
+// ---------- tabs ----------
+document.querySelectorAll("#nav button").forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll("#nav button").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
+    $("tab-"+btn.dataset.tab).classList.remove("hidden");
+  };
+});
+function showApp(){
+  $("hello").classList.add("hidden");
+  $("chips").classList.remove("hidden");
+  $("nav").classList.remove("hidden");
+  $("tab-control").classList.remove("hidden");
+}
+function hideApp(){
+  $("chips").classList.add("hidden");
+  $("nav").classList.add("hidden");
+  document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
+}
+
+// ---------- BLE ----------
 async function gattSetup(){
-  let lastErr = null;
+  let lastErr=null;
   for(let i=0;i<4;i++){
     try{
-      const gatt = await dev.gatt.connect();
-      await sleep(200*(i+1));                    // let discovery settle
-      const svc  = await gatt.getPrimaryService(SVC);
-      cmdChar    = await svc.getCharacteristic(CMD);
-      stateChar  = await svc.getCharacteristic(STATE);
+      const gatt=await dev.gatt.connect();
+      await sleep(200*(i+1));
+      const svc=await gatt.getPrimaryService(SVC);
+      cmdChar  =await svc.getCharacteristic(CMD);
+      stateChar=await svc.getCharacteristic(STATE);
       await stateChar.startNotifications();
       stateChar.addEventListener("characteristicvaluechanged",
                                  ev=>onState(dec.decode(ev.target.value)));
       return;
-    }catch(e){
-      lastErr = e;
-      try{ dev.gatt.disconnect(); }catch(_){}
-      await sleep(500);
-    }
+    }catch(e){ lastErr=e; try{dev.gatt.disconnect();}catch(_){}; await sleep(500); }
   }
-  throw lastErr || new Error("unknown");
+  throw lastErr||new Error("unknown");
 }
-
 async function connect(){
   try{
-    dev = await navigator.bluetooth.requestDevice({
+    dev=await navigator.bluetooth.requestDevice({
       filters:[{services:[SVC]}], optionalServices:[SVC]});
-  }catch(e){ return; }                       // user cancelled the chooser
+  }catch(e){ return; }
   dev.addEventListener("gattserverdisconnected", onDisconnected);
-  $("btnConnect").disabled = true;
+  $("btnConnect").disabled=true;
   hello("<b>Connecting…</b>");
-  try{
-    await gattSetup();
-  }catch(e){
-    $("btnConnect").disabled = false;
+  try{ await gattSetup(); }
+  catch(e){
+    $("btnConnect").disabled=false;
     hello("<b>Couldn't reach the controller.</b>"+
-      "<div class='mini'>("+(e && e.message || e)+")<br>"+
-      "Android may be holding a stale Bluetooth cache from a firmware "+
-      "update. Toggle the phone's Bluetooth OFF and ON, then Connect "+
-      "again. Still stuck? Connect once with nRF Connect, disconnect, "+
-      "and retry here.</div>");
+      "<div class='mini'>("+(e&&e.message||e)+")<br>Android may hold a stale "+
+      "Bluetooth cache after a firmware update — toggle the phone's Bluetooth "+
+      "OFF/ON and retry. Still stuck? Connect once with nRF Connect, "+
+      "disconnect, and retry here.</div>");
     return;
   }
-  $("btnConnect").disabled = false;
-  $("title").textContent = dev.name || "JMB Zone";
+  $("btnConnect").disabled=false;
+  $("title").textContent=dev.name||"JMB Zone";
   $("btnConnect").classList.add("hidden");
   $("hello").classList.add("hidden");
   authed=false;
   askPin();
 }
-
 async function onDisconnected(){
   authed=false; cmdChar=null;
-  hideOverlay();
-  $("chips").classList.add("hidden");
-  $("tools").classList.add("hidden");
-  // One quiet self-heal attempt before giving the user the bad news —
-  // Android drops BLE links casually (screen off, distance blips).
+  hideOverlay(); hideApp();
   if(dev){
     hello("<b>Link dropped — reconnecting…</b>");
     try{
       await sleep(800);
       await gattSetup();
-      hello("");
       $("hello").classList.add("hidden");
-      askPin();                               // auth resets on reconnect
+      askPin();
       const saved=localStorage.getItem("jmb_pin");
-      if(saved){ $("pinInput").value=saved; tryPin(); }   // auto re-auth
+      if(saved){ $("pinInput").value=saved; tryPin(); }
       return;
     }catch(_){}
   }
@@ -244,27 +313,23 @@ async function onDisconnected(){
   hello("<b>Disconnected.</b><div class='mini'>Tap Connect to rejoin.</div>");
   $("ports").innerHTML="";
 }
-
 async function send(s){
   if(!cmdChar) return;
   try{ await cmdChar.writeValueWithoutResponse(enc.encode(s)); }
   catch(e){ try{ await cmdChar.writeValue(enc.encode(s)); }catch(_){} }
 }
-
-// throttled per-key writer for sliders (~12 msg/s each, always sends final)
 const pend={}, timers={};
-function sendThrottled(key, line){
+function sendThrottled(key,line){
   pend[key]=line;
   if(timers[key]) return;
-  timers[key]=setTimeout(()=>{ delete timers[key]; send(pend[key]); }, 80);
+  timers[key]=setTimeout(()=>{ delete timers[key]; send(pend[key]); },80);
 }
 
 // ---------- PIN ----------
 function askPin(){
   $("overlay").classList.remove("hidden");
   $("pinErr").textContent="";
-  const saved=localStorage.getItem("jmb_pin");
-  $("pinInput").value = saved || "";
+  $("pinInput").value=localStorage.getItem("jmb_pin")||"";
   setTimeout(()=>$("pinInput").focus(),50);
 }
 function hideOverlay(){ $("overlay").classList.add("hidden"); }
@@ -273,7 +338,6 @@ async function tryPin(){
   if(!pin) return;
   $("pinErr").textContent="";
   await send("PIN="+pin);
-  // acceptance == a state notify arrives; silence == wrong PIN
   clearTimeout(authTimer);
   authTimer=setTimeout(()=>{
     if(!authed) $("pinErr").textContent="No answer — wrong PIN?";
@@ -283,82 +347,73 @@ async function tryPin(){
 $("pinGo").onclick=tryPin;
 $("pinInput").addEventListener("keydown",e=>{ if(e.key==="Enter") tryPin(); });
 
-// ---------- state parsing / render ----------
+// ---------- state ----------
 function onState(str){
   if(!str.startsWith("JMB;")) return;
-  if(!authed){ authed=true; hideOverlay(); }
-  const kv={}, pstr={};
+  if(!authed){ authed=true; hideOverlay(); showApp(); }
+  kv={}; const pstr={};
   for(const part of str.split(";")){
     const i=part.indexOf("=");
     if(i<0) continue;
     const k=part.slice(0,i), v=part.slice(i+1);
     if(/^P\d+$/.test(k)) pstr[k]=v; else kv[k]=v;
   }
-  $("chips").classList.remove("hidden");
-  $("tools").classList.remove("hidden");
-  $("hello").classList.add("hidden");
   setChip("chipDmx","DMX", kv.DMX==="1"?"live":"none", kv.DMX==="1"?"ok":"bad");
   setChip("chipFps","fps", kv.FPS??"—");
   setChip("chipCid","ID",  kv.CID??"—");
-  setChip("chipCurve","curve", CURVES[+kv.CRV]??"—");
-  setChip("chipAm","apply",   AMODES[+kv.AM]??"—");
-  setChip("chipFw","fw",  kv.FW??"—");
-
   const n=+(kv.PORTS||0);
   ports=[];
   for(let p=1;p<=n;p++){
-    const m={}; // A1,PE0,M0,R0,G0,B0,D100,O1,F00
+    const m={};
     for(const f of (pstr["P"+p]||"").split(",")){
-      const mm=f.match(/^([A-Z]+)([0-9A-F]+)$/i);
+      const mm=f.match(/^([A-Z]+)(-?[0-9A-F]+)$/i);
       if(mm) m[mm[1]] = mm[1]==="F" ? parseInt(mm[2],16) : +mm[2];
     }
     ports.push(m);
   }
-  renderPorts();
+  renderControl(); renderPortInfo(); renderDiag(); renderSetup();
 }
 function setChip(id,label,val,cls){
   const el=$(id);
   el.innerHTML=label+" <b>"+val+"</b>";
   el.className="chip"+(cls?" "+cls:"");
 }
-
-function renderPorts(){
-  const root=$("ports");
-  ports.forEach((m,idx)=>{
-    const p=idx+1;
-    let card=$("port"+p);
-    if(!card){ card=buildCard(p); root.appendChild(card); }
-    // badges
-    const on = m.O===1, flt = (m.F||0)!==0;
-    const bOn=$("on"+p);
-    bOn.textContent = on ? "online" : "offline";
-    bOn.className   = "badge "+(on?"on":"off");
-    const bF=$("flt"+p);
-    if(flt){
-      bF.classList.remove("hidden");
-      bF.textContent = FAULTS.filter(([b])=>m.F&b).map(([,t])=>t).join("+")||"FAULT";
-    } else bF.classList.add("hidden");
-    // fields (skip any the user is actively touching)
-    setIf(p,"ADDR", m.A, el=>el.value=m.A);
-    setIf(p,"PERS", m.PE, el=>el.value=m.PE);
-    setIf(p,"MAN",  m.M,  el=>el.checked=m.M===1);
-    setIf(p,"X",    m.X,  el=>el.value=m.X??0);
-    setIf(p,"S",    m.S,  el=>{ el.value=m.S??128; $("vS"+p).textContent=m.S??128; });
-    for(const c of ["R","G","B","D"]){
-      const v = c==="D"?m.D:m[c];
-      setIf(p,c, v, el=>{ el.value=v; $(("v"+c)+p).textContent=v; });
-    }
-    $("sw"+p).style.background =
-        `rgb(${(m.R??0)*2.55},${(m.G??0)*2.55},${(m.B??0)*2.55})`;
-  });
-}
-function setIf(p,key,val,apply){
+function faultWords(f){ return FAULTS.filter(([b])=>f&b).map(([,t])=>t).join("+")||""; }
+function setIf(p,key,apply){
   const el=$(key.toLowerCase()+p);
   if(!el) return;
   if(Date.now()-(hot[p+"."+key]||0) < HOT_MS) return;
   apply(el);
 }
 
+// ---------- Control tab ----------
+function renderControl(){
+  const root=$("ports");
+  ports.forEach((m,idx)=>{
+    const p=idx+1;
+    let card=$("port"+p);
+    if(!card){ card=buildCard(p); root.appendChild(card); }
+    const on=m.O===1, flt=(m.F||0)!==0;
+    const bOn=$("on"+p);
+    bOn.textContent=on?"online":"offline";
+    bOn.className="badge "+(on?"on":"off");
+    const bF=$("flt"+p);
+    if(flt){ bF.classList.remove("hidden"); bF.textContent=faultWords(m.F)||"FAULT"; }
+    else bF.classList.add("hidden");
+    setIf(p,"ADDR",el=>el.value=m.A);
+    setIf(p,"HEAD",el=>el.value=m.H??0);
+    setIf(p,"PERS",el=>el.value=m.PE);
+    setIf(p,"MAN", el=>el.checked=m.M===1);
+    setIf(p,"X",   el=>el.value=m.X??0);
+    setIf(p,"S",   el=>{ el.value=m.S??128; $("vS"+p).textContent=m.S??128; });
+    for(const c of ["R","G","B","D"]){
+      const v=c==="D"?m.D:m[c];
+      setIf(p,c,el=>{ el.value=v; $("v"+c+p).textContent=v; });
+    }
+    $("sw"+p).style.background=
+      `rgb(${(m.R??0)*2.55},${(m.G??0)*2.55},${(m.B??0)*2.55})`;
+  });
+}
 function buildCard(p){
   const d=document.createElement("div");
   d.className="card"; d.id="port"+p;
@@ -372,31 +427,36 @@ function buildCard(p){
     <div class="rows">
       <div class="row"><label>Address</label>
         <input type="number" id="addr${p}" min="1" max="512">
-        <label style="width:auto">Mode</label>
+        <label style="width:auto">Head</label>
+        <input type="number" id="head${p}" min="0" max="9999">
+      </div>
+      <div class="row"><label>Mode</label>
         <select id="pers${p}">${PERS_NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join("")}</select>
       </div>
       <div class="row"><label>Effect</label>
-        <select id="x${p}" style="width:150px">${FX_NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join("")}</select>
-        <span class="mini" style="margin:0">runs whenever DMX is absent</span>
+        <select id="x${p}" style="width:148px">${FX_NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join("")}</select>
       </div>
-      <div class="row"><label>Speed</label>
+      <div class="row w"><label>Speed</label>
         <input type="range" id="s${p}" min="0" max="255">
         <span class="val" id="vS${p}">128</span>
       </div>
       <div class="row"><label>Manual</label>
         <label class="toggle"><input type="checkbox" id="man${p}"><span></span></label>
-        <span class="mini" style="margin:0">live DMX always outranks manual</span>
+        <span class="mini" style="margin:0">live DMX outranks manual + effects</span>
       </div>
       <div class="row r"><label>Red</label><input type="range" id="r${p}" min="0" max="100"><span class="val" id="vR${p}">0</span></div>
       <div class="row g"><label>Green</label><input type="range" id="g${p}" min="0" max="100"><span class="val" id="vG${p}">0</span></div>
       <div class="row b"><label>Blue</label><input type="range" id="b${p}" min="0" max="100"><span class="val" id="vB${p}">0</span></div>
-      <div class="row"><label>Dim</label><input type="range" id="d${p}" min="0" max="100"><span class="val" id="vD${p}">100</span></div>
+      <div class="row w"><label>Dim</label><input type="range" id="d${p}" min="0" max="100"><span class="val" id="vD${p}">100</span></div>
     </div>`;
-  // wire events
-  const touch=(k)=>{ hot[p+"."+k]=Date.now(); };
+  const touch=k=>{ hot[p+"."+k]=Date.now(); };
   d.querySelector("#addr"+p).addEventListener("change",e=>{
-    let v=Math.max(1,Math.min(512, +e.target.value||1));
+    let v=Math.max(1,Math.min(512,+e.target.value||1));
     e.target.value=v; touch("ADDR"); send(`P${p}.ADDR=${v}`);
+  });
+  d.querySelector("#head"+p).addEventListener("change",e=>{
+    let v=Math.max(0,Math.min(9999,+e.target.value||0));
+    e.target.value=v; touch("HEAD"); send(`P${p}.HEAD=${v}`);
   });
   d.querySelector("#pers"+p).addEventListener("change",e=>{
     touch("PERS"); send(`P${p}.PERS=${+e.target.value}`);
@@ -406,49 +466,151 @@ function buildCard(p){
   });
   d.querySelector("#s"+p).addEventListener("input",e=>{
     touch("S"); $("vS"+p).textContent=e.target.value;
-    sendThrottled(p+".FXS", `P${p}.FXS=${+e.target.value}`);
+    sendThrottled(p+".FXS",`P${p}.FXS=${+e.target.value}`);
   });
   d.querySelector("#man"+p).addEventListener("change",e=>{
     touch("MAN"); send(`P${p}.MAN=${e.target.checked?1:0}`);
   });
   for(const [id,field] of [["r","R"],["g","G"],["b","B"],["d","DIM"]]){
-    const el=d.querySelector("#"+id+p);
-    el.addEventListener("input",e=>{
-      const key = field==="DIM"?"D":field;
+    d.querySelector("#"+id+p).addEventListener("input",e=>{
+      const key=field==="DIM"?"D":field;
       touch(key);
       $("v"+key+p).textContent=e.target.value;
-      if(key!=="D"){                        // live swatch while dragging
+      if(key!=="D"){
         const cur={R:+$("r"+p).value,G:+$("g"+p).value,B:+$("b"+p).value};
         $("sw"+p).style.background=`rgb(${cur.R*2.55},${cur.G*2.55},${cur.B*2.55})`;
       }
-      sendThrottled(p+"."+field, `P${p}.${field}=${e.target.value}`);
+      sendThrottled(p+"."+field,`P${p}.${field}=${e.target.value}`);
     });
   }
   return d;
 }
 
-// ---------- tools ----------
-$("btnConnect").onclick=connect;
-$("btnRefresh").onclick=()=>send("GET");
-$("btnDisc").onclick=()=>{ if(dev&&dev.gatt.connected) dev.gatt.disconnect(); };
-$("btnCid").onclick=()=>{
-  const v=prompt("Controller ID (0-9999) — shown on screens, in the BLE name "+
-                 "at next boot, and in the RDM label:");
-  if(v!==null && v!=="") send("CID="+Math.max(0,Math.min(9999,+v||0)));
+// ---------- Scenes tab ----------
+function loadScenes(){ try{ return JSON.parse(localStorage.getItem("jmb_scenes")||"[]"); }catch(_){ return []; } }
+function saveScenes(s){ localStorage.setItem("jmb_scenes",JSON.stringify(s)); }
+function renderScenes(){
+  const list=$("sceneList"); list.innerHTML="";
+  loadScenes().forEach((sc,i)=>{
+    const row=document.createElement("div");
+    row.className="scene";
+    row.innerHTML=`<b>${sc.name}</b>
+      <input type="number" min="0" max="60" step="0.5" value="${sc.fade??2}" title="fade s">
+      <button class="primary">Recall</button><button class="danger">✕</button>`;
+    const [fadeIn,btnGo,btnDel]=row.querySelectorAll("input,button");
+    btnGo.onclick=()=>{ sc.fade=+fadeIn.value||0; const all=loadScenes(); all[i]=sc; saveScenes(all); recallScene(sc); };
+    btnDel.onclick=()=>{ const all=loadScenes(); all.splice(i,1); saveScenes(all); renderScenes(); };
+    list.appendChild(row);
+  });
+}
+$("btnSaveScene").onclick=()=>{
+  const name=prompt("Scene name:");
+  if(!name) return;
+  const snap=ports.map(m=>({r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
+                            x:m.X??0,s:m.S??128}));
+  const all=loadScenes();
+  all.push({name:name.trim(),fade:2,ports:snap});
+  saveScenes(all); renderScenes();
 };
+let fadeTimer=null;
+function recallScene(sc){
+  clearInterval(fadeTimer);
+  const from=ports.map(m=>({r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100}));
+  // Effects + speed switch at the start; colours crossfade.
+  sc.ports.forEach((t,i)=>{
+    const p=i+1;
+    send(`P${p}.MAN=1`); send(`P${p}.FX=${t.x}`); send(`P${p}.FXS=${t.s}`);
+    for(const k of ["R","G","B","D"]) hot[p+"."+k]=Date.now()+ (sc.fade*1000);
+  });
+  const T=Math.max(0,(sc.fade||0)*1000), t0=Date.now();
+  const step=()=>{
+    const k=T?Math.min(1,(Date.now()-t0)/T):1;
+    const e=k*k*(3-2*k);                       // smoothstep
+    sc.ports.forEach((t,i)=>{
+      if(i>=from.length) return;
+      const p=i+1,f=from[i];
+      sendThrottled(p+".R",`P${p}.R=${Math.round(f.r+(t.r-f.r)*e)}`);
+      sendThrottled(p+".G",`P${p}.G=${Math.round(f.g+(t.g-f.g)*e)}`);
+      sendThrottled(p+".B",`P${p}.B=${Math.round(f.b+(t.b-f.b)*e)}`);
+      sendThrottled(p+".DIM",`P${p}.DIM=${Math.round(f.d+(t.d-f.d)*e)}`);
+    });
+    if(k>=1) clearInterval(fadeTimer);
+  };
+  fadeTimer=setInterval(step,120); step();
+}
+renderScenes();
+
+// ---------- Ports tab ----------
+function renderPortInfo(){
+  const root=$("portInfo");
+  ports.forEach((m,idx)=>{
+    const p=idx+1;
+    let card=$("pi"+p);
+    if(!card){
+      card=document.createElement("div");
+      card.className="card"; card.id="pi"+p;
+      root.appendChild(card);
+    }
+    const on=m.O===1, fw=faultWords(m.F||0);
+    card.innerHTML=`
+      <div class="port-head"><h2>Port ${p}</h2>
+        ${fw?`<span class="badge fault">${fw}</span>`:""}
+        <span class="badge ${on?"on":"off"}">${on?"online":"offline"}</span>
+      </div>
+      <table>
+        <tr><th>Patch</th><td class="num">${PERS_NAMES[m.PE]??"?"} @ ${m.A??"—"} · head ${m.H??"—"}</td></tr>
+        <tr><th>Current</th><td class="num">A ${m.IA??"—"} mA · B ${m.IB??"—"} mA</td></tr>
+        <tr><th>Temp</th><td class="num">${m.T!=null?(m.T/10).toFixed(1)+" °C":"—"}</td></tr>
+        <tr><th>Source</th><td>${kv.DMX==="1"?"DMX":(m.X?FX_NAMES[m.X]:(m.M?"manual":"hold"))}</td></tr>
+      </table>`;
+  });
+}
+
+// ---------- Diag tab ----------
+function renderDiag(){
+  $("diagDmx").innerHTML=`
+    <tr><th>Status</th><td>${kv.DMX==="1"?"live":"no signal"} · ${kv.FPS??"—"} fps</td></tr>
+    <tr><th>Slots</th><td class="num">${kv.SL??"—"} · start code ${kv.SC??"—"}</td></tr>
+    <tr><th>ASC pkts</th><td class="num">${kv.ASC??"—"}</td></tr>
+    <tr><th>Errors</th><td class="num">${kv.ERR??"—"}</td></tr>
+    <tr><th>RDM</th><td class="num">${kv.RDM??"—"} requests · ${kv.ANS??"—"} answered</td></tr>`;
+  let rows="<tr><th>Port</th><th>rx</th><th>crc err</th><th>fault</th></tr>";
+  ports.forEach((m,i)=>{
+    rows+=`<tr><td>P${i+1}</td><td class="num">${m.RX??"—"}</td>
+           <td class="num">${m.CE??"—"}</td><td>${faultWords(m.F||0)||"—"}</td></tr>`;
+  });
+  $("diagBus").innerHTML=rows;
+}
+
+// ---------- Setup tab ----------
+let setupTouched=0;
+function renderSetup(){
+  if(Date.now()-setupTouched<HOT_MS) return;
+  $("setCid").value=kv.CID??"";
+  $("setCurve").value=kv.CRV??"0";
+  $("setAmode").value=kv.AM??"0";
+  $("fwLine").textContent="Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+" ports";
+}
+$("btnCidApply").onclick=()=>{ setupTouched=Date.now();
+  send("CID="+Math.max(0,Math.min(9999,+$("setCid").value||0))); };
+$("setCurve").onchange=e=>{ setupTouched=Date.now(); send("CURVE="+ +e.target.value); };
+$("setAmode").onchange=e=>{ setupTouched=Date.now(); send("AMODE="+ +e.target.value); };
+$("btnRefresh").onclick=()=>send("GET");
+$("btnDisc").onclick=()=>{ const d0=dev; dev=null; if(d0&&d0.gatt.connected) d0.gatt.disconnect(); };
 $("btnPin").onclick=()=>{
   const v=prompt("New PIN (4-16 characters, no spaces):");
-  if(v && v.trim().length>=4){
+  if(v&&v.trim().length>=4){
     send("NEWPIN="+v.trim());
     localStorage.setItem("jmb_pin",v.trim());
     alert("PIN changed. Reconnections must use the new PIN.");
   }
 };
+$("btnConnect").onclick=connect;
 
 if(!navigator.bluetooth){
-  $("hello").innerHTML="<b>This browser has no Web Bluetooth.</b>"+
+  hello("<b>This browser has no Web Bluetooth.</b>"+
     "<div class='mini'>Use Chrome or Edge (Android / desktop). On iPhone, "+
-    "open this file in the Bluefy browser.</div>";
+    "open this page in the Bluefy browser.</div>");
   $("btnConnect").disabled=true;
 }
 </script>
