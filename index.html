@@ -17,6 +17,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0e1116">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
 <title>JMB Zone</title>
 <style>
   :root {
@@ -142,23 +146,26 @@
   nav button.active .ico { text-shadow:0 0 12px var(--acc); }
   .swatch, #swBig { transition:box-shadow .25s; }
 
-  /* rotary wheels (dimmer / fx speed) */
-  .wheels { justify-content:space-evenly; }
-  .wheelbox { position:relative; width:106px; user-select:none;
-              touch-action:none; cursor:pointer; }
-  .wheelbox svg { display:block; width:100%; }
-  .wtrack { fill:none; stroke:var(--card2); stroke-width:9; }
-  .wfill  { fill:none; stroke:#f2f5f8; stroke-width:9; stroke-linecap:round;
-            filter:drop-shadow(0 0 5px rgba(255,255,255,.30));
-            transition:stroke-dasharray .10s linear; }
-  .wticks line { stroke:#39434f; stroke-width:1.6; }
-  .wticks { transition:transform .12s ease-out; }
-  .wval { position:absolute; top:37%; left:0; right:0; text-align:center;
-          font-size:15px; font-weight:700; font-variant-numeric:tabular-nums;
-          pointer-events:none; }
-  .wlab { position:absolute; top:56%; left:0; right:0; text-align:center;
-          font-size:9.5px; color:var(--dim); letter-spacing:1.5px;
-          pointer-events:none; }
+  /* side-mounted jog wheels (dimmer / fx speed) — MQ-console intensity feel:
+     a tick texture that scrolls under your thumb, fill rises with the value */
+  .wheels { justify-content:space-evenly; align-items:flex-end; }
+  .wheelbox { position:relative; width:74px; height:150px; user-select:none;
+              touch-action:none; cursor:ns-resize; border-radius:12px;
+              border:1px solid var(--line); overflow:hidden;
+              background:repeating-linear-gradient(to bottom,
+                #232b36 0 3px, #171e27 3px 13px); }
+  .efill { position:absolute; left:0; right:0; bottom:0; height:0;
+           background:linear-gradient(to top, rgba(245,245,248,.30),
+                                              rgba(245,245,248,.08));
+           border-top:2px solid #f2f5f8;
+           box-shadow:0 0 12px rgba(255,255,255,.28);
+           transition:height .08s linear; }
+  .eval { position:absolute; top:8px; left:0; right:0; text-align:center;
+          font-size:14px; font-weight:700; font-variant-numeric:tabular-nums;
+          text-shadow:0 1px 3px #000; pointer-events:none; }
+  .elab { position:absolute; bottom:6px; left:0; right:0; text-align:center;
+          font-size:9px; letter-spacing:1.4px; color:var(--dim);
+          text-shadow:0 1px 2px #000; pointer-events:none; }
 </style>
 </head>
 <body>
@@ -182,7 +189,13 @@
     Chrome/Edge only — on iPhone use the Bluefy browser. Bluetooth on.</div>
   </div>
 
-  <div id="tab-control" class="tab hidden"><div id="ports"></div></div>
+  <div id="tab-control" class="tab hidden">
+    <div class="card"><div class="ctlrow">
+      <button id="btnPrep">Prep all</button>
+      <span class="mini" style="margin:0">RGB 100% · FX speed 50% · dimmer 0%</span>
+    </div></div>
+    <div id="ports"></div>
+  </div>
 
   <div id="tab-colour" class="tab hidden">
     <div class="card">
@@ -265,6 +278,15 @@
     </div>
     <div class="card">
       <div class="ctlrow">
+        <button id="btnIdent">Flash to find</button>
+        <button id="btnResetAll" class="danger">Reset all ports…</button>
+        <button id="btnUndo">Undo reset</button>
+      </div>
+      <div class="mini">Flash strobes this controller's screen + outputs for
+      3s — tap it after connecting to check you're on the right unit.</div>
+    </div>
+    <div class="card">
+      <div class="ctlrow">
         <button id="btnRefresh">Refresh</button>
         <button id="btnPin">Change PIN…</button>
         <button id="btnDisc" class="danger">Disconnect</button>
@@ -300,7 +322,8 @@ const CMD   = "a1b20002-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const STATE = "a1b20003-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const PERS_NAMES = ["RGB 8-bit","RGB 16-bit","CW/WW 8-bit","CW/WW 16-bit","FX 10ch"];
 const FX_NAMES = ["Off","Candle","Fire","Fireworks","Water","Siren","Laser","Club",
-                  "Lightning","Rainbow","Aurora","Sunset","TV Sim","Strobe","Police"];
+                  "Lightning","Rainbow","Aurora","Sunset","TV Sim","Strobe","Police",
+                  "Pulse"];
 const CURVES = ["Linear","Soft 1.6","Theatre 2.2"];
 const AMODES = ["Same","Seq","Offset"];
 const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
@@ -414,6 +437,12 @@ function sendThrottled(key,line){
   if(timers[key]) return;
   timers[key]=setTimeout(()=>{ delete timers[key]; send(pend[key]); },80);
 }
+// Touching any colour control IS the manual-mode intent — the old toggle is
+// gone; this quietly (re)arms manual at most every 2.5s per port.
+const lastMan={};
+function ensureMan(p){
+  if(Date.now()-(lastMan[p]||0)>2500){ lastMan[p]=Date.now(); send(`P${p}.MAN=1`); }
+}
 
 // ---------- PIN ----------
 function askPin(){
@@ -504,7 +533,6 @@ function renderControl(){
     setIf(p,"ADDR",el=>el.value=m.A);
     setIf(p,"HEAD",el=>el.value=m.H??0);
     setIf(p,"PERS",el=>el.value=m.PE);
-    setIf(p,"MAN", el=>el.checked=m.M===1);
     setIf(p,"X",   el=>el.value=m.X??0);
     for(const c of ["R","G","B"]){
       setIf(p,c,el=>{ el.value=m[c]; $("v"+c+p).textContent=m[c]; });
@@ -540,10 +568,6 @@ function buildCard(p){
       <div class="row"><label>Effect</label>
         <select id="x${p}" style="width:148px">${FX_NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join("")}</select>
       </div>
-      <div class="row"><label>Manual</label>
-        <label class="toggle"><input type="checkbox" id="man${p}"><span></span></label>
-        <span class="mini" style="margin:0">live DMX outranks manual + effects</span>
-      </div>
       <div class="row r"><label>Red</label><input type="range" id="r${p}" min="0" max="100"><span class="val" id="vR${p}">0</span></div>
       <div class="row g"><label>Green</label><input type="range" id="g${p}" min="0" max="100"><span class="val" id="vG${p}">0</span></div>
       <div class="row b"><label>Blue</label><input type="range" id="b${p}" min="0" max="100"><span class="val" id="vB${p}">0</span></div>
@@ -567,12 +591,10 @@ function buildCard(p){
   d.querySelector("#x"+p).addEventListener("change",e=>{
     touch("X"); send(`P${p}.FX=${+e.target.value}`);
   });
-  d.querySelector("#man"+p).addEventListener("change",e=>{
-    touch("MAN"); send(`P${p}.MAN=${e.target.checked?1:0}`);
-  });
   for(const [id,field] of [["r","R"],["g","G"],["b","B"]]){
     d.querySelector("#"+id+p).addEventListener("input",e=>{
       touch(field);
+      ensureMan(p);      // touching a colour IS the intent — no toggle needed
       $("v"+field+p).textContent=e.target.value;
       const cur={R:+$("r"+p).value,G:+$("g"+p).value,B:+$("b"+p).value};
       $("sw"+p).style.background=`rgb(${cur.R*2.55},${cur.G*2.55},${cur.B*2.55})`;
@@ -588,50 +610,33 @@ function buildCard(p){
   return d;
 }
 
-// ---------- rotary wheel control ----------
-// A 270° encoder-style dial: arc fill for the value, a tick ring that spins
-// with it, glow on the fill. Drag anywhere on the dial — the angle is the
-// value; the dead 90° gap sits at the bottom.
+// ---------- side jog-wheel control ----------
+// MQ-console intensity-wheel feel: drag up/down anywhere on the wheel; the
+// tick texture scrolls under your thumb (relative jog = fine control), the
+// glow fill shows the value. No absolute jumps — grabbing never snaps.
 const wheels={};
 function makeWheel(host,{label,min=0,max=100,value=min,fmt=v=>v,onInput}){
-  const R=38, C=2*Math.PI*R, SWEEP=0.75;
-  let ticks="";
-  for(let i=0;i<24;i++){
-    const a=i/24*2*Math.PI;
-    ticks+=`<line x1="${50+Math.cos(a)*26}" y1="${50+Math.sin(a)*26}"
-                  x2="${50+Math.cos(a)*31}" y2="${50+Math.sin(a)*31}"/>`;
-  }
-  host.innerHTML=`<svg viewBox="0 0 100 100">
-    <circle class="wtrack" cx="50" cy="50" r="${R}"
-      stroke-dasharray="${C*SWEEP} ${C}" transform="rotate(135 50 50)"/>
-    <circle class="wfill" cx="50" cy="50" r="${R}"
-      stroke-dasharray="0 ${C}" transform="rotate(135 50 50)"/>
-    <g class="wticks" style="transform-origin:50% 50%">${ticks}</g>
-  </svg><div class="wval"></div><div class="wlab">${label}</div>`;
-  const fill=host.querySelector(".wfill"),
-        tg  =host.querySelector(".wticks"),
-        val =host.querySelector(".wval");
+  host.innerHTML=`<div class="efill"></div>
+    <div class="eval"></div><div class="elab">${label}</div>`;
+  const fill=host.querySelector(".efill"),
+        val =host.querySelector(".eval");
   let cur=value;
   const paint=()=>{
     const f=(cur-min)/(max-min);
-    fill.setAttribute("stroke-dasharray",`${C*SWEEP*f} ${C}`);
-    tg.style.transform=`rotate(${f*270}deg)`;
+    fill.style.height=(f*100)+"%";
+    host.style.backgroundPositionY=(-cur*2.2)+"px";   // ticks scroll = jog
     val.textContent=fmt(Math.round(cur));
-  };
-  const fromEvent=ev=>{
-    const r=host.getBoundingClientRect();
-    const dx=ev.clientX-(r.left+r.width/2),
-          dy=ev.clientY-(r.top+r.width/2);
-    let va=((Math.atan2(dy,dx)*180/Math.PI)-135+360)%360;   // 0 at sweep start
-    if(va>270) va=(va>315)?0:270;                           // snap the dead gap
-    cur=min+va/270*(max-min);
-    paint();
-    if(onInput) onInput(Math.round(cur));
   };
   host.addEventListener("pointerdown",ev=>{
     host.setPointerCapture(ev.pointerId);
-    fromEvent(ev);
-    const mv=e=>fromEvent(e);
+    let y0=ev.clientY, c0=cur;
+    const mv=e=>{
+      // 150px of travel ≈ 110% of range — fast enough to sweep, fine enough
+      // to trim single steps near the ends.
+      cur=Math.max(min,Math.min(max, c0+(y0-e.clientY)/150*(max-min)*1.1));
+      paint();
+      if(onInput) onInput(Math.round(cur));
+    };
     const up=()=>{ host.removeEventListener("pointermove",mv);
                    host.removeEventListener("pointerup",up); };
     host.addEventListener("pointermove",mv);
@@ -668,14 +673,17 @@ $("btnSaveScene").onclick=()=>{
   saveScenes(all); renderScenes();
 };
 let fadeTimer=null;
-function recallScene(sc){
+async function recallScene(sc){
   clearInterval(fadeTimer);
+  // Accuracy: refresh the truth first — a fade computed from stale state
+  // visibly jumped when the rig had moved since the last notify.
+  send("GET"); await sleep(300);
   const from=ports.map(m=>({r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100}));
   // Effects + speed switch at the start; colours crossfade.
   sc.ports.forEach((t,i)=>{
     const p=i+1;
-    send(`P${p}.MAN=1`); send(`P${p}.FX=${t.x}`); send(`P${p}.FXS=${t.s}`);
-    for(const k of ["R","G","B","D"]) hot[p+"."+k]=Date.now()+ (sc.fade*1000);
+    send(`P${p}.MAN=1`); send(`P${p}.FX=${t.x}`); send(`P${p}.FXS=${t.s??128}`);
+    for(const k of ["R","G","B","D"]) hot[p+"."+k]=Date.now()+(sc.fade*1000);
   });
   const T=Math.max(0,(sc.fade||0)*1000), t0=Date.now();
   const step=()=>{
@@ -684,14 +692,16 @@ function recallScene(sc){
     sc.ports.forEach((t,i)=>{
       if(i>=from.length) return;
       const p=i+1,f=from[i];
-      sendThrottled(p+".R",`P${p}.R=${Math.round(f.r+(t.r-f.r)*e)}`);
-      sendThrottled(p+".G",`P${p}.G=${Math.round(f.g+(t.g-f.g)*e)}`);
-      sendThrottled(p+".B",`P${p}.B=${Math.round(f.b+(t.b-f.b)*e)}`);
+      // One combined write per port per tick (the four-field version was
+      // steppy: packets interleaved and the strip stair-stepped).
+      sendThrottled(p+".RGB",
+        `P${p}.RGB=${Math.round(f.r+(t.r-f.r)*e)},`+
+        `${Math.round(f.g+(t.g-f.g)*e)},${Math.round(f.b+(t.b-f.b)*e)}`);
       sendThrottled(p+".DIM",`P${p}.DIM=${Math.round(f.d+(t.d-f.d)*e)}`);
     });
     if(k>=1) clearInterval(fadeTimer);
   };
-  fadeTimer=setInterval(step,120); step();
+  fadeTimer=setInterval(step,80); step();
 }
 renderScenes();
 
@@ -777,27 +787,49 @@ function tintRGB(rgb,duvUI){                   // + green / − magenta
     .map(v=>Math.max(0,Math.min(255,v)));
 }
 function currentRGB(){ return tintRGB(col.base,col.duv).map(v=>Math.round(v)); }
+// LED strips render blackbody maths colder than it looks on a screen (bench:
+// 4000K read too cold) — warm-trim what we SEND for near-white colours;
+// saturated colours pass untouched. The picker model stays colorimetric.
+function ledAdjust(rgb){
+  if(rgb2hsv(rgb).s>0.75) return rgb;
+  return [rgb[0], rgb[1]*0.96, rgb[2]*0.80]
+    .map(v=>Math.max(0,Math.min(255,Math.round(v))));
+}
 function colTargetList(){
   return colTgt==="all" ? ports.map((_,i)=>i+1) : [+colTgt];
 }
 function pushColour(){
-  const [r,g,b]=currentRGB();
+  const [r,g,b]=ledAdjust(currentRGB());
   const pr=Math.round(r/2.55), pg=Math.round(g/2.55), pb=Math.round(b/2.55);
   const mix=cctMixOf(col.base);
-  colTargetList().forEach(p=>{
-    const pe=ports[p-1]&&ports[p-1].PE;
-    for(const k of ["R","G","B","D","X"]) hot[p+"."+k]=Date.now();
-    if(!colEngaged[p]){                        // stomp: picker owns the port —
-      send(`P${p}.FX=0`);                      // kill any running effect and
-      send(`P${p}.MAN=1`);                     // take manual control
-      colEngaged[p]=true;
-    }
-    if(pe===2||pe===3)                         // CW/WW port: G=cool, R=warm
-      sendThrottled(p+".RGB",`P${p}.RGB=${mix.ww},${mix.cw},0`);
+  const list=colTargetList();
+  const isCct=p=>{const pe=ports[p-1]&&ports[p-1].PE; return pe===2||pe===3;};
+  list.forEach(p=>{ for(const k of ["R","G","B","D","X"]) hot[p+"."+k]=Date.now(); });
+  // ALL + uniform personalities → the firmware's ALL.* commands: two radio
+  // packets total instead of two per port (per-port bursts overflowed the
+  // Android BLE queue and later ports silently missed writes).
+  const mixed = list.some(isCct) && list.some(p=>!isCct(p));
+  if(colTgt==="all" && !mixed){
+    if(!colEngaged.all){ send("ALL.FX=0"); send("ALL.MAN=1"); colEngaged.all=true; }
+    if(list.length && isCct(list[0]))
+      sendThrottled("all.RGB",`ALL.RGB=${mix.ww},${mix.cw},0`);
     else
-      sendThrottled(p+".RGB",`P${p}.RGB=${pr},${pg},${pb}`);
-    sendThrottled(p+".DIM",`P${p}.DIM=${col.dim}`);
-  });
+      sendThrottled("all.RGB",`ALL.RGB=${pr},${pg},${pb}`);
+    sendThrottled("all.DIM",`ALL.DIM=${col.dim}`);
+  }else{
+    list.forEach(p=>{
+      if(!colEngaged[p]){                      // stomp: picker owns the port —
+        send(`P${p}.FX=0`);                    // kill any running effect and
+        send(`P${p}.MAN=1`);                   // take manual control
+        colEngaged[p]=true;
+      }
+      if(isCct(p))                             // CW/WW port: G=cool, R=warm
+        sendThrottled(p+".RGB",`P${p}.RGB=${mix.ww},${mix.cw},0`);
+      else
+        sendThrottled(p+".RGB",`P${p}.RGB=${pr},${pg},${pb}`);
+      sendThrottled(p+".DIM",`P${p}.DIM=${col.dim}`);
+    });
+  }
   paintCols();
 }
 // Seed the picker from what the target port is actually set to. The port's
@@ -1070,6 +1102,66 @@ $("btnCidApply").onclick=()=>{ setupTouched=Date.now();
   send("CID="+Math.max(0,Math.min(9999,+$("setCid").value||0))); };
 $("setCurve").onchange=e=>{ setupTouched=Date.now(); send("CURVE="+ +e.target.value); };
 $("setAmode").onchange=e=>{ setupTouched=Date.now(); send("AMODE="+ +e.target.value); };
+// ---------- prep / reset-all / undo ----------
+$("btnPrep").onclick=()=>{
+  // Programmer prep: colour dialled to full, speed at designed tempo,
+  // dimmer down — nothing lights until you raise a wheel.
+  ports.forEach((_,i)=>{ const p=i+1;
+    for(const k of ["R","G","B","D","S"]) hot[p+"."+k]=Date.now(); });
+  send("ALL.MAN=1"); send("ALL.RGB=100,100,100");
+  send("ALL.FXS=128"); send("ALL.DIM=0");
+};
+async function applyQueue(q,label){
+  for(let i=0;i<q.length;i++){
+    await send(q[i]); await sleep(60);
+    $("impStatus").textContent=`${label}… ${i+1}/${q.length}`;
+  }
+  await send("GET");
+  $("impStatus").textContent=label+" done ✓";
+}
+function snapshotPorts(){
+  return ports.map(m=>({a:m.A??1,h:m.H??0,pe:m.PE??0,m:m.M??0,
+                        r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
+                        x:m.X??0,s:m.S??128}));
+}
+function portQueue(list){
+  const q=[];
+  list.slice(0,ports.length).forEach((t,i)=>{
+    const p=i+1;
+    q.push(`P${p}.ADDR=${t.a??1}`,`P${p}.HEAD=${t.h??0}`,
+           `P${p}.PERS=${t.pe??0}`,
+           `P${p}.RGB=${t.r??0},${t.g??0},${t.b??0}`,
+           `P${p}.DIM=${t.d??100}`,`P${p}.FX=${t.x??0}`,
+           `P${p}.FXS=${t.s??128}`,`P${p}.MAN=${t.m?1:0}`);
+    for(const k of ["R","G","B","D","X","S","ADDR","HEAD","PERS"])
+      hot[p+"."+k]=Date.now()+4000;
+  });
+  return q;
+}
+$("btnResetAll").onclick=async()=>{
+  if(!confirm("Reset ALL ports?\nDMX 001, head 0001, RGB 100%, FX off, "+
+              "speed 128, dimmer 0%.\nUndo will restore the current state."))
+    return;
+  localStorage.setItem("jmb_undo",JSON.stringify(snapshotPorts()));
+  const q=[];
+  ports.forEach((_,i)=>{ const p=i+1;
+    q.push(`P${p}.ADDR=1`,`P${p}.HEAD=1`,`P${p}.RGB=100,100,100`,
+           `P${p}.DIM=0`,`P${p}.FX=0`,`P${p}.FXS=128`,`P${p}.MAN=0`);
+    for(const k of ["R","G","B","D","X","S","ADDR","HEAD"])
+      hot[p+"."+k]=Date.now()+4000;
+  });
+  await applyQueue(q,"Reset");
+};
+$("btnUndo").onclick=async()=>{
+  let snap; try{ snap=JSON.parse(localStorage.getItem("jmb_undo")||""); }
+  catch(_){ $("impStatus").textContent="Nothing to undo."; return; }
+  if(!Array.isArray(snap)){ $("impStatus").textContent="Nothing to undo."; return; }
+  if(!confirm("Restore all ports to the state saved before the last reset?"))
+    return;
+  await applyQueue(portQueue(snap),"Undo");
+};
+$("btnIdent").onclick=()=>send("IDENT");
+
 // ---------- settings export / import ----------
 $("btnExport").onclick=()=>{
   const data={ app:"jmb-zone", ver:1, exported:new Date().toISOString(),
@@ -1101,26 +1193,9 @@ $("impFile").addEventListener("change",async ev=>{
               `${data.ports.length} ports`+(nsc?`, ${nsc} scenes`:"")+
               ` — overwrites current settings.`)) return;
   const q=["CID="+(data.cid||0),"CURVE="+(data.curve||0),
-           "AMODE="+(data.amode||0)];
-  data.ports.slice(0,ports.length).forEach((t,i)=>{
-    const p=i+1;
-    q.push(`P${p}.ADDR=${t.a??1}`,`P${p}.HEAD=${t.h??0}`,
-           `P${p}.PERS=${t.pe??0}`,
-           `P${p}.RGB=${t.r??0},${t.g??0},${t.b??0}`,
-           `P${p}.DIM=${t.d??100}`,`P${p}.FX=${t.x??0}`,
-           `P${p}.FXS=${t.s??128}`,`P${p}.MAN=${t.m?1:0}`);
-    // hold inbound refresh off these fields while the queue drains
-    for(const k of ["R","G","B","D","X","S","ADDR","HEAD","PERS","MAN"])
-      hot[p+"."+k]=Date.now()+4000;
-  });
-  for(let i=0;i<q.length;i++){
-    await send(q[i]);
-    await sleep(60);                    // pace the radio, ~40 msgs ≈ 2.5s
-    $("impStatus").textContent=`Applying… ${i+1}/${q.length}`;
-  }
+           "AMODE="+(data.amode||0)].concat(portQueue(data.ports));
+  await applyQueue(q,"Applying");
   if(nsc){ saveScenes(data.scenes); renderScenes(); }
-  await send("GET");
-  $("impStatus").textContent="Settings applied ✓";
 });
 
 $("btnRefresh").onclick=()=>send("GET");
