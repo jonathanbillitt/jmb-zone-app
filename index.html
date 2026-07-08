@@ -9,9 +9,9 @@
     service a1b20001-…  cmd a1b20002-… (write)  state a1b20003-… (notify/read)
     auth:  "PIN=xxxx" → state notify = accepted, silence = wrong
     cmds:  GET | CID=n | CURVE=n | AMODE=n | NEWPIN=x |
-           Pn.ADDR/HEAD/PERS/MAN/R/G/B/DIM/FX/FXS=v
+           Pn.ADDR/HEAD/PERS/MAN/R/G/B/DIM/FX/FXS=v | Pn.LABEL=hex ("0"=clear)
     state: JMB;FW;PORTS;CID;DMX;FPS;CRV;AM;SL;SC;ASC;ERR;RDM;ANS;
-           Pn=A,PE,M,R,G,B,D,O,F,X,S,H,IA,IB,T,RX,CE;…
+           Pn=A,PE,M,R,G,B,D,O,F,X,S,H,IA,IB,T,RX,CE,L(hex);…
 ========================================================================== -->
 <html lang="en">
 <head>
@@ -35,11 +35,7 @@
   header { display:flex; align-items:center; gap:12px; padding:12px 16px;
            background:var(--card); border-bottom:1px solid var(--line);
            position:sticky; top:0; z-index:5; }
-  header .logo { width:32px; height:32px; border:2.5px solid var(--acc);
-                 border-radius:6px; display:flex; align-items:flex-end;
-                 justify-content:center; gap:2px; padding:4px; }
-  header .logo i { display:block; width:4px; background:var(--acc);
-                   border-radius:1px; }
+  header .logo { width:34px; height:34px; display:block; }
   h1 { font-size:16px; margin:0; flex:1; font-weight:600; }
   button { background:var(--card2); color:var(--text); border:1px solid var(--line);
            border-radius:8px; padding:9px 14px; font-size:14px; cursor:pointer; }
@@ -56,7 +52,14 @@
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px;
           padding:14px 16px; margin-top:12px; }
   .port-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
-  .port-head h2 { font-size:15px; margin:0; flex:1; }
+  .port-head h2 { font-size:15px; margin:0; }
+  .plabel { flex:1; min-width:0; font-size:12px; color:var(--dim);
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+            cursor:pointer; padding:3px 0; }
+  .plabel.empty { opacity:.45; font-style:italic; }
+  .pilabel { font-weight:400; color:var(--dim); font-size:13px; }
+  /* Ports-tab cards have no .plabel — the title itself pushes badges right */
+  #portInfo .port-head h2 { flex:1; }
   .badge { font-size:11px; padding:2px 9px; border-radius:999px; font-weight:600; }
   .badge.on   { background:#12351c; color:var(--ok); }
   .badge.off  { background:#3a2325; color:var(--bad); }
@@ -171,7 +174,24 @@
 <body>
 
 <header>
-  <div class="logo"><i style="height:7px"></i><i style="height:12px"></i><i style="height:18px"></i></div>
+  <svg class="logo" viewBox="0 0 128 128" aria-hidden="true">
+    <defs>
+      <linearGradient id="lgP" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#c53cff"/><stop offset="1" stop-color="#6a2cf5"/>
+      </linearGradient>
+      <linearGradient id="lgC" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#5fd7ff"/><stop offset="1" stop-color="#1f8fe0"/>
+      </linearGradient>
+    </defs>
+    <rect x="6" y="6" width="116" height="116" rx="26" fill="#0b0b18"/>
+    <rect x="14" y="14" width="100" height="100" rx="20" fill="none"
+          stroke="url(#lgP)" stroke-width="9"/>
+    <rect x="32" y="33" width="64" height="11" rx="3" fill="url(#lgP)"/>
+    <rect x="32" y="84" width="64" height="11" rx="3" fill="url(#lgP)"/>
+    <text x="64" y="74" font-family="system-ui,Segoe UI,Roboto,sans-serif"
+          font-size="30" font-weight="800" letter-spacing="1"
+          fill="url(#lgC)" text-anchor="middle">JMB</text>
+  </svg>
   <h1 id="title">JMB Zone</h1>
   <button id="btnConnect" class="primary">Connect</button>
 </header>
@@ -536,6 +556,16 @@ function onState(str){
     if(idx<0||idx>=n) continue;
     const m={};
     for(const f of pstr[k].split(",")){
+      // L = port label, hex-encoded text ("L0" = empty) — decoded here, never
+      // through the numeric whitelist below.
+      if(f[0]==="L"){
+        const hx=f.slice(1);
+        let s="";
+        if(/^(?:[0-9A-F]{2})+$/.test(hx))
+          for(let i=0;i<hx.length;i+=2) s+=String.fromCharCode(parseInt(hx.slice(i,i+2),16));
+        m.L=s.replace(/[^\x20-\x7E]/g,"").slice(0,16);
+        continue;
+      }
       // Keys are WHITELISTED, longest first — F carries hex, and hex digits
       // A-F are valid key letters, so a greedy [A-Z]+ parsed "FA0" as key
       // "FA" and the LATCHED fault bit vanished from every badge (agent
@@ -552,6 +582,19 @@ function onState(str){
   if(n && n!==colPortsN){ renderColourTargets(n); colPortsN=n; }
   renderControl(); renderPortInfo(); renderDiag(); renderSetup();
 }
+function hexEnc(s){
+  let o="";
+  for(const c of s) o+=c.charCodeAt(0).toString(16).padStart(2,"0").toUpperCase();
+  return o;
+}
+function paintLabel(p,v){
+  const el=$("l"+p);
+  if(!el) return;
+  el.textContent=v||"+ label";
+  el.classList.toggle("empty",!v);
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,
+  c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function setChip(id,label,val,cls){
   const el=$(id);
   el.innerHTML=label+" <b>"+val+"</b>";
@@ -589,6 +632,7 @@ function renderControl(){
     const fresh=k=>Date.now()-(hot[p+"."+k]||0)>=HOT_MS;
     if(wheels[p+".D"] && fresh("D")) wheels[p+".D"].set(m.D??100);
     if(wheels[p+".S"] && fresh("S")) wheels[p+".S"].set(m.S??128);
+    if(fresh("L")) paintLabel(p,m.L||"");
     const cr=(m.R??0)*2.55, cg=(m.G??0)*2.55, cb=(m.B??0)*2.55;
     const sw=$("sw"+p);
     sw.style.background=`rgb(${cr},${cg},${cb})`;
@@ -602,6 +646,7 @@ function buildCard(p){
     <div class="port-head">
       <div class="swatch" id="sw${p}"></div>
       <h2>Port ${p}</h2>
+      <span class="plabel" id="l${p}" title="Tap to label this port"></span>
       <span class="badge fault hidden" id="flt${p}"></span>
       <span class="badge off" id="on${p}">—</span>
     </div>
@@ -626,6 +671,16 @@ function buildCard(p){
       </div>
     </div>`;
   const touch=k=>{ hot[p+"."+k]=Date.now(); };
+  d.querySelector("#l"+p).addEventListener("click",()=>{
+    const cur=(ports[p-1]&&ports[p-1].L)||"";
+    let v=prompt("Port "+p+" label (max 16 characters — shows under the head number on the port screen):",cur);
+    if(v===null) return;
+    v=v.replace(/[^\x20-\x7E]/g,"").trim().slice(0,16);
+    touch("L");
+    if(ports[p-1]) ports[p-1].L=v;
+    paintLabel(p,v);
+    send(`P${p}.LABEL=${v?hexEnc(v):"0"}`);
+  });
   d.querySelector("#addr"+p).addEventListener("change",e=>{
     let v=Math.max(1,Math.min(512,+e.target.value||1));
     e.target.value=v; touch("ADDR"); send(`P${p}.ADDR=${v}`);
@@ -1067,7 +1122,7 @@ function renderPortInfo(){
     }
     const on=m.O===1, fw=faultWords(m.F||0);
     card.innerHTML=`
-      <div class="port-head"><h2>Port ${p}</h2>
+      <div class="port-head"><h2>Port ${p}${m.L?` <span class="pilabel">· ${esc(m.L)}</span>`:""}</h2>
         ${fw?`<span class="badge fault">${fw}</span>`:""}
         <span class="badge ${on?"on":"off"}">${on?"online":"offline"}</span>
       </div>
@@ -1210,7 +1265,11 @@ function portQueue(list){
            `P${p}.RGB=${t.r??0},${t.g??0},${t.b??0}`,
            `P${p}.DIM=${t.d??100}`,`P${p}.FX=${t.x??0}`,
            `P${p}.FXS=${t.s??128}`,`P${p}.MAN=${t.m?1:0}`);
-    for(const k of ["R","G","B","D","X","S","ADDR","HEAD","PERS"])
+    if(t.l!==undefined){
+      const lv=String(t.l).replace(/[^\x20-\x7E]/g,"").trim().slice(0,16);
+      q.push(`P${p}.LABEL=${lv?hexEnc(lv):"0"}`);
+    }
+    for(const k of ["R","G","B","D","X","S","ADDR","HEAD","PERS","L"])
       hot[p+"."+k]=Date.now()+4000;
   });
   return q;
@@ -1246,7 +1305,7 @@ $("btnExport").onclick=()=>{
     cid:+(kv.CID||0), curve:+(kv.CRV||0), amode:+(kv.AM||0),
     ports:ports.map(m=>({a:m.A??1,h:m.H??0,pe:m.PE??0,m:m.M??0,
                          r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
-                         x:m.X??0,s:m.S??128})),
+                         x:m.X??0,s:m.S??128,l:m.L||""})),
     scenes:loadScenes() };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const a=document.createElement("a");
