@@ -60,6 +60,12 @@
   .pilabel { font-weight:400; color:var(--dim); font-size:13px; }
   /* Ports-tab cards have no .plabel — the title itself pushes badges right */
   #portInfo .port-head h2 { flex:1; }
+  /* Universe viewer takes the whole screen while open — 512 cells need
+     every pixel they can get on a phone. */
+  #univWrap:not(.hidden) { position:fixed; inset:0; z-index:60;
+    background:var(--bg); padding:14px 14px 18px;
+    display:flex; flex-direction:column; }
+  #univWrap canvas { flex:1; width:100%; min-height:0; }
   .badge { font-size:11px; padding:2px 9px; border-radius:999px; font-weight:600; }
   .badge.on   { background:#12351c; color:var(--ok); }
   .badge.off  { background:#3a2325; color:var(--bad); }
@@ -254,9 +260,13 @@
         <button id="btnUniv">Show levels</button>
       </div>
       <div id="univWrap" class="hidden">
-        <canvas id="univCanvas" style="width:100%;border-radius:10px;
-          border:1px solid var(--line);margin-top:10px;touch-action:none"></canvas>
-        <div class="mini" id="univSel">tap a cell for channel + level</div>
+        <div class="ctlrow" style="margin-bottom:8px">
+          <b style="flex:1">DMX Universe</b>
+          <span class="mini" id="univSel">tap a cell for channel + level</span>
+          <button id="btnUnivClose">Hide</button>
+        </div>
+        <canvas id="univCanvas" style="border-radius:10px;
+          border:1px solid var(--line);touch-action:none"></canvas>
       </div>
     </div>
     <div class="card">
@@ -1155,7 +1165,7 @@ function renderDiag(){
 // 32×16 heatmap of all 512 channels, fed by "JMBU;O=<first>;<hex>" chunks
 // requested with UNIV while the view is open (~1s cadence). Tap for values.
 const univ=new Uint8Array(513);
-let univTimer=null, univSelCh=0;
+let univTimer=null;
 function univStop(){
   if(univTimer){ clearInterval(univTimer); univTimer=null; }
   const w=$("univWrap"), b=$("btnUniv");
@@ -1187,8 +1197,10 @@ function drawUniv(){
   const cv=$("univCanvas");
   if(!cv || $("univWrap").classList.contains("hidden")) return;
   const COLSN=32, ROWS=16;
-  const W=cv.clientWidth||320, H=Math.round(W*ROWS/COLSN);
-  if(cv.width!==W){ cv.width=W; cv.height=H; }
+  // Full-screen overlay: the canvas is flex-stretched, so honour BOTH
+  // dimensions instead of deriving height from width.
+  const W=cv.clientWidth||320, H=cv.clientHeight||Math.round(W*ROWS/COLSN);
+  if(cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; }
   const ctx=cv.getContext("2d"), cw=W/COLSN, chh=H/ROWS;
   for(let ch=1;ch<=512;ch++){
     const i=ch-1, x=(i%COLSN)*cw, y=Math.floor(i/COLSN)*chh, v=univ[ch];
@@ -1200,10 +1212,6 @@ function drawUniv(){
       ctx.fillStyle=`rgb(${r},${g},${b})`;
     }
     ctx.fillRect(x+0.5,y+0.5,cw-1,chh-1);
-    if(ch===univSelCh){
-      ctx.strokeStyle="#4da3ff"; ctx.lineWidth=1.5;
-      ctx.strokeRect(x+0.75,y+0.75,cw-1.5,chh-1.5);
-    }
   }
 }
 $("univCanvas").addEventListener("pointerdown",ev=>{
@@ -1211,12 +1219,10 @@ $("univCanvas").addEventListener("pointerdown",ev=>{
   const cx=Math.floor((ev.clientX-r.left)/r.width*32),
         cy=Math.floor((ev.clientY-r.top)/r.height*16);
   const ch=cy*32+cx+1;
-  if(ch>=1&&ch<=512){
-    univSelCh=ch;
+  if(ch>=1&&ch<=512)
     $("univSel").textContent=`ch ${ch} = ${univ[ch]} (${Math.round(univ[ch]/2.55)}%)`;
-    drawUniv();
-  }
 });
+$("btnUnivClose").onclick=univStop;
 
 // ---------- Setup tab ----------
 let setupTouched=0;
@@ -1235,8 +1241,21 @@ $("setAmode").onchange=e=>{ setupTouched=Date.now(); send("AMODE="+ +e.target.va
 $("btnPrep").onclick=()=>{
   // Programmer prep: colour dialled to full, speed at designed tempo,
   // dimmer down — nothing lights until you raise a wheel.
-  ports.forEach((_,i)=>{ const p=i+1;
-    for(const k of ["R","G","B","D","S"]) hot[p+"."+k]=Date.now(); });
+  ports.forEach((m,i)=>{ const p=i+1;
+    for(const k of ["R","G","B","D","S"]) hot[p+"."+k]=Date.now();
+    // Park the UI where the prep actually put things — faders used to stay
+    // wherever they were, lying about the port state underneath.
+    for(const c of ["R","G","B"]){
+      const el=$(c.toLowerCase()+p);
+      if(el){ el.value=100; $("v"+c+p).textContent=100; }
+    }
+    const sw=$("sw"+p);
+    if(sw){ sw.style.background="rgb(255,255,255)";
+            sw.style.boxShadow="0 0 14px rgba(255,255,255,.55)"; }
+    if(wheels[p+".D"]) wheels[p+".D"].set(0);
+    if(wheels[p+".S"]) wheels[p+".S"].set(128);
+    m.R=m.G=m.B=100; m.D=0; m.S=128; m.M=1;
+  });
   send("ALL.DIM=0");                       // dimmer down FIRST — never a
   send("ALL.MAN=1");                       // full-white blast on the way
   send("ALL.RGB=100,100,100");
