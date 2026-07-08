@@ -787,12 +787,15 @@ function tintRGB(rgb,duvUI){                   // + green / − magenta
     .map(v=>Math.max(0,Math.min(255,v)));
 }
 function currentRGB(){ return tintRGB(col.base,col.duv).map(v=>Math.round(v)); }
-// LED strips render blackbody maths colder than it looks on a screen (bench:
-// 4000K read too cold) — warm-trim what we SEND for near-white colours;
-// saturated colours pass untouched. The picker model stays colorimetric.
+// LED strips render blackbody maths colder than it looks on a screen —
+// warm-trim what we SEND. Bench-tuned twice: 0.80 blue still read cold at
+// 4000K, so the white-point cut is now 30% blue / 6% green, and instead of
+// a hard saturation gate the correction SCALES with whiteness: full at
+// white, fading to nothing by sat 0.75 — pure colours pass untouched and
+// there is no visible step sweeping the Sat fader. Model stays colorimetric.
 function ledAdjust(rgb){
-  if(rgb2hsv(rgb).s>0.75) return rgb;
-  return [rgb[0], rgb[1]*0.96, rgb[2]*0.80]
+  const w=1-Math.min(rgb2hsv(rgb).s/0.75,1);   // 1 = white … 0 = saturated
+  return [rgb[0], rgb[1]*(1-0.06*w), rgb[2]*(1-0.30*w)]
     .map(v=>Math.max(0,Math.min(255,Math.round(v))));
 }
 function colTargetList(){
