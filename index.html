@@ -365,6 +365,13 @@ function hideApp(){
 }
 
 // ---------- BLE ----------
+// Reentrancy guard (agent review): retry-loop disconnects fire the
+// gattserverdisconnected handler, which used to start a SECOND reconnect
+// loop fighting the first; listeners also accumulated across reconnects
+// (N× onState per notify). One busy flag + once-listeners + a named state
+// handler fix the class.
+let busy=false;
+function stateHandler(ev){ onState(dec.decode(ev.target.value)); }
 async function gattSetup(){
   let lastErr=null;
   for(let i=0;i<4;i++){
@@ -375,61 +382,84 @@ async function gattSetup(){
       cmdChar  =await svc.getCharacteristic(CMD);
       stateChar=await svc.getCharacteristic(STATE);
       await stateChar.startNotifications();
-      stateChar.addEventListener("characteristicvaluechanged",
-                                 ev=>onState(dec.decode(ev.target.value)));
+      stateChar.removeEventListener("characteristicvaluechanged",stateHandler);
+      stateChar.addEventListener("characteristicvaluechanged",stateHandler);
+      dev.addEventListener("gattserverdisconnected",onDisconnected,{once:true});
       return;
     }catch(e){ lastErr=e; try{dev.gatt.disconnect();}catch(_){}; await sleep(500); }
   }
   throw lastErr||new Error("unknown");
 }
 async function connect(){
-  try{
-    dev=await navigator.bluetooth.requestDevice({
-      filters:[{services:[SVC]}], optionalServices:[SVC]});
-  }catch(e){ return; }
-  dev.addEventListener("gattserverdisconnected", onDisconnected);
+  if(busy) return;
+  busy=true;
   $("btnConnect").disabled=true;
-  hello("<b>Connecting…</b>");
-  try{ await gattSetup(); }
-  catch(e){
+  try{
+    try{
+      dev=await navigator.bluetooth.requestDevice({
+        filters:[{services:[SVC]}], optionalServices:[SVC]});
+    }catch(e){ return; }                    // user cancelled the chooser
+    hello("<b>Connecting…</b>");
+    try{ await gattSetup(); }
+    catch(e){
+      hello("<b>Couldn't reach the controller.</b>"+
+        "<div class='mini'>("+(e&&e.message||e)+")<br>Android may hold a stale "+
+        "Bluetooth cache after a firmware update — toggle the phone's Bluetooth "+
+        "OFF/ON and retry. Still stuck? Connect once with nRF Connect, "+
+        "disconnect, and retry here.</div>");
+      return;
+    }
+    $("title").textContent=dev.name||"JMB Zone";
+    $("btnConnect").classList.add("hidden");
+    $("hello").classList.add("hidden");
+    authed=false;
+    askPin();
+  }finally{
+    busy=false;
     $("btnConnect").disabled=false;
-    hello("<b>Couldn't reach the controller.</b>"+
-      "<div class='mini'>("+(e&&e.message||e)+")<br>Android may hold a stale "+
-      "Bluetooth cache after a firmware update — toggle the phone's Bluetooth "+
-      "OFF/ON and retry. Still stuck? Connect once with nRF Connect, "+
-      "disconnect, and retry here.</div>");
-    return;
   }
-  $("btnConnect").disabled=false;
-  $("title").textContent=dev.name||"JMB Zone";
-  $("btnConnect").classList.add("hidden");
-  $("hello").classList.add("hidden");
-  authed=false;
-  askPin();
 }
 async function onDisconnected(){
+  if(busy){ cmdChar=null; return; }         // a connect/reconnect owns the link
+  busy=true;
   authed=false; cmdChar=null;
   hideOverlay(); hideApp();
-  if(dev){
-    hello("<b>Link dropped — reconnecting…</b>");
-    try{
-      await sleep(800);
-      await gattSetup();
-      $("hello").classList.add("hidden");
-      askPin();
-      const saved=localStorage.getItem("jmb_pin");
-      if(saved){ $("pinInput").value=saved; tryPin(); }
-      return;
-    }catch(_){}
-  }
-  $("btnConnect").classList.remove("hidden");
-  hello("<b>Disconnected.</b><div class='mini'>Tap Connect to rejoin.</div>");
-  $("ports").innerHTML="";
+  univStop();
+  try{
+    if(dev){
+      hello("<b>Link dropped — reconnecting…</b>");
+      try{
+        await sleep(800);
+        await gattSetup();
+        $("hello").classList.add("hidden");
+        askPin();
+        const saved=localStorage.getItem("jmb_pin");
+        if(saved){ $("pinInput").value=saved; tryPin(); }
+        return;
+      }catch(_){}
+    }
+    $("btnConnect").classList.remove("hidden");
+    hello("<b>Disconnected.</b><div class='mini'>Tap Connect to rejoin.</div>");
+    $("ports").innerHTML="";
+  }finally{ busy=false; }
 }
-async function send(s){
-  if(!cmdChar) return;
-  try{ await cmdChar.writeValueWithoutResponse(enc.encode(s)); }
-  catch(e){ try{ await cmdChar.writeValue(enc.encode(s)); }catch(_){} }
+// SERIALIZED write queue (agent review): Android allows ONE in-flight GATT
+// op — parallel writes reject and were being swallowed, so the LAST value of
+// a drag/fade/prep could silently vanish. Everything now funnels through one
+// promise chain with a retry; ordering is guaranteed.
+let wq=Promise.resolve();
+function send(s){
+  if(!cmdChar) return wq;
+  wq=wq.then(async()=>{
+    if(!cmdChar) return;
+    try{ await cmdChar.writeValueWithoutResponse(enc.encode(s)); }
+    catch(e){
+      await sleep(25);
+      try{ await cmdChar.writeValueWithoutResponse(enc.encode(s)); }
+      catch(e2){ try{ await cmdChar.writeValue(enc.encode(s)); }catch(_){} }
+    }
+  });
+  return wq;
 }
 const pend={}, timers={};
 function sendThrottled(key,line){
@@ -452,16 +482,17 @@ function askPin(){
   setTimeout(()=>$("pinInput").focus(),50);
 }
 function hideOverlay(){ $("overlay").classList.add("hidden"); }
+let pinPending="";
 async function tryPin(){
   const pin=$("pinInput").value.trim();
   if(!pin) return;
   $("pinErr").textContent="";
+  pinPending=pin;                 // persisted only once the controller ACCEPTS
   await send("PIN="+pin);
   clearTimeout(authTimer);
   authTimer=setTimeout(()=>{
     if(!authed) $("pinErr").textContent="No answer — wrong PIN?";
   },1500);
-  localStorage.setItem("jmb_pin",pin);
 }
 $("pinGo").onclick=tryPin;
 $("pinInput").addEventListener("keydown",e=>{ if(e.key==="Enter") tryPin(); });
@@ -475,7 +506,12 @@ function onState(str){
   if(str.startsWith("JMBU;")){ onUniv(str); return; }
   const cont = str.startsWith("JMB+;");
   if(!str.startsWith("JMB;") && !cont) return;
-  if(!authed){ authed=true; hideOverlay(); showApp(); }
+  if(!authed){
+    authed=true;
+    clearTimeout(authTimer);
+    if(pinPending){ localStorage.setItem("jmb_pin",pinPending); pinPending=""; }
+    hideOverlay(); showApp();
+  }
   const pstr={};
   for(const part of str.split(";")){
     const i=part.indexOf("=");
@@ -485,16 +521,29 @@ function onState(str){
   }
   const n=+(kv.PORTS||0);
   while(ports.length<n) ports.push({});
+  if(ports.length>n){                     // variant shrank (8→4 reconnect):
+    for(let i=n+1;i<=8;i++){              // stale cards would still send Pn.*
+      const c1=$("port"+i), c2=$("pi"+i);
+      if(c1) c1.remove();
+      if(c2) c2.remove();
+      delete wheels[i+".D"]; delete wheels[i+".S"];
+    }
+    if(colTgt!=="all" && +colTgt>n) colTgt="all";
+  }
   ports.length=n;
   for(const k in pstr){
     const idx=+k.slice(1)-1;
     if(idx<0||idx>=n) continue;
     const m={};
     for(const f of pstr[k].split(",")){
-      const mm=f.match(/^([A-Z]+)(-?[0-9A-F]+)$/i);
+      // Keys are WHITELISTED, longest first — F carries hex, and hex digits
+      // A-F are valid key letters, so a greedy [A-Z]+ parsed "FA0" as key
+      // "FA" and the LATCHED fault bit vanished from every badge (agent
+      // review — safety-display bug).
+      const mm=f.match(/^(PE|IA|IB|RX|CE|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
       if(mm) m[mm[1]] = mm[1]==="F" ? parseInt(mm[2],16) : +mm[2];
     }
-    ports[idx]=m;
+    ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
   }
   setChip("chipDmx","DMX", kv.DMX==="1"?"live":"none", kv.DMX==="1"?"ok":"bad");
   setChip("chipFps","fps", kv.FPS??"—");
@@ -530,12 +579,12 @@ function renderControl(){
     const bF=$("flt"+p);
     if(flt){ bF.classList.remove("hidden"); bF.textContent=faultWords(m.F)||"FAULT"; }
     else bF.classList.add("hidden");
-    setIf(p,"ADDR",el=>el.value=m.A);
+    setIf(p,"ADDR",el=>el.value=m.A??1);
     setIf(p,"HEAD",el=>el.value=m.H??0);
-    setIf(p,"PERS",el=>el.value=m.PE);
+    setIf(p,"PERS",el=>el.value=m.PE??0);
     setIf(p,"X",   el=>el.value=m.X??0);
     for(const c of ["R","G","B"]){
-      setIf(p,c,el=>{ el.value=m[c]; $("v"+c+p).textContent=m[c]; });
+      setIf(p,c,el=>{ el.value=m[c]??0; $("v"+c+p).textContent=m[c]??0; });
     }
     const fresh=k=>Date.now()-(hot[p+"."+k]||0)>=HOT_MS;
     if(wheels[p+".D"] && fresh("D")) wheels[p+".D"].set(m.D??100);
@@ -638,9 +687,11 @@ function makeWheel(host,{label,min=0,max=100,value=min,fmt=v=>v,onInput}){
       if(onInput) onInput(Math.round(cur));
     };
     const up=()=>{ host.removeEventListener("pointermove",mv);
-                   host.removeEventListener("pointerup",up); };
+                   host.removeEventListener("pointerup",up);
+                   host.removeEventListener("pointercancel",up); };
     host.addEventListener("pointermove",mv);
     host.addEventListener("pointerup",up);
+    host.addEventListener("pointercancel",up);   // notification-shade swipes
   });
   paint();
   return { set:v=>{ cur=v; paint(); } };
@@ -648,7 +699,11 @@ function makeWheel(host,{label,min=0,max=100,value=min,fmt=v=>v,onInput}){
 
 // ---------- Scenes tab ----------
 function loadScenes(){ try{ return JSON.parse(localStorage.getItem("jmb_scenes")||"[]"); }catch(_){ return []; } }
-function saveScenes(s){ localStorage.setItem("jmb_scenes",JSON.stringify(s)); }
+function saveScenes(s){
+  try{ localStorage.setItem("jmb_scenes",JSON.stringify(s)); }
+  catch(e){ const el=$("impStatus");
+            if(el) el.textContent="Scene storage full — not saved."; }
+}
 function renderScenes(){
   const list=$("sceneList"); list.innerHTML="";
   loadScenes().forEach((sc,i)=>{
@@ -681,6 +736,7 @@ async function recallScene(sc){
   const from=ports.map(m=>({r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100}));
   // Effects + speed switch at the start; colours crossfade.
   sc.ports.forEach((t,i)=>{
+    if(i>=ports.length) return;           // scene saved on a bigger variant
     const p=i+1;
     send(`P${p}.MAN=1`); send(`P${p}.FX=${t.x}`); send(`P${p}.FXS=${t.s??128}`);
     for(const k of ["R","G","B","D"]) hot[p+"."+k]=Date.now()+(sc.fade*1000);
@@ -857,7 +913,7 @@ function seedColour(){
       if(tot>0){
         col.base=kelvin2rgb(2700+(cw/tot)*3800);
         col.dim=Math.round((m.D??100)*Math.max(ww,cw)/100);
-      }
+      } else col.dim=0;                 // dark port: keep chroma, honest dim
       col.duv=0;
     } else if(m.R||m.G||m.B){
       const rgbIn=[(m.R??0)*2.55,(m.G??0)*2.55,(m.B??0)*2.55];
@@ -866,7 +922,7 @@ function seedColour(){
       col.base=hsv255(hsv.s>0.02?hsv.h:col._h, hsv.s, 1);
       col.dim=Math.round((m.D??100)*hsv.v);
       col.duv=0;                        // trim can't be recovered from RGB
-    }
+    } else { col.dim=0; col.duv=0; }    // black port: keep chroma, dim to 0
   }
   paintCols();
 }
@@ -942,9 +998,11 @@ function buildCols(){
       el.setPointerCapture(ev.pointerId); drag(ev);
       const mv=e2=>drag(e2);
       const up=()=>{ el.removeEventListener("pointermove",mv);
-                     el.removeEventListener("pointerup",up); };
+                     el.removeEventListener("pointerup",up);
+                     el.removeEventListener("pointercancel",up); };
       el.addEventListener("pointermove",mv);
       el.addEventListener("pointerup",up);
+      el.addEventListener("pointercancel",up);
     });
   });
   paintCols();
@@ -1043,7 +1101,12 @@ function renderDiag(){
 // requested with UNIV while the view is open (~1s cadence). Tap for values.
 const univ=new Uint8Array(513);
 let univTimer=null, univSelCh=0;
-function univStop(){ if(univTimer){ clearInterval(univTimer); univTimer=null; } }
+function univStop(){
+  if(univTimer){ clearInterval(univTimer); univTimer=null; }
+  const w=$("univWrap"), b=$("btnUniv");
+  if(w) w.classList.add("hidden");
+  if(b) b.textContent="Show levels";
+}
 $("btnUniv").onclick=()=>{
   const w=$("univWrap");
   if(w.classList.contains("hidden")){
@@ -1119,10 +1182,13 @@ $("btnPrep").onclick=()=>{
   // dimmer down — nothing lights until you raise a wheel.
   ports.forEach((_,i)=>{ const p=i+1;
     for(const k of ["R","G","B","D","S"]) hot[p+"."+k]=Date.now(); });
-  send("ALL.MAN=1"); send("ALL.RGB=100,100,100");
-  send("ALL.FXS=128"); send("ALL.DIM=0");
+  send("ALL.DIM=0");                       // dimmer down FIRST — never a
+  send("ALL.MAN=1");                       // full-white blast on the way
+  send("ALL.RGB=100,100,100");
+  send("ALL.FXS=128");
 };
 async function applyQueue(q,label){
+  clearInterval(fadeTimer);               // a running scene fade would fight
   for(let i=0;i<q.length;i++){
     await send(q[i]); await sleep(60);
     $("impStatus").textContent=`${label}… ${i+1}/${q.length}`;
@@ -1206,7 +1272,7 @@ $("impFile").addEventListener("change",async ev=>{
   const q=["CID="+(data.cid||0),"CURVE="+(data.curve||0),
            "AMODE="+(data.amode||0)].concat(portQueue(data.ports));
   await applyQueue(q,"Applying");
-  if(nsc){ saveScenes(data.scenes); renderScenes(); }
+  if(nsc){ saveScenes(data.scenes.slice(0,100)); renderScenes(); }
 });
 
 $("btnRefresh").onclick=()=>send("GET");
