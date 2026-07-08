@@ -787,22 +787,30 @@ function tintRGB(rgb,duvUI){                   // + green / − magenta
     .map(v=>Math.max(0,Math.min(255,v)));
 }
 function currentRGB(){ return tintRGB(col.base,col.duv).map(v=>Math.round(v)); }
-// LED strips render blackbody maths colder than it looks on a screen —
-// warm-trim what we SEND. Bench-tuned twice: 0.80 blue still read cold at
-// 4000K, so the white-point cut is now 30% blue / 6% green, and instead of
-// a hard saturation gate the correction SCALES with whiteness: full at
-// white, fading to nothing by sat 0.75 — pure colours pass untouched and
-// there is no visible step sweeping the Sat fader. Model stays colorimetric.
-function ledAdjust(rgb){
-  const w=1-Math.min(rgb2hsv(rgb).s/0.75,1);   // 1 = white … 0 = saturated
-  return [rgb[0], rgb[1]*(1-0.06*w), rgb[2]*(1-0.30*w)]
-    .map(v=>Math.max(0,Math.min(255,Math.round(v))));
+// TAPE WHITE-POINT MAP — bench-calibrated: a true 4000K look required
+// asking for 2500K, i.e. this tape renders blackbody colour ~1.6× colder
+// than nominal. So whites are re-rendered at K × 0.625 before sending,
+// blended by whiteness (full remap at white, none by sat 0.75 — saturated
+// colours pass untouched, no step on the Sat fader). Applied at SEND time
+// only: faders and swatch keep reading honest colorimetric Kelvin, and the
+// same table ships to every controller — units always match.
+const TAPE_K = 2500/4000;
+function ledWhiteRemap(rgb){
+  const hsv=rgb2hsv(rgb);
+  const w=1-Math.min(hsv.s/0.75,1);            // 1 = white … 0 = saturated
+  if(w<=0) return rgb.slice();
+  const cct=rgb2cct(rgb).cct;
+  const warm=kelvin2rgb(Math.max(1000,cct*TAPE_K));
+  return rgb.map((v,i)=>v*(1-w)+warm[i]*w);
 }
 function colTargetList(){
   return colTgt==="all" ? ports.map((_,i)=>i+1) : [+colTgt];
 }
 function pushColour(){
-  const [r,g,b]=ledAdjust(currentRGB());
+  // remap the base white-point for the tape, THEN apply the ΔUV trim so a
+  // deliberate green/magenta tint survives the remap.
+  const [r,g,b]=tintRGB(ledWhiteRemap(col.base),col.duv)
+                  .map(v=>Math.max(0,Math.min(255,Math.round(v))));
   const pr=Math.round(r/2.55), pg=Math.round(g/2.55), pb=Math.round(b/2.55);
   const mix=cctMixOf(col.base);
   const list=colTargetList();
