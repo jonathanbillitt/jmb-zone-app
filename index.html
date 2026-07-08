@@ -188,7 +188,7 @@
           stroke="url(#lgP)" stroke-width="9"/>
     <rect x="32" y="33" width="64" height="11" rx="3" fill="url(#lgP)"/>
     <rect x="32" y="84" width="64" height="11" rx="3" fill="url(#lgP)"/>
-    <text x="64" y="74" font-family="system-ui,Segoe UI,Roboto,sans-serif"
+    <text x="64" y="75" font-family="system-ui,Segoe UI,Roboto,sans-serif"
           font-size="30" font-weight="800" letter-spacing="1"
           fill="url(#lgC)" text-anchor="middle">JMB</text>
   </svg>
@@ -290,7 +290,7 @@
       <div class="ctlrow">
         <button id="btnExport">Export settings</button>
         <button id="btnImport">Import settings…</button>
-        <input type="file" id="impFile" accept=".json,application/json" class="hidden">
+        <input type="file" id="impFile" accept=".jmb,.json,application/json" class="hidden">
       </div>
       <div class="mini">Everything: ID, curve, apply mode, all port patch +
       looks + effects, and this phone's scenes — one shareable file.</div>
@@ -1310,7 +1310,7 @@ $("btnExport").onclick=()=>{
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
-  a.download="jmb-zone-"+(kv.CID||"0")+"-settings.json";
+  a.download="jmb-zone-"+(kv.CID||"0")+"-show.jmb";
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
   $("impStatus").textContent="Exported "+a.download;
