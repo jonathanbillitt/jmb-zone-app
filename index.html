@@ -321,8 +321,9 @@
         <button id="btnResetAll" class="danger">Reset all ports…</button>
         <button id="btnUndo">Undo reset</button>
       </div>
-      <div class="mini">Flash strobes this controller's screen + outputs for
-      3s — tap it after connecting to check you're on the right unit.</div>
+      <div class="mini">Flash strobes this controller's screen “HERE” for
+      3s (outputs untouched) — tap it after connecting to check you're on
+      the right unit.</div>
     </div>
     <div class="card">
       <div class="ctlrow">
@@ -352,7 +353,7 @@
     <button id="pinGo" class="primary" style="width:100%">Unlock</button>
     <button id="pinFlash" style="width:100%;margin-top:8px">Flash this controller</button>
     <div class="mini" style="margin-top:6px">Not sure it's the right one? Flash it —
-    its screen and outputs blink white for 3 seconds.</div>
+    its screen blinks “HERE” for 3 seconds. Outputs are left untouched.</div>
     <div class="err" id="pinErr"></div>
   </div>
 </div>
@@ -374,7 +375,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-09.2";
+const APP_VER="2026-07-09.3";
 let ports=[], kv={};
 const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
