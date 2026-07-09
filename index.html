@@ -360,6 +360,9 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
                 [0x10,"GROUND"],[0x20,"LINK"],[0x40,"24V"],[0x80,"LATCHED"]];
 
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
+// Bump on every deploy — shown in Setup, the fastest way to spot a stale
+// cached copy on a phone.
+const APP_VER="2026-07-09.1";
 let ports=[], kv={};
 const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
@@ -1231,7 +1234,7 @@ function renderSetup(){
   $("setCid").value=kv.CID??"";
   $("setCurve").value=kv.CRV??"0";
   $("setAmode").value=kv.AM??"0";
-  $("fwLine").textContent="Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+" ports";
+  $("fwLine").textContent="Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+" ports · app "+APP_VER;
 }
 $("btnCidApply").onclick=()=>{ setupTouched=Date.now();
   send("CID="+Math.max(0,Math.min(9999,+$("setCid").value||0))); };
