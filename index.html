@@ -122,6 +122,8 @@
   .scene { display:flex; align-items:center; gap:8px; padding:9px 0;
            border-bottom:1px solid var(--line); }
   .scene b { flex:1; font-weight:600; font-size:14px; }
+  .scname { cursor:pointer; }
+  .scname:active { color:var(--acc); }
   .scene input { width:56px; background:var(--card2); color:var(--text);
                  border:1px solid var(--line); border-radius:7px; padding:6px; }
   /* Colour tab — MagicQ-style vertical picker columns */
@@ -220,7 +222,7 @@
 
   <div id="tab-control" class="tab hidden">
     <div class="card"><div class="ctlrow">
-      <button id="btnPrep">Prep all</button>
+      <button id="btnPrep">Clear all</button>
       <span class="mini" style="margin:0">RGB 100% · FX speed 50% · dimmer 0%</span>
     </div></div>
     <div id="ports"></div>
@@ -243,9 +245,10 @@
       <div class="ctlrow">
         <button id="btnSaveScene" class="primary">Save current as scene…</button>
       </div>
-      <div class="mini">Recall sends manual colours to every port; the fade box
-      is seconds of crossfade (0 = snap). Effects switch at the start of the
-      fade. Scenes live in this phone's browser.</div>
+      <div class="mini">Recall crossfades to the scene over the fade seconds
+      (0 = snap), always over that time from any state. Effects fade out (and
+      in) through a dip rather than snapping. Tap a scene's name to rename it.
+      Scenes live in this phone's browser.</div>
       <div id="sceneList"></div>
     </div>
   </div>
@@ -379,7 +382,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-09.4";
+const APP_VER="2026-07-09.5";
 let ports=[], kv={};
 const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
@@ -843,10 +846,16 @@ function renderScenes(){
   loadScenes().forEach((sc,i)=>{
     const row=document.createElement("div");
     row.className="scene";
-    row.innerHTML=`<b>${sc.name}</b>
+    row.innerHTML=`<b class="scname" title="Tap to rename">${esc(sc.name)}</b>
       <input type="number" min="0" max="60" step="0.5" value="${sc.fade??2}" title="fade s">
       <button class="primary">Recall</button><button class="danger">✕</button>`;
     const [fadeIn,btnGo,btnDel]=row.querySelectorAll("input,button");
+    row.querySelector(".scname").onclick=()=>{
+      const v=prompt("Rename scene:",sc.name);
+      if(v===null) return;
+      const nm=v.trim(); if(!nm) return;
+      const all=loadScenes(); all[i].name=nm; saveScenes(all); renderScenes();
+    };
     btnGo.onclick=()=>{ sc.fade=+fadeIn.value||0; const all=loadScenes(); all[i]=sc; saveScenes(all); recallScene(sc); };
     btnDel.onclick=()=>{ const all=loadScenes(); all.splice(i,1); saveScenes(all); renderScenes(); };
     list.appendChild(row);
@@ -865,29 +874,49 @@ let fadeTimer=null;
 async function recallScene(sc){
   clearInterval(fadeTimer);
   // Accuracy: refresh the truth first — a fade computed from stale state
-  // visibly jumped when the rig had moved since the last notify.
+  // visibly jumped when the rig had moved since the last notify. Firing
+  // mid-fade is fine: GET reads wherever the strip currently sits, so the new
+  // scene's time is always honoured from any previous state (effect included).
   send("GET"); await sleep(300);
-  const from=ports.map(m=>({r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100}));
-  // Effects + speed switch at the start; colours crossfade.
-  sc.ports.forEach((t,i)=>{
-    if(i>=ports.length) return;           // scene saved on a bigger variant
-    const p=i+1;
-    send(`P${p}.MAN=1`); send(`P${p}.FX=${t.x}`); send(`P${p}.FXS=${t.s??128}`);
-    for(const k of ["R","G","B","D"]) hot[p+"."+k]=Date.now()+(sc.fade*1000);
-  });
+  const from=ports.map(m=>({r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,fx:m.X??0}));
   const T=Math.max(0,(sc.fade||0)*1000), t0=Date.now();
+  const switched=new Array(ports.length).fill(false);
+  // Hold the driven fields for the whole fade so incoming state can't stomp it.
+  sc.ports.forEach((t,i)=>{ if(i>=ports.length) return; const p=i+1;
+    for(const k of ["R","G","B","D","X","S"]) hot[p+"."+k]=Date.now()+T+500; });
   const step=()=>{
     const k=T?Math.min(1,(Date.now()-t0)/T):1;
     const e=k*k*(3-2*k);                       // smoothstep
     sc.ports.forEach((t,i)=>{
-      if(i>=from.length) return;
-      const p=i+1,f=from[i];
-      // One combined write per port per tick (the four-field version was
-      // steppy: packets interleaved and the strip stair-stepped).
-      sendThrottled(p+".RGB",
-        `P${p}.RGB=${Math.round(f.r+(t.r-f.r)*e)},`+
-        `${Math.round(f.g+(t.g-f.g)*e)},${Math.round(f.b+(t.b-f.b)*e)}`);
-      sendThrottled(p+".DIM",`P${p}.DIM=${Math.round(f.d+(t.d-f.d)*e)}`);
+      if(i>=from.length) return;               // scene saved on a bigger variant
+      const p=i+1, f=from[i];
+      const involvesFx = f.fx || t.x;          // effect on either end?
+      if(involvesFx){
+        // A port shows ONE thing at a time, so an effect can't colour-crossfade
+        // (the app can't see its live colour). Instead fade the old look DOWN
+        // to black over the first half, swap to the scene at the bottom, then
+        // fade the new look UP — a clean dip, no snap, always over the scene's
+        // time. Covers effect→scene, scene→effect and effect→effect.
+        if(e < 0.5){
+          sendThrottled(p+".DIM",`P${p}.DIM=${Math.round(f.d*(1-e/0.5))}`);
+        }else{
+          if(!switched[i]){
+            switched[i]=true;
+            send(`P${p}.MAN=1`); send(`P${p}.FX=${t.x}`); send(`P${p}.FXS=${t.s??128}`);
+            send(`P${p}.RGB=${t.r},${t.g},${t.b}`);
+          }
+          sendThrottled(p+".DIM",`P${p}.DIM=${Math.round(t.d*((e-0.5)/0.5))}`);
+        }
+      }else{
+        // Static → static: true colour crossfade (one combined write per tick;
+        // the four-field version was steppy — packets interleaved).
+        if(!switched[i]){ switched[i]=true;
+          send(`P${p}.MAN=1`); send(`P${p}.FX=${t.x}`); send(`P${p}.FXS=${t.s??128}`); }
+        sendThrottled(p+".RGB",
+          `P${p}.RGB=${Math.round(f.r+(t.r-f.r)*e)},`+
+          `${Math.round(f.g+(t.g-f.g)*e)},${Math.round(f.b+(t.b-f.b)*e)}`);
+        sendThrottled(p+".DIM",`P${p}.DIM=${Math.round(f.d+(t.d-f.d)*e)}`);
+      }
     });
     if(k>=1) clearInterval(fadeTimer);
   };
