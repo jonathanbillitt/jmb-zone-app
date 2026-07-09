@@ -382,7 +382,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-09.5";
+const APP_VER="2026-07-09.6";
 let ports=[], kv={};
 const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
@@ -1340,25 +1340,27 @@ $("btnHoldApply").onclick=()=>{ setupTouched=Date.now();
   send("HOLD="+Math.max(0,Math.min(60,+$("setHold").value||5))); };
 // ---------- prep / reset-all / undo ----------
 $("btnPrep").onclick=()=>{
-  // Programmer prep: colour dialled to full, speed at designed tempo,
-  // dimmer down — nothing lights until you raise a wheel.
+  // Clear to a clean programming base: effect OFF, colour full, speed at
+  // designed tempo, dimmer down — nothing lights until you raise a wheel.
   ports.forEach((m,i)=>{ const p=i+1;
-    for(const k of ["R","G","B","D","S"]) hot[p+"."+k]=Date.now();
-    // Park the UI where the prep actually put things — faders used to stay
-    // wherever they were, lying about the port state underneath.
+    for(const k of ["R","G","B","D","S","X"]) hot[p+"."+k]=Date.now();
+    // Park the UI where the clear actually put things — faders/effect used to
+    // stay wherever they were, lying about the port state underneath.
     for(const c of ["R","G","B"]){
       const el=$(c.toLowerCase()+p);
       if(el){ el.value=100; $("v"+c+p).textContent=100; }
     }
+    const xs=$("x"+p); if(xs) xs.value=0;    // effect select → Off
     const sw=$("sw"+p);
     if(sw){ sw.style.background="rgb(255,255,255)";
             sw.style.boxShadow="0 0 14px rgba(255,255,255,.55)"; }
     if(wheels[p+".D"]) wheels[p+".D"].set(0);
     if(wheels[p+".S"]) wheels[p+".S"].set(128);
-    m.R=m.G=m.B=100; m.D=0; m.S=128; m.M=1;
+    m.R=m.G=m.B=100; m.D=0; m.S=128; m.M=1; m.X=0;
   });
   send("ALL.DIM=0");                       // dimmer down FIRST — never a
   send("ALL.MAN=1");                       // full-white blast on the way
+  send("ALL.FX=0");                        // kill any running effect
   send("ALL.RGB=100,100,100");
   send("ALL.FXS=128");
 };
