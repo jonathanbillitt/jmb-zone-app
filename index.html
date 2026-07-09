@@ -53,11 +53,14 @@
           padding:14px 16px; margin-top:12px; }
   .port-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
   .port-head h2 { font-size:15px; margin:0; }
-  .plabel { flex:1; min-width:0; font-size:12px; color:var(--dim);
-            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-            cursor:pointer; padding:3px 0; }
-  .plabel.empty { opacity:.45; font-style:italic; }
+  .port-head h2 { flex:1; }
   .pilabel { font-weight:400; color:var(--dim); font-size:13px; }
+  .adv { margin-top:6px; border-top:1px solid var(--line); padding-top:4px; }
+  .adv > summary { cursor:pointer; font-size:13px; color:var(--dim);
+                   padding:6px 0; list-style:revert; user-select:none; }
+  .adv[open] > summary { color:var(--text); }
+  .adv .row button.danger { width:100%; }
+  .unit { color:var(--dim); font-size:13px; width:auto; }
   /* Ports-tab cards have no .plabel — the title itself pushes badges right */
   #portInfo .port-head h2 { flex:1; }
   /* Universe viewer takes the whole screen while open — 512 cells need
@@ -294,6 +297,12 @@
             <option value="2">Offset</option></select>
           <span class="mini" style="margin:0">how base addresses fan out</span>
         </div>
+        <div class="row"><label>DMX hold</label>
+          <input type="number" id="setHold" min="0" max="60" step="1">
+          <span class="unit">s</span>
+          <button id="btnHoldApply">Apply</button>
+          <span class="mini" style="margin:0">keep last look after DMX loss · 0 = forever</span>
+        </div>
       </div>
     </div>
     <div class="card">
@@ -341,6 +350,9 @@
     <div class="mini">The controller ignores everything until it hears the PIN.</div>
     <input id="pinInput" inputmode="numeric" autocomplete="off" placeholder="••••">
     <button id="pinGo" class="primary" style="width:100%">Unlock</button>
+    <button id="pinFlash" style="width:100%;margin-top:8px">Flash this controller</button>
+    <div class="mini" style="margin-top:6px">Not sure it's the right one? Flash it —
+    its screen and outputs blink white for 3 seconds.</div>
     <div class="err" id="pinErr"></div>
   </div>
 </div>
@@ -362,7 +374,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-09.1";
+const APP_VER="2026-07-09.2";
 let ports=[], kv={};
 const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
@@ -529,6 +541,15 @@ async function tryPin(){
 }
 $("pinGo").onclick=tryPin;
 $("pinInput").addEventListener("keydown",e=>{ if(e.key==="Enter") tryPin(); });
+// Flash-to-find works before the PIN is entered (firmware accepts IDENT
+// pre-auth) — so with several controllers connected you can confirm which
+// one you picked before typing its PIN.
+$("pinFlash").onclick=()=>{
+  if(!cmdChar){ $("pinErr").textContent="Connect first."; return; }
+  send("IDENT");
+  const b=$("pinFlash"); b.textContent="Flashing…";
+  setTimeout(()=>{ b.textContent="Flash this controller"; },3000);
+};
 
 // ---------- state ----------
 // The controller chunks its state across several notifies when it outgrows
@@ -583,7 +604,7 @@ function onState(str){
       // A-F are valid key letters, so a greedy [A-Z]+ parsed "FA0" as key
       // "FA" and the LATCHED fault bit vanished from every badge (agent
       // review — safety-display bug).
-      const mm=f.match(/^(PE|IA|IB|RX|CE|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
+      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
       if(mm) m[mm[1]] = mm[1]==="F" ? parseInt(mm[2],16) : +mm[2];
     }
     ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
@@ -601,10 +622,8 @@ function hexEnc(s){
   return o;
 }
 function paintLabel(p,v){
-  const el=$("l"+p);
-  if(!el) return;
-  el.textContent=v||"+ label";
-  el.classList.toggle("empty",!v);
+  const el=$("lbl"+p);
+  if(el && document.activeElement!==el) el.value=v||"";
 }
 function esc(s){ return String(s).replace(/[&<>"]/g,
   c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
@@ -639,6 +658,9 @@ function renderControl(){
     setIf(p,"HEAD",el=>el.value=m.H??0);
     setIf(p,"PERS",el=>el.value=m.PE??0);
     setIf(p,"X",   el=>el.value=m.X??0);
+    setIf(p,"PWM", el=>el.value=m.PW??0);
+    setIf(p,"OCP", el=>el.value=((m.OC??6750)/1000).toFixed(2));
+    setIf(p,"OT",  el=>el.value=m.OT??80);
     for(const c of ["R","G","B"]){
       setIf(p,c,el=>{ el.value=m[c]??0; $("v"+c+p).textContent=m[c]??0; });
     }
@@ -659,11 +681,13 @@ function buildCard(p){
     <div class="port-head">
       <div class="swatch" id="sw${p}"></div>
       <h2>Port ${p}</h2>
-      <span class="plabel" id="l${p}" title="Tap to label this port"></span>
       <span class="badge fault hidden" id="flt${p}"></span>
       <span class="badge off" id="on${p}">—</span>
     </div>
     <div class="rows">
+      <div class="row"><label>Label</label>
+        <input type="text" id="lbl${p}" maxlength="16" placeholder="name this port"
+               style="flex:1" autocomplete="off"></div>
       <div class="row"><label>Address</label>
         <input type="number" id="addr${p}" min="1" max="512">
         <label style="width:auto">Head</label>
@@ -682,17 +706,47 @@ function buildCard(p){
         <div class="wheelbox" id="wd${p}"></div>
         <div class="wheelbox" id="ws${p}"></div>
       </div>
+      <details class="adv">
+        <summary>Advanced &amp; protection</summary>
+        <div class="row"><label>PWM</label>
+          <select id="pwm${p}">
+            <option value="0">Smooth 8 kHz</option>
+            <option value="1">Silent 20 kHz</option>
+            <option value="2">Custom</option>
+          </select></div>
+        <div class="row"><label>Current</label>
+          <input type="number" id="ocp${p}" min="0.25" max="6.75" step="0.25">
+          <span class="unit">A</span></div>
+        <div class="row"><label>Temp trip</label>
+          <input type="number" id="ot${p}" min="40" max="110" step="5">
+          <span class="unit">°C</span></div>
+        <div class="row"><button class="danger" id="clrf${p}">Clear fault &amp; re-enable</button></div>
+      </details>
     </div>`;
   const touch=k=>{ hot[p+"."+k]=Date.now(); };
-  d.querySelector("#l"+p).addEventListener("click",()=>{
-    const cur=(ports[p-1]&&ports[p-1].L)||"";
-    let v=prompt("Port "+p+" label (max 16 characters — shows under the head number on the port screen):",cur);
-    if(v===null) return;
-    v=v.replace(/[^\x20-\x7E]/g,"").trim().slice(0,16);
-    touch("L");
+  d.querySelector("#lbl"+p).addEventListener("change",e=>{
+    const v=e.target.value.replace(/[^\x20-\x7E]/g,"").trim().slice(0,16);
+    e.target.value=v; touch("L");
     if(ports[p-1]) ports[p-1].L=v;
-    paintLabel(p,v);
     send(`P${p}.LABEL=${v?hexEnc(v):"0"}`);
+  });
+  d.querySelector("#pwm"+p).addEventListener("change",e=>{
+    touch("PWM"); send(`P${p}.PWM=${+e.target.value}`);
+  });
+  d.querySelector("#ocp"+p).addEventListener("change",e=>{
+    let a=Math.max(0.25,Math.min(6.75,+e.target.value||6.75));
+    a=Math.round(a/0.25)*0.25; e.target.value=a;
+    touch("OCP"); send(`P${p}.OCP=${Math.round(a*1000)}`);
+  });
+  d.querySelector("#ot"+p).addEventListener("change",e=>{
+    let t=Math.max(40,Math.min(110,+e.target.value||80));
+    t=Math.round(t/5)*5; e.target.value=t;
+    touch("OT"); send(`P${p}.OT=${t}`);
+  });
+  d.querySelector("#clrf"+p).addEventListener("click",()=>{
+    send(`P${p}.CLRF=1`);
+    const b=$("clrf"+p), t=b.textContent;
+    b.textContent="Cleared"; setTimeout(()=>{ b.textContent=t; },1500);
   });
   d.querySelector("#addr"+p).addEventListener("change",e=>{
     let v=Math.max(1,Math.min(512,+e.target.value||1));
@@ -1234,12 +1288,15 @@ function renderSetup(){
   $("setCid").value=kv.CID??"";
   $("setCurve").value=kv.CRV??"0";
   $("setAmode").value=kv.AM??"0";
+  $("setHold").value=kv.HOLD??"5";
   $("fwLine").textContent="Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+" ports · app "+APP_VER;
 }
 $("btnCidApply").onclick=()=>{ setupTouched=Date.now();
   send("CID="+Math.max(0,Math.min(9999,+$("setCid").value||0))); };
 $("setCurve").onchange=e=>{ setupTouched=Date.now(); send("CURVE="+ +e.target.value); };
 $("setAmode").onchange=e=>{ setupTouched=Date.now(); send("AMODE="+ +e.target.value); };
+$("btnHoldApply").onclick=()=>{ setupTouched=Date.now();
+  send("HOLD="+Math.max(0,Math.min(60,+$("setHold").value||5))); };
 // ---------- prep / reset-all / undo ----------
 $("btnPrep").onclick=()=>{
   // Programmer prep: colour dialled to full, speed at designed tempo,
@@ -1291,7 +1348,10 @@ function portQueue(list){
       const lv=String(t.l).replace(/[^\x20-\x7E]/g,"").trim().slice(0,16);
       q.push(`P${p}.LABEL=${lv?hexEnc(lv):"0"}`);
     }
-    for(const k of ["R","G","B","D","X","S","ADDR","HEAD","PERS","L"])
+    if(t.pw!==undefined) q.push(`P${p}.PWM=${t.pw}`);
+    if(t.oc!==undefined) q.push(`P${p}.OCP=${t.oc}`);
+    if(t.ot!==undefined) q.push(`P${p}.OT=${t.ot}`);
+    for(const k of ["R","G","B","D","X","S","ADDR","HEAD","PERS","L","PWM","OCP","OT"])
       hot[p+"."+k]=Date.now()+4000;
   });
   return q;
@@ -1327,7 +1387,8 @@ $("btnExport").onclick=()=>{
     cid:+(kv.CID||0), curve:+(kv.CRV||0), amode:+(kv.AM||0),
     ports:ports.map(m=>({a:m.A??1,h:m.H??0,pe:m.PE??0,m:m.M??0,
                          r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
-                         x:m.X??0,s:m.S??128,l:m.L||""})),
+                         x:m.X??0,s:m.S??128,l:m.L||"",
+                         pw:m.PW??0,oc:m.OC??6750,ot:m.OT??80})),
     scenes:loadScenes() };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const a=document.createElement("a");
