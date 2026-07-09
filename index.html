@@ -284,6 +284,10 @@
   <div id="tab-setup" class="tab hidden">
     <div class="card">
       <div class="rows">
+        <div class="row"><label>Name</label>
+          <input type="text" id="setName" maxlength="16" placeholder="name this controller"
+                 style="flex:1" autocomplete="off">
+        </div>
         <div class="row"><label>ID</label>
           <input type="number" id="setCid" min="0" max="9999">
           <button id="btnCidApply">Apply</button>
@@ -382,7 +386,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-09.6";
+const APP_VER="2026-07-09.7";
 let ports=[], kv={};
 const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
@@ -620,7 +624,8 @@ function onState(str){
   setChip("chipDmx","DMX", kv.DMX==="1"?"live":"none", kv.DMX==="1"?"ok":"bad");
   setChip("chipFps","fps", kv.FPS??"—");
   setChip("chipCid","ID",  kv.CID??"—");
-  if(n) $("title").textContent=(dev&&dev.name||"JMB Zone")+" · "+n+"-port";
+  if(n){ const cn=hexDec(kv.CN);
+    $("title").textContent=(cn||(dev&&dev.name)||"JMB Zone")+" · "+n+"-port"; }
   if(n && n!==colPortsN){ renderColourTargets(n); colPortsN=n; }
   renderControl(); renderPortInfo(); renderDiag(); renderSetup();
 }
@@ -628,6 +633,13 @@ function hexEnc(s){
   let o="";
   for(const c of s) o+=c.charCodeAt(0).toString(16).padStart(2,"0").toUpperCase();
   return o;
+}
+function hexDec(hx){
+  hx=String(hx||"");
+  if(!/^(?:[0-9A-Fa-f]{2})+$/.test(hx)) return "";   // "0" / empty / odd = none
+  let s="";
+  for(let i=0;i<hx.length;i+=2) s+=String.fromCharCode(parseInt(hx.slice(i,i+2),16));
+  return s.replace(/[^\x20-\x7E]/g,"").slice(0,16);
 }
 function paintLabel(p,v){
   const el=$("lbl"+p);
@@ -1326,12 +1338,18 @@ $("btnUnivClose").onclick=univStop;
 let setupTouched=0;
 function renderSetup(){
   if(Date.now()-setupTouched<HOT_MS) return;
+  if(document.activeElement!==$("setName")) $("setName").value=hexDec(kv.CN);
   $("setCid").value=kv.CID??"";
   $("setCurve").value=kv.CRV??"0";
   $("setAmode").value=kv.AM??"0";
   $("setHold").value=kv.HOLD??"5";
   $("fwLine").textContent="Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+" ports · app "+APP_VER;
 }
+$("setName").addEventListener("change",e=>{
+  setupTouched=Date.now();
+  const v=e.target.value.replace(/[^\x20-\x7E]/g,"").trim().slice(0,16);
+  e.target.value=v; send("CNAME="+(v?hexEnc(v):"0"));
+});
 $("btnCidApply").onclick=()=>{ setupTouched=Date.now();
   send("CID="+Math.max(0,Math.min(9999,+$("setCid").value||0))); };
 $("setCurve").onchange=e=>{ setupTouched=Date.now(); send("CURVE="+ +e.target.value); };
@@ -1427,7 +1445,7 @@ $("btnIdent").onclick=()=>send("IDENT");
 $("btnExport").onclick=()=>{
   const data={ app:"jmb-zone", ver:1, exported:new Date().toISOString(),
     device:(dev&&dev.name)||"",
-    cid:+(kv.CID||0), curve:+(kv.CRV||0), amode:+(kv.AM||0),
+    cid:+(kv.CID||0), name:hexDec(kv.CN), curve:+(kv.CRV||0), amode:+(kv.AM||0),
     ports:ports.map(m=>({a:m.A??1,h:m.H??0,pe:m.PE??0,m:m.M??0,
                          r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
                          x:m.X??0,s:m.S??128,l:m.L||"",
@@ -1454,7 +1472,9 @@ $("impFile").addEventListener("change",async ev=>{
   if(!confirm(`Apply "${f.name}" to this controller?\n`+
               `${data.ports.length} ports`+(nsc?`, ${nsc} scenes`:"")+
               ` — overwrites current settings.`)) return;
-  const q=["CID="+(data.cid||0),"CURVE="+(data.curve||0),
+  const nm=String(data.name||"").replace(/[^\x20-\x7E]/g,"").trim().slice(0,16);
+  const q=["CID="+(data.cid||0),"CNAME="+(nm?hexEnc(nm):"0"),
+           "CURVE="+(data.curve||0),
            "AMODE="+(data.amode||0)].concat(portQueue(data.ports));
   await applyQueue(q,"Applying");
   if(nsc){ saveScenes(data.scenes.slice(0,100)); renderScenes(); }
