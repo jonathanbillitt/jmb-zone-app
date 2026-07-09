@@ -364,6 +364,10 @@ const SVC   = "a1b20001-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const CMD   = "a1b20002-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const STATE = "a1b20003-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const PERS_NAMES = ["RGB 8-bit","RGB 16-bit","CW/WW 8-bit","CW/WW 16-bit","FX 10ch"];
+// Channels per personality (index = PE). The whole footprint must fit the
+// universe, so the last legal start address is 513 - footprint (10ch → 503).
+const PERS_CH = [3,6,2,4,10];
+const maxAddr = pe => 513 - (PERS_CH[pe] ?? 1);
 const FX_NAMES = ["Off","Candle","Fire","Fireworks","Water","Siren","Laser","Club",
                   "Lightning","Rainbow","Aurora","Sunset","TV Sim","Strobe","Police",
                   "Pulse","Party","Traffic"];
@@ -375,7 +379,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-09.3";
+const APP_VER="2026-07-09.4";
 let ports=[], kv={};
 const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
@@ -657,7 +661,8 @@ function renderControl(){
     else bF.classList.add("hidden");
     setIf(p,"ADDR",el=>el.value=m.A??1);
     setIf(p,"HEAD",el=>el.value=m.H??0);
-    setIf(p,"PERS",el=>el.value=m.PE??0);
+    setIf(p,"PERS",el=>{ el.value=m.PE??0;
+      const af=$("addr"+p); if(af) af.max=maxAddr(m.PE??0); });
     setIf(p,"X",   el=>el.value=m.X??0);
     setIf(p,"PWM", el=>el.value=m.PW??0);
     setIf(p,"OCP", el=>el.value=((m.OC??6750)/1000).toFixed(2));
@@ -750,7 +755,8 @@ function buildCard(p){
     b.textContent="Cleared"; setTimeout(()=>{ b.textContent=t; },1500);
   });
   d.querySelector("#addr"+p).addEventListener("change",e=>{
-    let v=Math.max(1,Math.min(512,+e.target.value||1));
+    const mx=maxAddr(+$("pers"+p).value||0);
+    let v=Math.max(1,Math.min(mx,+e.target.value||1));
     e.target.value=v; touch("ADDR"); send(`P${p}.ADDR=${v}`);
   });
   d.querySelector("#head"+p).addEventListener("change",e=>{
@@ -758,7 +764,12 @@ function buildCard(p){
     e.target.value=v; touch("HEAD"); send(`P${p}.HEAD=${v}`);
   });
   d.querySelector("#pers"+p).addEventListener("change",e=>{
-    touch("PERS"); send(`P${p}.PERS=${+e.target.value}`);
+    const pe=+e.target.value, mx=maxAddr(pe), af=$("addr"+p);
+    af.max=mx;
+    // If the new footprint no longer fits the current start, drop it — the
+    // firmware re-clamps too, but reflect it immediately so the field is honest.
+    if(+af.value>mx){ af.value=mx; touch("ADDR"); send(`P${p}.ADDR=${mx}`); }
+    touch("PERS"); send(`P${p}.PERS=${pe}`);
   });
   d.querySelector("#x"+p).addEventListener("change",e=>{
     touch("X"); send(`P${p}.FX=${+e.target.value}`);
