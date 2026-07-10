@@ -386,7 +386,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-09.7";
+const APP_VER="2026-07-10.1";
 let ports=[], kv={};
 const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
@@ -1451,7 +1451,9 @@ $("btnExport").onclick=()=>{
                          x:m.X??0,s:m.S??128,l:m.L||"",
                          pw:m.PW??0,oc:m.OC??6750,ot:m.OT??80})),
     scenes:loadScenes() };
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  // octet-stream (not application/json) so the browser keeps the .jmb name as-is
+  // instead of appending ".json" → the file was saving as "...jmb.json".
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/octet-stream"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
   a.download="jmb-zone-"+(kv.CID||"0")+"-show.jmb";
