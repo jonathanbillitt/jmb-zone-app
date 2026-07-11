@@ -124,6 +124,8 @@
   .scene b { flex:1; font-weight:600; font-size:14px; }
   .scname { cursor:pointer; }
   .scname:active { color:var(--acc); }
+  .scfade { display:flex; align-items:center; gap:4px; font-size:12px;
+            color:var(--dim); white-space:nowrap; }
   .scene input { width:56px; background:var(--card2); color:var(--text);
                  border:1px solid var(--line); border-radius:7px; padding:6px; }
   /* Colour tab — MagicQ-style vertical picker columns */
@@ -386,7 +388,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-10.1";
+const APP_VER="2026-07-11.1";
 let ports=[], kv={};
 const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
@@ -858,17 +860,32 @@ function renderScenes(){
   loadScenes().forEach((sc,i)=>{
     const row=document.createElement("div");
     row.className="scene";
+    const fv=(sc.fade==null)?2:Math.min(60,Math.max(0,+sc.fade||0));   // sanitise
     row.innerHTML=`<b class="scname" title="Tap to rename">${esc(sc.name)}</b>
-      <input type="number" min="0" max="60" step="0.5" value="${sc.fade??2}" title="fade s">
+      <span class="scfade">Fade
+        <input type="number" min="0" max="60" step="0.5" value="${fv}"
+               inputmode="decimal">s</span>
       <button class="primary">Recall</button><button class="danger">✕</button>`;
-    const [fadeIn,btnGo,btnDel]=row.querySelectorAll("input,button");
+    const fadeIn=row.querySelector("input");
+    const [btnGo,btnDel]=row.querySelectorAll("button");
+    // Persist the fade the MOMENT it changes — no more "only saved on Recall,
+    // and via a whole-object overwrite" that let stale values slip in. Clamp
+    // 0-60s. Also block wheel-scroll from silently nudging the number.
+    const commitFade=()=>{
+      let v=Math.min(60,Math.max(0,+fadeIn.value||0));
+      v=Math.round(v*2)/2;                       // snap to 0.5
+      fadeIn.value=v; sc.fade=v;
+      const all=loadScenes(); if(all[i]){ all[i].fade=v; saveScenes(all); }
+    };
+    fadeIn.addEventListener("change",commitFade);
+    fadeIn.addEventListener("wheel",e=>e.preventDefault(),{passive:false});
     row.querySelector(".scname").onclick=()=>{
       const v=prompt("Rename scene:",sc.name);
       if(v===null) return;
       const nm=v.trim(); if(!nm) return;
       const all=loadScenes(); all[i].name=nm; saveScenes(all); renderScenes();
     };
-    btnGo.onclick=()=>{ sc.fade=+fadeIn.value||0; const all=loadScenes(); all[i]=sc; saveScenes(all); recallScene(sc); };
+    btnGo.onclick=()=>{ commitFade(); recallScene(sc); };   // fade already persisted
     btnDel.onclick=()=>{ const all=loadScenes(); all.splice(i,1); saveScenes(all); renderScenes(); };
     list.appendChild(row);
   });
