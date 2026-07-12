@@ -377,6 +377,28 @@
       keep the supply from tripping.</div>
     </div>
     <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <label style="font-weight:600">Sequencer</label>
+        <button id="seqRun">Run</button>
+      </div>
+      <div class="mini" style="margin-top:0">Standalone colour chase — plays on a
+      loop across all ports whenever there's no DMX (shop windows, architectural).
+      Survives a power blink.</div>
+      <div id="seqList" style="margin:8px 0"></div>
+      <div class="row">
+        <select id="seqLook" style="width:104px"></select>
+        <input type="number" id="seqFade" min="0" max="600" step="0.1" style="width:64px" placeholder="fade">
+        <span class="unit">s</span>
+        <input type="number" id="seqHold" min="0" max="600" step="0.1" style="width:64px" placeholder="hold">
+        <span class="unit">s</span>
+        <button id="seqAdd">Add</button>
+      </div>
+      <div class="ctlrow" style="margin-top:8px">
+        <button id="seqApply">Save to controller</button>
+        <button id="seqClear">Clear</button>
+      </div>
+    </div>
+    <div class="card">
       <div class="ctlrow">
         <button id="btnExport">Export settings</button>
         <button id="btnImport">Import settings…</button>
@@ -450,7 +472,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-12.protect";
+const APP_VER="2026-07-12.seq";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1443,6 +1465,15 @@ function renderSetup(){
   if(document.activeElement!==$("netUni")) $("netUni").value=kv.NUN??"1";
   if(document.activeElement!==$("setFold")) $("setFold").value=kv.TF??"1";
   if(document.activeElement!==$("setPsu"))  $("setPsu").value=((+(kv.PB||0))/10)||0;
+  // Sequencer: Run button reflects live state; step list syncs unless editing
+  $("seqRun").textContent = kv.SQ==="1" ? "Stop" : "Run";
+  $("seqRun").className = kv.SQ==="1" ? "danger" : "";
+  if(Date.now()-seqTouched>=HOT_MS){
+    seqSteps=(kv.SQS||"").split(",").filter(Boolean).map(t=>{
+      const [look,fade_ds,hold_ds]=t.split(":").map(Number);
+      return {look,fade_ds,hold_ds};});
+    renderSeqList();
+  }
   const srcName=["off","DMX","sACN","Art-Net"][+(kv.SRC||0)]||"—";
   const netOn=(kv.NET==="1"), wifiUp=(kv.NW==="1");
   $("netStatus").textContent = !netOn ? "off"
@@ -1454,6 +1485,34 @@ $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.val
 $("btnPsuApply").onclick=()=>{ setupTouched=Date.now();
   const da=Math.round(Math.max(0,Math.min(60,+$("setPsu").value||0))*10);
   send("PSUDA="+da); };
+// ---------- Sequencer ----------
+const SEQ_LOOKS=[[2,"Red"],[3,"Orange"],[4,"Yellow"],[5,"Green"],[6,"Cyan"],
+  [7,"Blue"],[8,"Magenta"],[9,"White"],[10,"2200K"],[11,"2700K"],[12,"3200K"],
+  [13,"4000K"],[14,"5600K"],[15,"6500K"],[1,"Off"]];
+const seqName=v=>{const f=SEQ_LOOKS.find(x=>x[0]===+v);return f?f[1]:"?";};
+let seqSteps=[], seqTouched=0;
+(function(){const s=$("seqLook");if(s)SEQ_LOOKS.forEach(([v,n])=>{
+  const o=document.createElement("option");o.value=v;o.textContent=n;s.appendChild(o);});})();
+function renderSeqList(){
+  const el=$("seqList");if(!el)return;
+  el.innerHTML = seqSteps.length ? seqSteps.map((s,i)=>
+    `<div class="row" style="justify-content:space-between;padding:2px 0">
+       <span>${i+1}. <b>${seqName(s.look)}</b> · ${(s.fade_ds/10)}s fade · ${(s.hold_ds/10)}s hold</span>
+       <button data-si="${i}" class="seqDel">✕</button></div>`).join("")
+    : `<div class="mini" style="margin:0">No steps — add some, or Save an empty list to keep the default rainbow.</div>`;
+  el.querySelectorAll(".seqDel").forEach(b=>b.onclick=()=>{
+    seqTouched=Date.now(); seqSteps.splice(+b.dataset.si,1); renderSeqList();});
+}
+$("seqAdd").onclick=()=>{ seqTouched=Date.now();
+  seqSteps.push({look:+$("seqLook").value,
+    fade_ds:Math.round(Math.max(0,Math.min(600,+$("seqFade").value||2))*10),
+    hold_ds:Math.round(Math.max(0,Math.min(600,+$("seqHold").value||3))*10)});
+  renderSeqList(); };
+$("seqClear").onclick=()=>{ seqTouched=Date.now(); seqSteps=[]; renderSeqList(); };
+$("seqApply").onclick=async()=>{ seqTouched=Date.now();
+  const q=["SEQCLR",...seqSteps.map(s=>`SEQADD=${s.look},${s.fade_ds},${s.hold_ds}`)];
+  await applyQueue(q,"Sequence"); seqTouched=0; };
+$("seqRun").onclick=()=>{ send("SEQ="+(kv.SQ==="1"?"0":"1")); };
 $("netEn").onchange=e=>{ setupTouched=Date.now(); send("NET="+ +e.target.value); };
 $("btnUniApply").onclick=()=>{ setupTouched=Date.now();
   send("WUNI="+Math.max(1,Math.min(63999,+$("netUni").value||1))); };
