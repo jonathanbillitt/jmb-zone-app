@@ -1,9 +1,15 @@
 {
   "name": "JMB Zone",
   "short_name": "JMB Zone",
-  "description": "JMB Zone LED controller companion",
+  "description": "Companion controller for JMB Zone LED lighting: patch, colour, effects, scenes and telemetry over Bluetooth.",
+  "id": "/jmb-zone-app/",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["utilities", "productivity"],
   "background_color": "#08081a",
   "theme_color": "#08081a",
   "icons": [
