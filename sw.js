@@ -3,7 +3,7 @@
 // with no signal (handy at a venue). Strategy is NETWORK-FIRST so an online
 // launch always gets the freshest build, falling back to the cached copy only
 // when the network is unreachable. Bump CACHE on each deploy to evict old copies.
-const CACHE  = "jmb-zone-2026-07-12.play";
+const CACHE  = "jmb-zone-2026-07-12.protect";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest",
                 "./icon.svg", "./icon-maskable.svg", "./privacy.html"];
 
