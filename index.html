@@ -399,6 +399,19 @@
       </div>
     </div>
     <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <label style="font-weight:600">Chain broadcast</label>
+      </div>
+      <div class="ctlrow" style="margin-top:6px">
+        <button id="chBlack" class="danger">Blackout chain</button>
+        <button id="chFull">Full chain</button>
+        <button id="chDmx">DMX In</button>
+      </div>
+      <div class="mini">Sets a look on this unit <em>and</em> every <b>armed</b> unit down
+      the DMX line. Arm each downstream unit first on its panel: menu → Setup →
+      <b>Chain Listen → ARMED</b>. Deploy from the first controller in the chain.</div>
+    </div>
+    <div class="card">
       <div class="ctlrow">
         <button id="btnExport">Export settings</button>
         <button id="btnImport">Import settings…</button>
@@ -472,7 +485,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-12.seq";
+const APP_VER="2026-07-13.chain";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1513,6 +1526,10 @@ $("seqApply").onclick=async()=>{ seqTouched=Date.now();
   const q=["SEQCLR",...seqSteps.map(s=>`SEQADD=${s.look},${s.fade_ds},${s.hold_ds}`)];
   await applyQueue(q,"Sequence"); seqTouched=0; };
 $("seqRun").onclick=()=>{ send("SEQ="+(kv.SQ==="1"?"0":"1")); };
+// ---------- Chain broadcast (factory look index: 0=DMX In, 1=Off, 9=White) ----------
+$("chBlack").onclick=()=>send("CHLOOK=1");
+$("chFull").onclick=()=>send("CHLOOK=9");
+$("chDmx").onclick=()=>send("CHLOOK=0");
 $("netEn").onchange=e=>{ setupTouched=Date.now(); send("NET="+ +e.target.value); };
 $("btnUniApply").onclick=()=>{ setupTouched=Date.now();
   send("WUNI="+Math.max(1,Math.min(63999,+$("netUni").value||1))); };
