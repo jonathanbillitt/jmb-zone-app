@@ -119,6 +119,12 @@
   .mini { color:var(--dim); font-size:12px; margin-top:8px; }
   .ctlrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   .hidden { display:none !important; }
+  .dmxwarn { background:#3d2f14; border:1px solid var(--warn); color:var(--warn);
+             border-radius:12px; padding:12px 14px; margin-bottom:12px;
+             font-size:13.5px; line-height:1.45; }
+  .dmxwarn strong { display:block; color:var(--warn); font-size:15px; margin-bottom:3px; }
+  .dmxwarn em { color:var(--text); font-style:normal; font-weight:600; }
+  .dmxwarn #dmxWarnSrc { font-weight:700; }
   .scene { display:flex; align-items:center; gap:8px; padding:9px 0;
            border-bottom:1px solid var(--line); }
   .scene b { flex:1; font-weight:600; font-size:14px; }
@@ -223,6 +229,11 @@
   </div>
 
   <div id="tab-control" class="tab hidden">
+    <div id="dmxWarn" class="dmxwarn hidden">
+      <strong>Live DMX in control</strong>
+      <span id="dmxWarnSrc"></span> is driving the outputs — manual colour, dimmer
+      and effects here are <em>overridden</em> until the signal stops.
+    </div>
     <div class="card"><div class="ctlrow">
       <button id="btnPrep">Clear all</button>
       <span class="mini" style="margin:0">RGB 100% · FX speed 50% · dimmer 0%</span>
@@ -315,6 +326,36 @@
       </div>
     </div>
     <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <label style="font-weight:600">Network DMX</label>
+        <span class="mini" id="netStatus" style="margin:0">—</span>
+      </div>
+      <div class="rows">
+        <div class="row"><label>Enable</label>
+          <select id="netEn" style="width:90px"><option value="0">Off</option>
+            <option value="1">On</option></select>
+          <span class="mini" style="margin:0">receive sACN / Art-Net over Wi-Fi</span>
+        </div>
+        <div class="row"><label>Wi-Fi</label>
+          <input type="text" id="netSsid" placeholder="network name (SSID)"
+                 style="flex:1" autocomplete="off">
+        </div>
+        <div class="row"><label>Password</label>
+          <input type="password" id="netPass" placeholder="leave blank to keep"
+                 style="flex:1" autocomplete="off">
+          <button id="btnWifiApply">Join</button>
+        </div>
+        <div class="row"><label>Universe</label>
+          <input type="number" id="netUni" min="1" max="63999" style="width:90px">
+          <button id="btnUniApply">Apply</button>
+          <span class="mini" style="margin:0">match the console's output universe</span>
+        </div>
+      </div>
+      <div class="mini">A lighting console (or an Art-Net node) on the same Wi-Fi
+      router streams the universe here — no DMX cable to the fixtures. Wired DMX
+      still works and out-prioritises the network on a tie.</div>
+    </div>
+    <div class="card">
       <div class="ctlrow">
         <button id="btnExport">Export settings</button>
         <button id="btnImport">Import settings…</button>
@@ -388,7 +429,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-11.2";
+const APP_VER="2026-07-12.dmxwarn";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -669,6 +710,17 @@ function setIf(p,key,apply){
 
 // ---------- Control tab ----------
 function renderControl(){
+  // Live DMX / sACN / Art-Net outranks everything on this tab — warn loudly so
+  // "my faders do nothing" is self-explaining rather than a support call.
+  const dmxLive = kv.DMX==="1";
+  const w=$("dmxWarn");
+  if(w){
+    w.classList.toggle("hidden", !dmxLive);
+    if(dmxLive){
+      const src=["a network source","DMX","sACN","Art-Net"][+(kv.SRC||1)]||"DMX";
+      $("dmxWarnSrc").textContent=src+(kv.FPS?` (${kv.FPS} fps)`:"");
+    }
+  }
   const root=$("ports");
   ports.forEach((m,idx)=>{
     const p=idx+1;
@@ -1365,8 +1417,27 @@ function renderSetup(){
   $("setCurve").value=kv.CRV??"0";
   $("setAmode").value=kv.AM??"0";
   $("setHold").value=kv.HOLD??"5";
+  // Network DMX — don't stomp a field the user is editing
+  if(document.activeElement!==$("netEn"))  $("netEn").value=kv.NET??"0";
+  if(document.activeElement!==$("netUni")) $("netUni").value=kv.NUN??"1";
+  const srcName=["off","DMX","sACN","Art-Net"][+(kv.SRC||0)]||"—";
+  const netOn=(kv.NET==="1"), wifiUp=(kv.NW==="1");
+  $("netStatus").textContent = !netOn ? "off"
+      : wifiUp ? `Wi-Fi ${kv.NIP||""} · ${kv.NRS||"?"}dBm · live: ${srcName}`
+      : "connecting…";
   $("fwLine").textContent="Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+" ports · app "+APP_VER;
 }
+$("netEn").onchange=e=>{ setupTouched=Date.now(); send("NET="+ +e.target.value); };
+$("btnUniApply").onclick=()=>{ setupTouched=Date.now();
+  send("WUNI="+Math.max(1,Math.min(63999,+$("netUni").value||1))); };
+$("btnWifiApply").onclick=()=>{ setupTouched=Date.now();
+  const ss=$("netSsid").value.trim();
+  const pw=$("netPass").value;                    // may contain spaces/symbols
+  if(ss) send("WSSID="+hexEnc(ss));
+  if(pw) send("WPASS="+hexEnc(pw));               // blank = keep existing
+  $("netPass").value="";                          // never leave the secret on screen
+  send("NET=1"); $("netEn").value="1";            // joining implies enable
+};
 $("setName").addEventListener("change",e=>{
   setupTouched=Date.now();
   const v=e.target.value.replace(/[^\x20-\x7E]/g,"").trim().slice(0,16);
