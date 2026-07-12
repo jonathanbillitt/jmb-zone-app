@@ -504,7 +504,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-13.fx";
+const APP_VER="2026-07-13.native";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -552,7 +552,15 @@ function hideApp(){
 // handler fix the class.
 let busy=false;
 function stateHandler(ev){ onState(dec.decode(ev.target.value)); }
+// Native BLE bridge: present only inside the Capacitor iOS/Android shell (set by
+// the bundled ble-native.js). When absent (the PWA / Chrome / Bluefy), every
+// call below falls through to the original Web Bluetooth path — unchanged.
+const NBLE=()=>window.JmbNativeBle||null;
+const devName=()=>NBLE()?NBLE().name:((dev&&dev.name)||"");
+const bleAvailable=()=>!!(navigator.bluetooth||NBLE());
+const bleConnected=()=>NBLE()?!!NBLE().connected:!!cmdChar;
 async function gattSetup(){
+  if(NBLE()){ await NBLE().openAndSubscribe(s=>onState(s),onDisconnected); return; }
   let lastErr=null;
   for(let i=0;i<4;i++){
     try{
@@ -576,7 +584,8 @@ async function connect(){
   $("btnConnect").disabled=true;
   try{
     try{
-      dev=await navigator.bluetooth.requestDevice({
+      if(NBLE()){ await NBLE().requestDevice(); }
+      else dev=await navigator.bluetooth.requestDevice({
         filters:[{services:[SVC]}], optionalServices:[SVC]});
     }catch(e){ return; }                    // user cancelled the chooser
     hello("<b>Connecting…</b>");
@@ -589,7 +598,7 @@ async function connect(){
         "disconnect, and retry here.</div>");
       return;
     }
-    $("title").textContent=dev.name||"JMB Zone";
+    $("title").textContent=devName()||"JMB Zone";
     $("btnConnect").classList.add("hidden");
     $("hello").classList.add("hidden");
     authed=false;
@@ -629,6 +638,11 @@ async function onDisconnected(){
 // promise chain with a retry; ordering is guaranteed.
 let wq=Promise.resolve();
 function send(s){
+  if(NBLE()){
+    if(!NBLE().connected) return wq;
+    wq=wq.then(()=>NBLE().write(s).catch(()=>{}));
+    return wq;
+  }
   if(!cmdChar) return wq;
   wq=wq.then(async()=>{
     if(!cmdChar) return;
@@ -748,7 +762,7 @@ function onState(str){
   setChip("chipFps","fps", kv.FPS??"—");
   setChip("chipCid","ID",  kv.CID??"—");
   if(n){ const cn=hexDec(kv.CN);
-    $("title").textContent=(cn||(dev&&dev.name)||"JMB Zone")+" · "+n+"-port"; }
+    $("title").textContent=(cn||devName()||"JMB Zone")+" · "+n+"-port"; }
   if(n && n!==colPortsN){ renderColourTargets(n); colPortsN=n; }
   renderControl(); renderPortInfo(); renderDiag(); renderSetup();
 }
@@ -1690,7 +1704,7 @@ $("btnIdent").onclick=()=>send("IDENT");
 // ---------- settings export / import ----------
 $("btnExport").onclick=()=>{
   const data={ app:"jmb-zone", ver:1, exported:new Date().toISOString(),
-    device:(dev&&dev.name)||"",
+    device:devName(),
     cid:+(kv.CID||0), name:hexDec(kv.CN), curve:+(kv.CRV||0), amode:+(kv.AM||0),
     ports:ports.map(m=>({a:m.A??1,h:m.H??0,pe:m.PE??0,m:m.M??0,
                          r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
@@ -1729,7 +1743,8 @@ $("impFile").addEventListener("change",async ev=>{
 });
 
 $("btnRefresh").onclick=()=>send("GET");
-$("btnDisc").onclick=()=>{ const d0=dev; dev=null; if(d0&&d0.gatt.connected) d0.gatt.disconnect(); };
+$("btnDisc").onclick=()=>{ if(NBLE()){ NBLE().disconnect(); onDisconnected(); return; }
+  const d0=dev; dev=null; if(d0&&d0.gatt.connected) d0.gatt.disconnect(); };
 $("btnPin").onclick=()=>{
   const v=prompt("New PIN (4-16 characters, no spaces):");
   if(v&&v.trim().length>=4){
@@ -1740,10 +1755,10 @@ $("btnPin").onclick=()=>{
 };
 $("btnConnect").onclick=connect;
 
-if(!navigator.bluetooth){
+if(!bleAvailable()){
   hello("<b>This browser has no Web Bluetooth.</b>"+
     "<div class='mini'>Use Chrome or Edge (Android / desktop). On iPhone, "+
-    "open this page in the Bluefy browser.</div>");
+    "open this page in the Bluefy browser — or install the App Store build.</div>");
   $("btnConnect").disabled=true;
 }
 </script>
