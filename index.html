@@ -257,6 +257,7 @@
     <div class="card">
       <div class="ctlrow">
         <button id="btnSaveScene" class="primary">Save current as scene…</button>
+        <button id="btnCapture">Capture live</button>
       </div>
       <div class="mini">Recall crossfades to the scene over the fade seconds
       (0 = snap), always over that time from any state. Effects fade out (and
@@ -412,6 +413,24 @@
       <b>Chain Listen → ARMED</b>. Deploy from the first controller in the chain.</div>
     </div>
     <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <label style="font-weight:600">Effects</label>
+        <span class="mini" id="fxBpmNow" style="margin:0"></span>
+      </div>
+      <div class="row">
+        <button id="fxTap" style="min-width:88px">Tap</button>
+        <input type="number" id="fxBpm" min="60" max="240" style="width:70px">
+        <span class="unit">BPM</span>
+        <button id="fxBpmApply">Set</button>
+      </div>
+      <div class="row"><label>Spread</label>
+        <input type="range" id="fxSpread" min="0" max="100" step="5" style="flex:1">
+        <span id="fxSpreadV" style="width:38px;text-align:right"></span>
+      </div>
+      <div class="mini">Tap to set the rig's effect tempo (or type a BPM). Spread
+      offsets each port in time so effects sweep across the rig as a wave.</div>
+    </div>
+    <div class="card">
       <div class="ctlrow">
         <button id="btnExport">Export settings</button>
         <button id="btnImport">Import settings…</button>
@@ -485,7 +504,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-13.chain";
+const APP_VER="2026-07-13.fx";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1012,6 +1031,16 @@ $("btnSaveScene").onclick=()=>{
   all.push({name:name.trim(),fade:2,ports:snap});
   saveScenes(all); renderScenes();
 };
+// One-tap capture of the current look — no prompt, auto-named by time.
+$("btnCapture").onclick=()=>{
+  const snap=ports.map(m=>({r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
+                            x:m.X??0,s:m.S??128}));
+  const t=new Date(), hh=String(t.getHours()).padStart(2,"0"),
+        mm=String(t.getMinutes()).padStart(2,"0");
+  const all=loadScenes();
+  all.push({name:`Live ${hh}:${mm}`,fade:2,ports:snap});
+  saveScenes(all); renderScenes();
+};
 let fadeTimer=null;
 async function recallScene(sc){
   clearInterval(fadeTimer);
@@ -1481,6 +1510,11 @@ function renderSetup(){
   // Sequencer: Run button reflects live state; step list syncs unless editing
   $("seqRun").textContent = kv.SQ==="1" ? "Stop" : "Run";
   $("seqRun").className = kv.SQ==="1" ? "danger" : "";
+  // Effects: tempo + spread
+  if(document.activeElement!==$("fxBpm")) $("fxBpm").value=kv.BPM??"128";
+  $("fxBpmNow").textContent=(kv.BPM??"128")+" BPM";
+  if(document.activeElement!==$("fxSpread")){ $("fxSpread").value=kv.SPR??"0";
+    $("fxSpreadV").textContent=(kv.SPR??"0")+"%"; }
   if(Date.now()-seqTouched>=HOT_MS){
     seqSteps=(kv.SQS||"").split(",").filter(Boolean).map(t=>{
       const [look,fade_ds,hold_ds]=t.split(":").map(Number);
@@ -1530,6 +1564,22 @@ $("seqRun").onclick=()=>{ send("SEQ="+(kv.SQ==="1"?"0":"1")); };
 $("chBlack").onclick=()=>send("CHLOOK=1");
 $("chFull").onclick=()=>send("CHLOOK=9");
 $("chDmx").onclick=()=>send("CHLOOK=0");
+// ---------- Effects: tap-tempo + spread ----------
+let tapTimes=[];
+$("fxTap").onclick=()=>{ const now=Date.now();
+  if(tapTimes.length && now-tapTimes[tapTimes.length-1]>2000) tapTimes=[];  // new tap set
+  tapTimes.push(now); if(tapTimes.length>6) tapTimes.shift();
+  if(tapTimes.length>=2){
+    const iv=[]; for(let i=1;i<tapTimes.length;i++) iv.push(tapTimes[i]-tapTimes[i-1]);
+    const avg=iv.reduce((a,b)=>a+b,0)/iv.length;
+    let bpm=Math.round(60000/avg); bpm=Math.max(60,Math.min(240,bpm));
+    setupTouched=Date.now(); $("fxBpm").value=bpm; $("fxBpmNow").textContent=bpm+" BPM";
+    send("BPM="+bpm);
+  } };
+$("fxBpmApply").onclick=()=>{ setupTouched=Date.now();
+  send("BPM="+Math.max(60,Math.min(240,+$("fxBpm").value||128))); };
+$("fxSpread").oninput=()=>{ $("fxSpreadV").textContent=$("fxSpread").value+"%"; };
+$("fxSpread").onchange=()=>{ setupTouched=Date.now(); send("SPREAD="+ +$("fxSpread").value); };
 $("netEn").onchange=e=>{ setupTouched=Date.now(); send("NET="+ +e.target.value); };
 $("btnUniApply").onclick=()=>{ setupTouched=Date.now();
   send("WUNI="+Math.max(1,Math.min(63999,+$("netUni").value||1))); };
