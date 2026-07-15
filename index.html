@@ -504,7 +504,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-13.native";
+const APP_VER="2026-07-13.review";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -615,7 +615,7 @@ async function onDisconnected(){
   hideOverlay(); hideApp();
   univStop();
   try{
-    if(dev){
+    if(dev || NBLE()){          // native path keeps deviceId, not dev — allow reconnect
       hello("<b>Link dropped — reconnecting…</b>");
       try{
         await sleep(800);
@@ -665,7 +665,11 @@ function sendThrottled(key,line){
 // gone; this quietly (re)arms manual at most every 2.5s per port.
 const lastMan={};
 function ensureMan(p){
-  if(Date.now()-(lastMan[p]||0)>2500){ lastMan[p]=Date.now(); send(`P${p}.MAN=1`); }
+  // Touching a colour is a manual takeover — also stomp any running effect
+  // (effect outranks manual in firmware, so without FX=0 the sliders look dead
+  // on an effected port). Matches the colour-picker path's behaviour.
+  if(Date.now()-(lastMan[p]||0)>2500){ lastMan[p]=Date.now();
+    send(`P${p}.FX=0`); send(`P${p}.MAN=1`); }
 }
 
 // ---------- PIN ----------
@@ -694,7 +698,7 @@ $("pinInput").addEventListener("keydown",e=>{ if(e.key==="Enter") tryPin(); });
 // pre-auth) — so with several controllers connected you can confirm which
 // one you picked before typing its PIN.
 $("pinFlash").onclick=()=>{
-  if(!cmdChar){ $("pinErr").textContent="Connect first."; return; }
+  if(!bleConnected()){ $("pinErr").textContent="Connect first."; return; }
   send("IDENT");
   const b=$("pinFlash"); b.textContent="Flashing…";
   setTimeout(()=>{ b.textContent="Flash this controller"; },3000);
@@ -1055,21 +1059,25 @@ $("btnCapture").onclick=()=>{
   all.push({name:`Live ${hh}:${mm}`,fade:2,ports:snap});
   saveScenes(all); renderScenes();
 };
-let fadeTimer=null;
+let fadeTimer=null, recallGen=0;
 async function recallScene(sc){
-  clearInterval(fadeTimer);
+  const myGen=++recallGen;             // supersede any in-flight recall
+  clearInterval(fadeTimer); fadeTimer=null;
   // Accuracy: refresh the truth first — a fade computed from stale state
   // visibly jumped when the rig had moved since the last notify. Firing
   // mid-fade is fine: GET reads wherever the strip currently sits, so the new
   // scene's time is always honoured from any previous state (effect included).
   send("GET"); await sleep(300);
+  if(myGen!==recallGen) return;        // a newer recall started during the await
   const from=ports.map(m=>({r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,fx:m.X??0}));
   const T=Math.max(0,(sc.fade||0)*1000), t0=Date.now();
   const switched=new Array(ports.length).fill(false);
   // Hold the driven fields for the whole fade so incoming state can't stomp it.
   sc.ports.forEach((t,i)=>{ if(i>=ports.length) return; const p=i+1;
     for(const k of ["R","G","B","D","X","S"]) hot[p+"."+k]=Date.now()+T+500; });
+  let myTimer=null;
   const step=()=>{
+    if(myGen!==recallGen){ clearInterval(myTimer); return; }  // superseded → stop THIS timer
     const k=T?Math.min(1,(Date.now()-t0)/T):1;
     const e=k*k*(3-2*k);                       // smoothstep
     sc.ports.forEach((t,i)=>{
@@ -1103,9 +1111,9 @@ async function recallScene(sc){
         sendThrottled(p+".DIM",`P${p}.DIM=${Math.round(f.d+(t.d-f.d)*e)}`);
       }
     });
-    if(k>=1) clearInterval(fadeTimer);
+    if(k>=1) clearInterval(myTimer);
   };
-  fadeTimer=setInterval(step,80); step();
+  myTimer=setInterval(step,80); fadeTimer=myTimer; step();
 }
 renderScenes();
 
@@ -1461,7 +1469,7 @@ $("btnUniv").onclick=()=>{
     w.classList.remove("hidden");
     $("btnUniv").textContent="Hide";
     send("UNIV");
-    univTimer=setInterval(()=>{ if(cmdChar) send("UNIV"); },1000);
+    univTimer=setInterval(()=>{ if(bleConnected()) send("UNIV"); },1000);
   }else{
     w.classList.add("hidden");
     $("btnUniv").textContent="Show levels";
@@ -1660,8 +1668,11 @@ function portQueue(list){
   const q=[];
   list.slice(0,ports.length).forEach((t,i)=>{
     const p=i+1;
-    q.push(`P${p}.ADDR=${t.a??1}`,`P${p}.HEAD=${t.h??0}`,
-           `P${p}.PERS=${t.pe??0}`,
+    // PERS before ADDR: the firmware clamps a start address against the CURRENT
+    // personality's footprint, so setting personality first stops an imported
+    // address (valid for its own personality) getting clamped low.
+    q.push(`P${p}.PERS=${t.pe??0}`,
+           `P${p}.ADDR=${t.a??1}`,`P${p}.HEAD=${t.h??0}`,
            `P${p}.RGB=${t.r??0},${t.g??0},${t.b??0}`,
            `P${p}.DIM=${t.d??100}`,`P${p}.FX=${t.x??0}`,
            `P${p}.FXS=${t.s??128}`,`P${p}.MAN=${t.m?1:0}`);

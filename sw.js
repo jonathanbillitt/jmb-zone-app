@@ -26,8 +26,10 @@ self.addEventListener("fetch", e => {
   e.respondWith(
     fetch(req)
       .then(resp => {                                   // online: serve + refresh cache
-        const copy = resp.clone();
-        caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+        if (resp && resp.ok) {                          // never cache a 404/5xx — a
+          const copy = resp.clone();                    // transient error must not
+          caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); // poison the shell
+        }
         return resp;
       })
       .catch(() =>                                      // offline: cached, else app shell
