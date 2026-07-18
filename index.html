@@ -366,16 +366,9 @@
             <option value="0">Off</option></select>
           <span class="mini" style="margin:0">dim a hot port instead of tripping</span>
         </div>
-        <div class="row"><label>PSU limit</label>
-          <input type="number" id="setPsu" min="0" max="60" step="0.5" style="width:90px">
-          <span class="unit">A</span>
-          <button id="btnPsuApply">Apply</button>
-          <span class="mini" style="margin:0">0 = off · caps total 24V draw</span>
-        </div>
       </div>
       <div class="mini">Thermal foldback eases a port down over the last 10°C
-      before its trip so it rides through; the PSU limit scales the whole rig to
-      keep the supply from tripping.</div>
+      before its trip so it rides through instead of hard-latching.</div>
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between">
@@ -504,7 +497,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-13.review";
+const APP_VER="2026-07-17.ux";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1528,7 +1521,6 @@ function renderSetup(){
   if(document.activeElement!==$("netEn"))  $("netEn").value=kv.NET??"0";
   if(document.activeElement!==$("netUni")) $("netUni").value=kv.NUN??"1";
   if(document.activeElement!==$("setFold")) $("setFold").value=kv.TF??"1";
-  if(document.activeElement!==$("setPsu"))  $("setPsu").value=((+(kv.PB||0))/10)||0;
   // Sequencer: Run button reflects live state; step list syncs unless editing
   $("seqRun").textContent = kv.SQ==="1" ? "Stop" : "Run";
   $("seqRun").className = kv.SQ==="1" ? "danger" : "";
@@ -1551,9 +1543,6 @@ function renderSetup(){
   $("fwLine").textContent="Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+" ports · app "+APP_VER;
 }
 $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.value); };
-$("btnPsuApply").onclick=()=>{ setupTouched=Date.now();
-  const da=Math.round(Math.max(0,Math.min(60,+$("setPsu").value||0))*10);
-  send("PSUDA="+da); };
 // ---------- Sequencer ----------
 const SEQ_LOOKS=[[2,"Red"],[3,"Orange"],[4,"Yellow"],[5,"Green"],[6,"Cyan"],
   [7,"Blue"],[8,"Magenta"],[9,"White"],[10,"2200K"],[11,"2700K"],[12,"3200K"],
