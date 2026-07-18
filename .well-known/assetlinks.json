@@ -1,10 +1,14 @@
-[{
-  "relation": ["delegate_permission/common.handle_all_urls"],
-  "target": {
-    "namespace": "android_app",
-    "package_name": "REPLACE_WITH_YOUR_PACKAGE_NAME",
-    "sha256_cert_fingerprints": [
-      "REPLACE_WITH_SHA256_FINGERPRINT_FROM_PLAY_APP_SIGNING"
-    ]
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.jmbzone.control",
+      "sha256_cert_fingerprints": [
+        "44:D4:21:53:50:F3:FC:14:72:4E:E6:B7:17:3A:C5:35:B7:45:A3:0B:C2:99:50:D8:CA:4C:64:94:28:7B:5D:27"
+      ]
+    }
   }
-}]
+]
