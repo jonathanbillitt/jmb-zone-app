@@ -226,6 +226,16 @@
     <b>Not connected.</b>
     <div class="mini">Tap Connect and pick your controller (“JMB Zone #ID-XXXX”).
     Chrome/Edge only — on iPhone use the Bluefy browser. Bluetooth on.</div>
+    <div class="ctlrow" style="margin-top:10px">
+      <button id="btnDemo">Explore in demo mode</button>
+    </div>
+    <div class="mini">Browse every tab with example data — no controller needed.
+    Nothing you tap is sent anywhere.</div>
+  </div>
+
+  <div id="demoBar" class="hidden" style="background:#1e2a3d;border:1px solid #4a6da8;
+       color:#9cc0f5;border-radius:12px;padding:8px 12px;margin-bottom:12px;font-size:13px">
+    <b>DEMO</b> — example data, not a live controller. Tap <b>Connect</b> to use your rig.
   </div>
 
   <div id="tab-control" class="tab hidden">
@@ -497,7 +507,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-17.ux";
+const APP_VER="2026-07-18.demo";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -526,6 +536,9 @@ document.querySelectorAll("#nav button").forEach(btn=>{
   };
 });
 function showApp(){
+  if(typeof demoTimer!=="undefined" && cmdChar||NBLE()&&NBLE().connected){
+    clearInterval(demoTimer); $("demoBar").classList.add("hidden");
+  }
   $("hello").classList.add("hidden");
   $("chips").classList.remove("hidden");
   $("nav").classList.remove("hidden");
@@ -1754,6 +1767,27 @@ $("btnPin").onclick=()=>{
   }
 };
 $("btnConnect").onclick=connect;
+// ---------- DEMO MODE ----------
+// Browse the whole app with example data and no hardware: store reviewers and
+// prospective users can explore every tab. send() already no-ops while
+// disconnected, so nothing a demo user touches goes anywhere.
+let demoTimer=null;
+$("btnDemo").onclick=()=>{
+  const P=(n,a,r,g,b,x)=>`P${n}=A${a},PE0,M1,R${r},G${g},B${b},D80,O1,F00,X${x},S128,H${n},`+
+    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6750,OT80,L0;`;
+  const seed=()=>onState(
+    "JMB;FW=demo;PORTS=4;CID=7;DMX=0;FPS=0;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=0;ERR=0;"+
+    "RDM=42;ANS=42;NET=1;NW=1;NUN=1;SRC=0;NIP=192.168.1.42;NRS=-52;TF=1;PB=0;"+
+    "SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=128;SPR=30;"+
+    "CN="+Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join("")+";"+
+    P(1,1,100,40,0,0)+P(2,4,0,80,100,0)+P(3,7,100,0,60,9)+P(4,10,100,100,100,0));
+  seed();
+  $("demoBar").classList.remove("hidden");
+  $("title").textContent="JMB Zone · demo";
+  showApp();
+  clearInterval(demoTimer);
+  demoTimer=setInterval(seed,3000);   // keep state fresh across tab hops
+};
 
 if(!bleAvailable()){
   hello("<b>This browser has no Web Bluetooth.</b>"+
