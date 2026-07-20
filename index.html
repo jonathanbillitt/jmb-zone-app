@@ -234,8 +234,10 @@
   </div>
 
   <div id="demoBar" class="hidden" style="background:#1e2a3d;border:1px solid #4a6da8;
-       color:#9cc0f5;border-radius:12px;padding:8px 12px;margin-bottom:12px;font-size:13px">
-    <b>DEMO</b> — example data, not a live controller. Tap <b>Connect</b> to use your rig.
+       color:#9cc0f5;border-radius:12px;padding:8px 12px;margin-bottom:12px;font-size:13px;
+       display:flex;align-items:center;gap:10px">
+    <span style="flex:1"><b>DEMO</b> — example data, not a live controller.</span>
+    <button id="btnDemoExit" style="flex:none">Exit demo</button>
   </div>
 
   <div id="tab-control" class="tab hidden">
@@ -382,28 +384,6 @@
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between">
-        <label style="font-weight:600">Sequencer</label>
-        <button id="seqRun">Run</button>
-      </div>
-      <div class="mini" style="margin-top:0">Standalone colour chase — plays on a
-      loop across all ports whenever there's no DMX (shop windows, architectural).
-      Survives a power blink.</div>
-      <div id="seqList" style="margin:8px 0"></div>
-      <div class="row">
-        <select id="seqLook" style="width:104px"></select>
-        <input type="number" id="seqFade" min="0" max="600" step="0.1" style="width:64px" placeholder="fade">
-        <span class="unit">s</span>
-        <input type="number" id="seqHold" min="0" max="600" step="0.1" style="width:64px" placeholder="hold">
-        <span class="unit">s</span>
-        <button id="seqAdd">Add</button>
-      </div>
-      <div class="ctlrow" style="margin-top:8px">
-        <button id="seqApply">Save to controller</button>
-        <button id="seqClear">Clear</button>
-      </div>
-    </div>
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
         <label style="font-weight:600">Chain broadcast</label>
       </div>
       <div class="ctlrow" style="margin-top:6px">
@@ -418,20 +398,13 @@
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <label style="font-weight:600">Effects</label>
-        <span class="mini" id="fxBpmNow" style="margin:0"></span>
-      </div>
-      <div class="row">
-        <button id="fxTap" style="min-width:88px">Tap</button>
-        <input type="number" id="fxBpm" min="60" max="240" style="width:70px">
-        <span class="unit">BPM</span>
-        <button id="fxBpmApply">Set</button>
       </div>
       <div class="row"><label>Spread</label>
         <input type="range" id="fxSpread" min="0" max="100" step="5" style="flex:1">
         <span id="fxSpreadV" style="width:38px;text-align:right"></span>
       </div>
-      <div class="mini">Tap to set the rig's effect tempo (or type a BPM). Spread
-      offsets each port in time so effects sweep across the rig as a wave.</div>
+      <div class="mini">Spread offsets each port in time so effects sweep across
+      the rig as a wave.</div>
     </div>
     <div class="card">
       <div class="ctlrow">
@@ -507,7 +480,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-18.demo";
+const APP_VER="2026-07-19.polish";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -832,6 +805,11 @@ function renderControl(){
     const bF=$("flt"+p);
     if(flt){ bF.classList.remove("hidden"); bF.textContent=faultWords(m.F)||"FAULT"; }
     else bF.classList.add("hidden");
+    // Advanced: the clear/re-enable control only exists WHILE faulted;
+    // healthy ports show a green tick instead.
+    const fcb=$("clrf"+p), fnf=$("nof"+p);
+    if(fcb) fcb.classList.toggle("hidden",!flt);
+    if(fnf) fnf.classList.toggle("hidden",flt);
     setIf(p,"ADDR",el=>el.value=m.A??1);
     setIf(p,"HEAD",el=>el.value=m.H??0);
     setIf(p,"PERS",el=>{ el.value=m.PE??0;
@@ -899,7 +877,10 @@ function buildCard(p){
         <div class="row"><label>Temp trip</label>
           <input type="number" id="ot${p}" min="40" max="110" step="5">
           <span class="unit">°C</span></div>
-        <div class="row"><button class="danger" id="clrf${p}">Clear fault &amp; re-enable</button></div>
+        <div class="row">
+          <button class="danger hidden" id="clrf${p}">Clear fault &amp; re-enable</button>
+          <span class="mini" id="nof${p}" style="margin:0;color:var(--ok);font-weight:600">&#10003; No faults</span>
+        </div>
       </details>
     </div>`;
   const touch=k=>{ hot[p+"."+k]=Date.now(); };
@@ -946,15 +927,32 @@ function buildCard(p){
   });
   d.querySelector("#x"+p).addEventListener("change",e=>{
     touch("X"); send(`P${p}.FX=${+e.target.value}`);
+    if(+e.target.value>0){
+      // Effect engaged: sliders become its RGB trim — open at full.
+      for(const [id,fl] of [["r","R"],["g","G"],["b","B"]]){
+        const el=d.querySelector("#"+id+p); if(el){ el.value=100; }
+        const vl=$("v"+fl+p); if(vl) vl.textContent="100";
+        send(`P${p}.FX${fl}=100`);
+      }
+    }
   });
   for(const [id,field] of [["r","R"],["g","G"],["b","B"]]){
     d.querySelector("#"+id+p).addEventListener("input",e=>{
-      touch(field);
-      ensureMan(p);      // touching a colour IS the intent — no toggle needed
       $("v"+field+p).textContent=e.target.value;
       const cur={R:+$("r"+p).value,G:+$("g"+p).value,B:+$("b"+p).value};
       $("sw"+p).style.background=`rgb(${cur.R*2.55},${cur.G*2.55},${cur.B*2.55})`;
-      sendThrottled(p+"."+field,`P${p}.${field}=${e.target.value}`);
+      const m=ports[p-1]||{};
+      if((m.X||0)>0 && m.M!==1){
+        // EFFECT TRIM: while an effect runs, the sliders MASK its channels
+        // (all at full = untouched effect; pull one down to take that colour
+        // out — e.g. Rainbow minus blue). The effect keeps running.
+        touch(field);
+        sendThrottled(p+".FX"+field,`P${p}.FX${field}=${e.target.value}`);
+      }else{
+        touch(field);
+        ensureMan(p);    // touching a colour IS the intent — no toggle needed
+        sendThrottled(p+"."+field,`P${p}.${field}=${e.target.value}`);
+      }
     });
   }
   wheels[p+".D"]=makeWheel(d.querySelector("#wd"+p),{
@@ -1005,7 +1003,19 @@ function makeWheel(host,{label,min=0,max=100,value=min,fmt=v=>v,onInput}){
 }
 
 // ---------- Scenes tab ----------
-function loadScenes(){ try{ return JSON.parse(localStorage.getItem("jmb_scenes")||"[]"); }catch(_){ return []; } }
+function loadScenes(){ try{
+  // NORMALISE on every load: only {name, fade 0-60, ports[]} survive. Old app
+  // versions let stray state (head numbers etc.) into stored scenes — those
+  // entries persist in localStorage across app updates, so scrub here, not
+  // just at write time.
+  const a=JSON.parse(localStorage.getItem("jmb_scenes")||"[]");
+  if(!Array.isArray(a)) return [];
+  return a.filter(x=>x&&typeof x==="object").map(x=>({
+    name:String(x.name??"Scene").slice(0,40),
+    fade:Math.min(60,Math.max(0,+x.fade||0)),
+    ports:Array.isArray(x.ports)?x.ports:[]}));
+ }catch(_){ return []; } }
+const SCENE_MAX=100;   // per-phone cap (documented in the manual)
 function saveScenes(s){
   try{ localStorage.setItem("jmb_scenes",JSON.stringify(s)); }
   catch(e){ const el=$("impStatus");
@@ -1047,6 +1057,7 @@ function renderScenes(){
   });
 }
 $("btnSaveScene").onclick=()=>{
+  if(loadScenes().length>=SCENE_MAX){ alert("Scene limit reached ("+SCENE_MAX+") — delete some first."); return; }
   const name=prompt("Scene name:");
   if(!name) return;
   const snap=ports.map(m=>({r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
@@ -1057,6 +1068,7 @@ $("btnSaveScene").onclick=()=>{
 };
 // One-tap capture of the current look — no prompt, auto-named by time.
 $("btnCapture").onclick=()=>{
+  if(loadScenes().length>=SCENE_MAX){ alert("Scene limit reached ("+SCENE_MAX+") — delete some first."); return; }
   const snap=ports.map(m=>({r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
                             x:m.X??0,s:m.S??128}));
   const t=new Date(), hh=String(t.getHours()).padStart(2,"0"),
@@ -1435,7 +1447,7 @@ function renderPortInfo(){
       </div>
       <table>
         <tr><th>Patch</th><td class="num">${PERS_NAMES[m.PE]??"?"} @ ${m.A??"—"} · head ${m.H??"—"}</td></tr>
-        <tr><th>Current</th><td class="num">A ${m.IA??"—"} mA · B ${m.IB??"—"} mA</td></tr>
+        <tr><th>Current</th><td class="num">A ${m.IA!=null?(m.IA/1000).toFixed(3)+" A":"—"} · B ${m.IB!=null?(m.IB/1000).toFixed(3)+" A":"—"}</td></tr>
         <tr><th>Temp</th><td class="num">${m.T!=null?(m.T/10).toFixed(1)+" °C":"—"}</td></tr>
         <tr><th>Source</th><td>${kv.DMX==="1"?"DMX":(m.X?FX_NAMES[m.X]:(m.M?"manual":"hold"))}</td></tr>
       </table>`;
@@ -1534,20 +1546,9 @@ function renderSetup(){
   if(document.activeElement!==$("netEn"))  $("netEn").value=kv.NET??"0";
   if(document.activeElement!==$("netUni")) $("netUni").value=kv.NUN??"1";
   if(document.activeElement!==$("setFold")) $("setFold").value=kv.TF??"1";
-  // Sequencer: Run button reflects live state; step list syncs unless editing
-  $("seqRun").textContent = kv.SQ==="1" ? "Stop" : "Run";
-  $("seqRun").className = kv.SQ==="1" ? "danger" : "";
-  // Effects: tempo + spread
-  if(document.activeElement!==$("fxBpm")) $("fxBpm").value=kv.BPM??"128";
-  $("fxBpmNow").textContent=(kv.BPM??"128")+" BPM";
+  // Effects: spread
   if(document.activeElement!==$("fxSpread")){ $("fxSpread").value=kv.SPR??"0";
     $("fxSpreadV").textContent=(kv.SPR??"0")+"%"; }
-  if(Date.now()-seqTouched>=HOT_MS){
-    seqSteps=(kv.SQS||"").split(",").filter(Boolean).map(t=>{
-      const [look,fade_ds,hold_ds]=t.split(":").map(Number);
-      return {look,fade_ds,hold_ds};});
-    renderSeqList();
-  }
   const srcName=["off","DMX","sACN","Art-Net"][+(kv.SRC||0)]||"—";
   const netOn=(kv.NET==="1"), wifiUp=(kv.NW==="1");
   $("netStatus").textContent = !netOn ? "off"
@@ -1556,52 +1557,11 @@ function renderSetup(){
   $("fwLine").textContent="Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+" ports · app "+APP_VER;
 }
 $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.value); };
-// ---------- Sequencer ----------
-const SEQ_LOOKS=[[2,"Red"],[3,"Orange"],[4,"Yellow"],[5,"Green"],[6,"Cyan"],
-  [7,"Blue"],[8,"Magenta"],[9,"White"],[10,"2200K"],[11,"2700K"],[12,"3200K"],
-  [13,"4000K"],[14,"5600K"],[15,"6500K"],[1,"Off"]];
-const seqName=v=>{const f=SEQ_LOOKS.find(x=>x[0]===+v);return f?f[1]:"?";};
-let seqSteps=[], seqTouched=0;
-(function(){const s=$("seqLook");if(s)SEQ_LOOKS.forEach(([v,n])=>{
-  const o=document.createElement("option");o.value=v;o.textContent=n;s.appendChild(o);});})();
-function renderSeqList(){
-  const el=$("seqList");if(!el)return;
-  el.innerHTML = seqSteps.length ? seqSteps.map((s,i)=>
-    `<div class="row" style="justify-content:space-between;padding:2px 0">
-       <span>${i+1}. <b>${seqName(s.look)}</b> · ${(s.fade_ds/10)}s fade · ${(s.hold_ds/10)}s hold</span>
-       <button data-si="${i}" class="seqDel">✕</button></div>`).join("")
-    : `<div class="mini" style="margin:0">No steps — add some, or Save an empty list to keep the default rainbow.</div>`;
-  el.querySelectorAll(".seqDel").forEach(b=>b.onclick=()=>{
-    seqTouched=Date.now(); seqSteps.splice(+b.dataset.si,1); renderSeqList();});
-}
-$("seqAdd").onclick=()=>{ seqTouched=Date.now();
-  seqSteps.push({look:+$("seqLook").value,
-    fade_ds:Math.round(Math.max(0,Math.min(600,+$("seqFade").value||2))*10),
-    hold_ds:Math.round(Math.max(0,Math.min(600,+$("seqHold").value||3))*10)});
-  renderSeqList(); };
-$("seqClear").onclick=()=>{ seqTouched=Date.now(); seqSteps=[]; renderSeqList(); };
-$("seqApply").onclick=async()=>{ seqTouched=Date.now();
-  const q=["SEQCLR",...seqSteps.map(s=>`SEQADD=${s.look},${s.fade_ds},${s.hold_ds}`)];
-  await applyQueue(q,"Sequence"); seqTouched=0; };
-$("seqRun").onclick=()=>{ send("SEQ="+(kv.SQ==="1"?"0":"1")); };
 // ---------- Chain broadcast (factory look index: 0=DMX In, 1=Off, 9=White) ----------
 $("chBlack").onclick=()=>send("CHLOOK=1");
 $("chFull").onclick=()=>send("CHLOOK=9");
 $("chDmx").onclick=()=>send("CHLOOK=0");
-// ---------- Effects: tap-tempo + spread ----------
-let tapTimes=[];
-$("fxTap").onclick=()=>{ const now=Date.now();
-  if(tapTimes.length && now-tapTimes[tapTimes.length-1]>2000) tapTimes=[];  // new tap set
-  tapTimes.push(now); if(tapTimes.length>6) tapTimes.shift();
-  if(tapTimes.length>=2){
-    const iv=[]; for(let i=1;i<tapTimes.length;i++) iv.push(tapTimes[i]-tapTimes[i-1]);
-    const avg=iv.reduce((a,b)=>a+b,0)/iv.length;
-    let bpm=Math.round(60000/avg); bpm=Math.max(60,Math.min(240,bpm));
-    setupTouched=Date.now(); $("fxBpm").value=bpm; $("fxBpmNow").textContent=bpm+" BPM";
-    send("BPM="+bpm);
-  } };
-$("fxBpmApply").onclick=()=>{ setupTouched=Date.now();
-  send("BPM="+Math.max(60,Math.min(240,+$("fxBpm").value||128))); };
+// ---------- Effects: spread ----------
 $("fxSpread").oninput=()=>{ $("fxSpreadV").textContent=$("fxSpread").value+"%"; };
 $("fxSpread").onchange=()=>{ setupTouched=Date.now(); send("SPREAD="+ +$("fxSpread").value); };
 $("netEn").onchange=e=>{ setupTouched=Date.now(); send("NET="+ +e.target.value); };
@@ -1787,6 +1747,11 @@ $("btnDemo").onclick=()=>{
   showApp();
   clearInterval(demoTimer);
   demoTimer=setInterval(seed,3000);   // keep state fresh across tab hops
+};
+$("btnDemoExit").onclick=()=>{
+  // Leave demo: stop the seeder and return to the connect screen clean.
+  clearInterval(demoTimer); demoTimer=null;
+  location.reload();
 };
 
 if(!bleAvailable()){
