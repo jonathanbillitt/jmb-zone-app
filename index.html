@@ -340,6 +340,23 @@
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between">
+        <label style="font-weight:600">CRMX Wireless</label>
+        <span class="mini" id="crmxStatus" style="margin:0">&#8212;</span>
+      </div>
+      <div class="ctlrow" style="margin-top:6px">
+        <button id="crmxLink" class="primary">Link</button>
+        <button id="crmxUnlink" class="danger">Unlink</button>
+        <select id="crmxAnt" style="width:110px">
+          <option value="1">Ext antenna</option>
+          <option value="0">Int antenna</option>
+        </select>
+      </div>
+      <div class="mini">Link pairs with a transmitter that's in linking mode
+      (e.g. Aurora); Unlink forgets it. Status is data-truth: "linked &#8212; no data"
+      means paired but the transmitter isn't sending.</div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
         <label style="font-weight:600">Network DMX</label>
         <span class="mini" id="netStatus" style="margin:0">—</span>
       </div>
@@ -480,7 +497,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-19.polish";
+const APP_VER="2026-07-24.crmx";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1549,6 +1566,12 @@ function renderSetup(){
   // Effects: spread
   if(document.activeElement!==$("fxSpread")){ $("fxSpread").value=kv.SPR??"0";
     $("fxSpreadV").textContent=(kv.SPR??"0")+"%"; }
+  // CRMX: CX 0=not linked 1=linking 2=linked/no data 3=linked+data
+  if(kv.CX!=null){
+    $("crmxStatus").textContent=["not linked","linking…",
+      "linked — no data","linked · "+(kv.FPS??"?")+"Hz"][+kv.CX]||"—";
+    if(document.activeElement!==$("crmxAnt")) $("crmxAnt").value=kv.CA??"1";
+  }
   const srcName=["off","DMX","sACN","Art-Net"][+(kv.SRC||0)]||"—";
   const netOn=(kv.NET==="1"), wifiUp=(kv.NW==="1");
   $("netStatus").textContent = !netOn ? "off"
@@ -1564,6 +1587,11 @@ $("chDmx").onclick=()=>send("CHLOOK=0");
 // ---------- Effects: spread ----------
 $("fxSpread").oninput=()=>{ $("fxSpreadV").textContent=$("fxSpread").value+"%"; };
 $("fxSpread").onchange=()=>{ setupTouched=Date.now(); send("SPREAD="+ +$("fxSpread").value); };
+$("crmxLink").onclick=()=>{ send("CRMXLINK");
+  $("crmxStatus").textContent="linking…"; };
+$("crmxUnlink").onclick=()=>{ if(confirm("Unlink from the paired transmitter?"))
+  send("CRMXUNLINK"); };
+$("crmxAnt").onchange=e=>{ setupTouched=Date.now(); send("CRMXANT="+ +e.target.value); };
 $("netEn").onchange=e=>{ setupTouched=Date.now(); send("NET="+ +e.target.value); };
 $("btnUniApply").onclick=()=>{ setupTouched=Date.now();
   send("WUNI="+Math.max(1,Math.min(63999,+$("netUni").value||1))); };
@@ -1737,7 +1765,7 @@ $("btnDemo").onclick=()=>{
     `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6750,OT80,L0;`;
   const seed=()=>onState(
     "JMB;FW=demo;PORTS=4;CID=7;DMX=0;FPS=0;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=0;ERR=0;"+
-    "RDM=42;ANS=42;NET=1;NW=1;NUN=1;SRC=0;NIP=192.168.1.42;NRS=-52;TF=1;PB=0;"+
+    "RDM=42;ANS=42;NET=1;NW=1;NUN=1;SRC=0;NIP=192.168.1.42;NRS=-52;TF=1;PB=0;CX=3;CA=1;"+
     "SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=128;SPR=30;"+
     "CN="+Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join("")+";"+
     P(1,1,100,40,0,0)+P(2,4,0,80,100,0)+P(3,7,100,0,60,9)+P(4,10,100,100,100,0));
