@@ -482,6 +482,18 @@ const SVC   = "a1b20001-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const CMD   = "a1b20002-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const STATE = "a1b20003-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const PERS_NAMES = ["RGB 8-bit","RGB 16-bit","CW/WW 8-bit","CW/WW 16-bit","FX 10ch"];
+// Swatch colour for a port: RGB ports show the mix; CW/WW ports blend warm
+// (2700K-ish) and cool (6500K-ish) white tones (WW rides the R value, CW the G).
+function swatchRGB(pe, r, g, b){          // r,g,b in 0-100
+  if(pe===2||pe===3){
+    const w=r/100, c=g/100, t=w+c;
+    if(t<=0.001) return [0,0,0];
+    const k=Math.min(1,t);                 // brightness from total drive
+    const mix=w/t;                         // 1 = all warm, 0 = all cool
+    return [ (mix*255+(1-mix)*201)*k, (mix*180+(1-mix)*226)*k, (mix*107+(1-mix)*255)*k ];
+  }
+  return [r*2.55, g*2.55, b*2.55];
+}
 // Channels per personality (index = PE). The whole footprint must fit the
 // universe, so the last legal start address is 513 - footprint (10ch → 503).
 const PERS_CH = [3,6,2,4,10];
@@ -497,7 +509,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-24.crmx";
+const APP_VER="2026-07-24.cct";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -831,6 +843,15 @@ function renderControl(){
     setIf(p,"HEAD",el=>el.value=m.H??0);
     setIf(p,"PERS",el=>{ el.value=m.PE??0;
       const af=$("addr"+p); if(af) af.max=maxAddr(m.PE??0); });
+    // Slider identity follows the personality: CW/WW ports get Warm/Cool
+    // (firmware maps WW to the R output, CW to the G output; B is unused).
+    {
+      const cct=(m.PE===2||m.PE===3);
+      const lr=$("lR"+p), lg=$("lG"+p), rb=$("rowB"+p);
+      if(lr) lr.textContent = cct ? "Warm" : "Red";
+      if(lg) lg.textContent = cct ? "Cool" : "Green";
+      if(rb) rb.classList.toggle("hidden", cct);
+    }
     setIf(p,"X",   el=>el.value=m.X??0);
     setIf(p,"PWM", el=>el.value=m.PW??0);
     setIf(p,"OCP", el=>el.value=((m.OC??6750)/1000).toFixed(2));
@@ -842,7 +863,7 @@ function renderControl(){
     if(wheels[p+".D"] && fresh("D")) wheels[p+".D"].set(m.D??100);
     if(wheels[p+".S"] && fresh("S")) wheels[p+".S"].set(m.S??128);
     if(fresh("L")) paintLabel(p,m.L||"");
-    const cr=(m.R??0)*2.55, cg=(m.G??0)*2.55, cb=(m.B??0)*2.55;
+    const [cr,cg,cb]=swatchRGB(m.PE??0, m.R??0, m.G??0, m.B??0);
     const sw=$("sw"+p);
     sw.style.background=`rgb(${cr},${cg},${cb})`;
     sw.style.boxShadow=(cr+cg+cb>40)?`0 0 14px rgba(${cr},${cg},${cb},.55)`:"none";
@@ -873,9 +894,9 @@ function buildCard(p){
       <div class="row"><label>Effect</label>
         <select id="x${p}" style="width:148px">${FX_NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join("")}</select>
       </div>
-      <div class="row r"><label>Red</label><input type="range" id="r${p}" min="0" max="100"><span class="val" id="vR${p}">0</span></div>
-      <div class="row g"><label>Green</label><input type="range" id="g${p}" min="0" max="100"><span class="val" id="vG${p}">0</span></div>
-      <div class="row b"><label>Blue</label><input type="range" id="b${p}" min="0" max="100"><span class="val" id="vB${p}">0</span></div>
+      <div class="row r" id="rowR${p}"><label id="lR${p}">Red</label><input type="range" id="r${p}" min="0" max="100"><span class="val" id="vR${p}">0</span></div>
+      <div class="row g" id="rowG${p}"><label id="lG${p}">Green</label><input type="range" id="g${p}" min="0" max="100"><span class="val" id="vG${p}">0</span></div>
+      <div class="row b" id="rowB${p}"><label id="lB${p}">Blue</label><input type="range" id="b${p}" min="0" max="100"><span class="val" id="vB${p}">0</span></div>
       <div class="row wheels">
         <div class="wheelbox" id="wd${p}"></div>
         <div class="wheelbox" id="ws${p}"></div>
@@ -957,7 +978,8 @@ function buildCard(p){
     d.querySelector("#"+id+p).addEventListener("input",e=>{
       $("v"+field+p).textContent=e.target.value;
       const cur={R:+$("r"+p).value,G:+$("g"+p).value,B:+$("b"+p).value};
-      $("sw"+p).style.background=`rgb(${cur.R*2.55},${cur.G*2.55},${cur.B*2.55})`;
+      const [sr,sg,sb]=swatchRGB((ports[p-1]||{}).PE??0, cur.R, cur.G, cur.B);
+      $("sw"+p).style.background=`rgb(${sr},${sg},${sb})`;
       const m=ports[p-1]||{};
       if((m.X||0)>0 && m.M!==1){
         // EFFECT TRIM: while an effect runs, the sliders MASK its channels
