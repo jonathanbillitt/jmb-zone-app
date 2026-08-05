@@ -82,6 +82,9 @@
   .row.g input[type=range] { accent-color:var(--g); }
   .row.b input[type=range] { accent-color:var(--b); }
   .row.w input[type=range] { accent-color:#f5f5f5; }   /* dim + speed: white */
+  .row.r.ww input[type=range] { accent-color:#ffc477; }  /* warm white: amber */
+  .row.g.cw input[type=range] { accent-color:#cfe8ff; }  /* cool white: ice   */
+  .row.ww label, .row.cw label { color:var(--text); }
   .row .val { width:38px; text-align:right; font-variant-numeric:tabular-nums;
               color:var(--dim); font-size:12.5px; }
   .row input[type=number], .row select, .row input[type=text] {
@@ -576,7 +579,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-05b.demo";
+const APP_VER="2026-08-06.cctint";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -919,8 +922,11 @@ function renderControl(){
     {
       const cct=(m.PE===2||m.PE===3);
       const lr=$("lR"+p), lg=$("lG"+p), rb=$("rowB"+p);
+      const rr=$("rowR"+p), rg=$("rowG"+p);
       if(lr) lr.textContent = cct ? "Warm" : "Red";
       if(lg) lg.textContent = cct ? "Cool" : "Green";
+      if(rr) rr.classList.toggle("ww", cct);   // amber track for warm white
+      if(rg) rg.classList.toggle("cw", cct);   // ice track for cool white
       if(rb) rb.classList.toggle("hidden", cct);
     }
     setIf(p,"X",   el=>el.value=m.X??0);
@@ -2077,7 +2083,7 @@ let demoTimer=null, demoOn=false, demoFlkTimer=null;
 // analyzer has example data — the whole Diag tab works without hardware.
 const demoP=[{a:1,pe:0,r:100,g:40,b:0,x:0},{a:4,pe:0,r:0,g:80,b:100,x:0},
              {a:7,pe:2,r:100,g:35,b:0,x:0},{a:10,pe:4,r:100,g:100,b:100,x:9}];
-const demoF={capon:0,capt0:0,flkon:0};
+const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1};
 function demoState(){
   const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S128,H${n},`+
     `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6750,OT80,L0;`;
@@ -2086,7 +2092,8 @@ function demoState(){
     "RDM=42;ANS=42;AGE=23;"+
     `CAPON=${demoF.capon};CAPMS=${demoF.capon?Date.now()-demoF.capt0:0};CFL=43;CFH=45;`+
     `FLKON=${demoF.flkon};FLKL=0;`+
-    "NET=1;NW=1;NUN=1;SRC=1;NIP=192.168.1.42;NRS=-52;TF=1;PB=0;CX=3;CA=1;"+
+    `NET=${demoF.net};NW=${demoF.net};NUN=${demoF.nun};SRC=${demoF.net?1:0};`+
+    "NIP=192.168.1.42;NRS=-52;TF=1;PB=0;CX=3;CA=1;"+
     "SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=128;SPR=30;"+
     "CN="+Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join("")+";"+
     demoP.map((d,i)=>P(i+1,d)).join(""));
@@ -2142,6 +2149,9 @@ function demoCmd(s){
   if(m=s.match(/^P(\d)\.(R|G|B)=(\d+)/)){ demoP[+m[1]-1][m[2].toLowerCase()]=+m[3]; return; }
   if(m=s.match(/^ALL\.RGB=(\d+),(\d+),(\d+)/)){ demoP.forEach(d=>{d.r=+m[1];d.g=+m[2];d.b=+m[3];}); return; }
   if(m=s.match(/^P(\d)\.FX=(\d+)/)){ demoP[+m[1]-1].x=+m[2]; demoState(); return; }
+  if(m=s.match(/^NET=(\d)/)){ demoF.net=+m[1]; demoState(); return; }
+  if(m=s.match(/^WUNI=(\d+)/)){ demoF.nun=+m[1]; demoState(); return; }
+  if(s.startsWith("WSSID=")||s.startsWith("WPASS=")) return;  // accepted quietly
   if(s.startsWith("CAP=1")){ demoF.capon=1; demoF.capt0=Date.now(); demoState(); return; }
   if(s.startsWith("CAP=0")){ demoF.capon=0; demoState(); return; }
   if(s.startsWith("FLK=1")){ demoF.flkon=1; demoState();
