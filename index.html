@@ -579,7 +579,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-06.cctint";
+const APP_VER="2026-08-06b.demofix";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1646,7 +1646,7 @@ $("btnUniv").onclick=()=>{
     $("btnUniv").textContent="Close";
     actCnt.fill(0); univPrev.set(univ);
     send("UNIV");
-    univTimer=setInterval(()=>{ if(!bleConnected()) return;
+    univTimer=setInterval(()=>{ if(!bleConnected() && !demoOn) return;
       send("UNIV");
       if((univMode==="min"||univMode==="max") && (univTick++&1)) send("UNIVMM");
     },1000);
@@ -1763,8 +1763,8 @@ function renderFlk(){
 let rdmDevs={}, rdmOrder=[], rdmPhaseTxt="", rdmActive=false, rdmOpenUid=null,
     rdmSens={}, rdmPend=null;
 $("btnRdmScan").onclick=()=>{
-  if(!bleConnected()) return;
-  if(kv.DMX==="1" &&
+  if(!bleConnected() && !demoOn) return;
+  if(!demoOn && kv.DMX==="1" &&
      !confirm("Upstream DMX is live. Scanning takes over the output line — "+
               "fixtures will lose data during the scan. Continue?")) return;
   rdmDevs={}; rdmOrder=[]; rdmSens={}; rdmOpenUid=null;
