@@ -576,7 +576,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-05.diag";
+const APP_VER="2026-08-05b.demo";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -713,6 +713,7 @@ async function onDisconnected(){
 // promise chain with a retry; ordering is guaranteed.
 let wq=Promise.resolve();
 function send(s){
+  if(demoOn){ demoCmd(s); return wq; }
   if(NBLE()){
     if(!NBLE().connected) return wq;
     wq=wq.then(()=>NBLE().write(s).catch(()=>{}));
@@ -1032,6 +1033,9 @@ function buildCard(p){
     // firmware re-clamps too, but reflect it immediately so the field is honest.
     if(+af.value>mx){ af.value=mx; touch("ADDR"); send(`P${p}.ADDR=${mx}`); }
     touch("PERS"); send(`P${p}.PERS=${pe}`);
+    // Optimistic: flip the Control-tab sliders to CCT/RGB immediately instead
+    // of waiting for the state echo (which demo mode never sends).
+    if(ports[p-1]){ ports[p-1].PE=pe; renderControl(); }
   });
   d.querySelector("#x"+p).addEventListener("change",e=>{
     touch("X"); send(`P${p}.FX=${+e.target.value}`);
@@ -1751,7 +1755,7 @@ function renderFlk(){
 
 // ---------- RDM universe controller ----------
 let rdmDevs={}, rdmOrder=[], rdmPhaseTxt="", rdmActive=false, rdmOpenUid=null,
-    rdmSens={};
+    rdmSens={}, rdmPend=null;
 $("btnRdmScan").onclick=()=>{
   if(!bleConnected()) return;
   if(kv.DMX==="1" &&
@@ -1785,6 +1789,13 @@ function onRdm(str){
   }else if(tag==="OK"||tag==="NK"){
     rdmPhaseTxt=(tag==="OK"?"✓ ":"✗ ")+(parts[2]||"").toLowerCase()+
       (tag==="NK"?" failed":"");
+    if(tag==="OK"&&rdmPend&&rdmDevs[rdmPend.uid]){
+      const d=rdmDevs[rdmPend.uid];
+      if(rdmPend.op==="ADDR") d.addr=rdmPend.val;
+      if(rdmPend.op==="PERS") d.pe=rdmPend.val;
+      if(rdmPend.op==="LABEL") d.label=rdmPend.txt;
+    }
+    rdmPend=null;
   }else if(tag==="ERR"){
     rdmPhaseTxt = parts[2]==="LIVE" ? "refused — upstream DMX live (rescan to force)"
       : parts[2]==="FULL" ? "device table full (16 max)" : "error";
@@ -1841,9 +1852,12 @@ function renderRdm(){
       el.onchange=()=>send(`RDM.${uid}.IDENT=${el.checked?1:0}`);
     else el.onclick=()=>{
       const g=f=>card.querySelector(`[data-f="${f}"]`);
-      if(el.dataset.act==="addr")  send(`RDM.${uid}.ADDR=${+g("addr").value||1}`);
-      if(el.dataset.act==="pers")  send(`RDM.${uid}.PERS=${+g("pers").value||1}`);
-      if(el.dataset.act==="label") send(`RDM.${uid}.LABEL=${hexEnc(g("label").value)}`);
+      if(el.dataset.act==="addr"){ rdmPend={uid,op:"ADDR",val:+g("addr").value||1};
+        send(`RDM.${uid}.ADDR=${rdmPend.val}`); }
+      if(el.dataset.act==="pers"){ rdmPend={uid,op:"PERS",val:+g("pers").value||1};
+        send(`RDM.${uid}.PERS=${rdmPend.val}`); }
+      if(el.dataset.act==="label"){ const t=g("label").value;
+        rdmPend={uid,op:"LABEL",txt:t}; send(`RDM.${uid}.LABEL=${hexEnc(t)}`); }
       if(el.dataset.act==="sens")  send(`RDM.${uid}.SENS=1`);
     };
   });
@@ -2058,26 +2072,111 @@ $("btnConnect").onclick=connect;
 // Browse the whole app with example data and no hardware: store reviewers and
 // prospective users can explore every tab. send() already no-ops while
 // disconnected, so nothing a demo user touches goes anywhere.
-let demoTimer=null;
-$("btnDemo").onclick=()=>{
-  const P=(n,a,r,g,b,x)=>`P${n}=A${a},PE0,M1,R${r},G${g},B${b},D80,O1,F00,X${x},S128,H${n},`+
+let demoTimer=null, demoOn=false, demoFlkTimer=null;
+// Mutable demo model: everything the user edits in demo sticks, and every
+// analyzer has example data — the whole Diag tab works without hardware.
+const demoP=[{a:1,pe:0,r:100,g:40,b:0,x:0},{a:4,pe:0,r:0,g:80,b:100,x:0},
+             {a:7,pe:2,r:100,g:35,b:0,x:0},{a:10,pe:4,r:100,g:100,b:100,x:9}];
+const demoF={capon:0,capt0:0,flkon:0};
+function demoState(){
+  const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S128,H${n},`+
     `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6750,OT80,L0;`;
-  const seed=()=>onState(
-    "JMB;FW=demo;PORTS=4;CID=7;DMX=0;FPS=0;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=0;ERR=0;"+
-    "RDM=42;ANS=42;NET=1;NW=1;NUN=1;SRC=0;NIP=192.168.1.42;NRS=-52;TF=1;PB=0;CX=3;CA=1;"+
+  onState(
+    "JMB;FW=demo;PORTS=4;CID=7;DMX=1;FPS=44;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=3;ERR=0;"+
+    "RDM=42;ANS=42;AGE=23;"+
+    `CAPON=${demoF.capon};CAPMS=${demoF.capon?Date.now()-demoF.capt0:0};CFL=43;CFH=45;`+
+    `FLKON=${demoF.flkon};FLKL=0;`+
+    "NET=1;NW=1;NUN=1;SRC=1;NIP=192.168.1.42;NRS=-52;TF=1;PB=0;CX=3;CA=1;"+
     "SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=128;SPR=30;"+
     "CN="+Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join("")+";"+
-    P(1,1,100,40,0,0)+P(2,4,0,80,100,0)+P(3,7,100,0,60,9)+P(4,10,100,100,100,0));
-  seed();
+    demoP.map((d,i)=>P(i+1,d)).join(""));
+}
+function demoChunks(pfx,arr){
+  for(let base=1;base<=512;base+=64){
+    let hex="";
+    for(let i=0;i<64;i++) hex+=(arr[base+i]|0).toString(16).padStart(2,"0");
+    onState(`${pfx};O=${base};${hex}`);
+  }
+}
+function demoUniv(){
+  const u=new Uint8Array(513), t=Date.now()/900;
+  demoP.forEach(d=>{ const foot=PERS_FOOT[d.pe]||3;
+    const lv=[d.r,d.g,d.b].map(v=>Math.round(v*2.55));
+    for(let k=0;k<foot;k++) u[d.a+k]=lv[k%3]; });
+  for(let ch=100;ch<=160;ch++)
+    u[ch]=Math.round(127+127*Math.sin(t+(ch-100)/6));   // moving wave
+  for(let ch=300;ch<=340;ch+=4) u[ch]=200;              // static rig
+  demoChunks("JMBU",u);
+}
+function demoUnivMM(){
+  const mn=new Uint8Array(513), mx=new Uint8Array(513);
+  for(let ch=100;ch<=160;ch++){ mn[ch]=0; mx[ch]=255; }
+  for(let ch=300;ch<=340;ch+=4){ mn[ch]=200; mx[ch]=200; }
+  demoP.forEach(d=>{ const foot=PERS_FOOT[d.pe]||3;
+    const lv=[d.r,d.g,d.b].map(v=>Math.round(v*2.55));
+    for(let k=0;k<foot;k++){ mn[d.a+k]=Math.max(0,lv[k%3]-8); mx[d.a+k]=Math.min(255,lv[k%3]+6); } });
+  demoChunks("JMBM",mn); demoChunks("JMBX",mx);
+}
+const DEMO_DEVS=[
+  {u:"4C50000123AB",a:1,fp:8,pe:2,pt:6,sn:1,md:"LED PAR QUAD",lb:"Stage L Par",mf:"LiteCo"},
+  {u:"4A4D00C0FFEE",a:101,fp:10,pe:5,pt:5,sn:8,md:"JMB Zone ONE",lb:"Booth strip",mf:"JMB Zone"},
+  {u:"48590000BEEF",a:200,fp:3,pe:1,pt:2,sn:2,md:"Hazer 900",lb:"",mf:"HazeWorks"}];
+function demoDevRow(d){
+  onState(`JMBR;DEV;U=${d.u};A=${d.a};FP=${d.fp};PE=${d.pe};PT=${d.pt};SN=${d.sn};`+
+          `MD=${hexEnc(d.md)};LB=${hexEnc(d.lb)};MF=${hexEnc(d.mf)}`);
+}
+function demoRdmScan(){
+  let q=[[300,"JMBR;PH=SCAN;N=0;Q=3"],[900,"JMBR;PH=SCAN;N=1;Q=4"],
+         [1500,"JMBR;PH=SCAN;N=2;Q=2"],[2100,"JMBR;PH=SCAN;N=3;Q=0"],
+         [2500,"JMBR;PH=INFO;N=3;I=0"]];
+  q.forEach(([t,m])=>setTimeout(()=>onState(m),t));
+  DEMO_DEVS.forEach((d,i)=>setTimeout(()=>{ demoDevRow(d);
+    onState(`JMBR;PH=INFO;N=3;I=${i+1}`); },2900+i*500));
+  setTimeout(()=>onState("JMBR;PH=READY;N=3"),4600);
+}
+function demoCmd(s){
+  let m;
+  if(m=s.match(/^P(\d)\.PERS=(\d+)/)){ demoP[+m[1]-1].pe=+m[2]; demoState(); return; }
+  if(m=s.match(/^P(\d)\.RGB=(\d+),(\d+),(\d+)/)){ const d=demoP[+m[1]-1];
+    d.r=+m[2]; d.g=+m[3]; d.b=+m[4]; return; }
+  if(m=s.match(/^P(\d)\.(R|G|B)=(\d+)/)){ demoP[+m[1]-1][m[2].toLowerCase()]=+m[3]; return; }
+  if(m=s.match(/^ALL\.RGB=(\d+),(\d+),(\d+)/)){ demoP.forEach(d=>{d.r=+m[1];d.g=+m[2];d.b=+m[3];}); return; }
+  if(m=s.match(/^P(\d)\.FX=(\d+)/)){ demoP[+m[1]-1].x=+m[2]; demoState(); return; }
+  if(s.startsWith("CAP=1")){ demoF.capon=1; demoF.capt0=Date.now(); demoState(); return; }
+  if(s.startsWith("CAP=0")){ demoF.capon=0; demoState(); return; }
+  if(s.startsWith("FLK=1")){ demoF.flkon=1; demoState();
+    clearInterval(demoFlkTimer);
+    demoFlkTimer=setInterval(()=>{ if(demoF.flkon)
+      onState(`JMBK;${100+((Math.random()*60)|0)},${(Math.random()*256)|0},${(Math.random()*256)|0},${(Math.random()*800)|0}`);
+    },3500);
+    return; }
+  if(s.startsWith("FLK=0")){ demoF.flkon=0; clearInterval(demoFlkTimer); demoState(); return; }
+  if(s==="UNIVMM"){ demoUnivMM(); return; }
+  if(s==="UNIV"){ demoUniv(); return; }
+  if(s.startsWith("RDMSCAN")){ demoRdmScan(); return; }
+  if(s==="RDMSTOP"){ onState("JMBR;PH=OFF"); return; }
+  if(m=s.match(/^RDM\.([0-9A-Fa-f]{12})\.([A-Z]+)=(.*)/)){
+    const op=m[2];
+    if(op==="SENS"){ const d=DEMO_DEVS.find(x=>x.u===m[1]);
+      for(let i=0;i<Math.min(2,(d?d.sn:0)||1);i++)
+        setTimeout(()=>onState(`JMBR;SN;U=${m[1]};I=${i};V=${230+((Math.random()*40)|0)};L=180;H=410`),250+i*150);
+      return; }
+    setTimeout(()=>onState(`JMBR;OK;${op};${m[3]}`),250);
+    return; }
+}
+$("btnDemo").onclick=()=>{
+  demoOn=true;
+  demoState();
   $("demoBar").classList.remove("hidden");
   $("title").textContent="JMB Zone · demo";
   showApp();
   clearInterval(demoTimer);
-  demoTimer=setInterval(seed,3000);   // keep state fresh across tab hops
+  demoTimer=setInterval(demoState,3000);   // keep state fresh across tab hops
 };
 $("btnDemoExit").onclick=()=>{
   // Leave demo: stop the seeder and return to the connect screen clean.
   clearInterval(demoTimer); demoTimer=null;
+  clearInterval(demoFlkTimer); demoOn=false;
   location.reload();
 };
 
