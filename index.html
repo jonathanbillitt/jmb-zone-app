@@ -125,6 +125,27 @@
   .dmxwarn strong { display:block; color:var(--warn); font-size:15px; margin-bottom:3px; }
   .dmxwarn em { color:var(--text); font-style:normal; font-weight:600; }
   .dmxwarn #dmxWarnSrc { font-weight:700; }
+  /* Diag tab — analyzer styling */
+  .statgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .stat { background:var(--card2); border:1px solid var(--line); border-radius:10px;
+          padding:8px 6px; text-align:center; }
+  .stat b { display:block; font-size:19px; font-variant-numeric:tabular-nums; }
+  .stat span { font-size:11px; color:var(--dim); }
+  .pill { font-size:12px; font-weight:600; padding:3px 12px; border-radius:999px;
+          background:#3a2325; color:var(--bad); }
+  .pill.live { background:#12351c; color:var(--ok); }
+  .modechip { padding:5px 12px; font-size:12.5px; border-radius:999px; }
+  .modechip.active { background:#123a5e; border-color:var(--acc); color:var(--acc);
+                     font-weight:600; }
+  .devcard { background:var(--card2); border:1px solid var(--line); border-radius:10px;
+             padding:10px 12px; margin-top:8px; }
+  .devcard .uid { font:11px ui-monospace,monospace; color:var(--dim); }
+  .devcard .dh { display:flex; align-items:center; gap:8px; cursor:pointer; }
+  .devcard .dh b { flex:1; font-size:14px; }
+  .devedit { border-top:1px solid var(--line); margin-top:9px; padding-top:9px; }
+  .evt { display:flex; gap:10px; font:12px ui-monospace,monospace; padding:3px 0;
+         border-bottom:1px solid var(--line); }
+  .evt .ch { color:var(--acc); width:56px; }
   .scene { display:flex; align-items:center; gap:8px; padding:9px 0;
            border-bottom:1px solid var(--line); }
   .scene b { flex:1; font-weight:600; font-size:14px; }
@@ -283,24 +304,70 @@
 
   <div id="tab-diag" class="tab hidden">
     <div class="card">
-      <b>DMX line</b>
-      <table id="diagDmx"></table>
+      <div class="ctlrow" style="margin-bottom:10px">
+        <b style="flex:1">DMX signal</b>
+        <span class="mini" id="stSrc" style="margin:0"></span>
+        <span class="pill" id="sigPill">no signal</span>
+      </div>
+      <div class="statgrid">
+        <div class="stat"><b id="stFps">—</b><span>fps</span></div>
+        <div class="stat"><b id="stSl">—</b><span>slots</span></div>
+        <div class="stat"><b id="stSc">—</b><span>start code</span></div>
+        <div class="stat"><b id="stAge">—</b><span>last packet</span></div>
+        <div class="stat"><b id="stAsc">—</b><span>ASC pkts</span></div>
+        <div class="stat"><b id="stErr">—</b><span>errors</span></div>
+      </div>
+      <canvas id="fpsSpark" style="width:100%;height:38px;margin-top:10px"></canvas>
+      <div class="mini" id="rdmLine"></div>
     </div>
+
     <div class="card">
       <div class="ctlrow">
-        <b style="flex:1">Universe</b>
-        <button id="btnUniv">Show levels</button>
+        <b style="flex:1">Universe analyzer</b>
+        <button id="btnUniv">Open</button>
       </div>
       <div id="univWrap" class="hidden">
         <div class="ctlrow" style="margin-bottom:8px">
-          <b style="flex:1">DMX Universe</b>
-          <span class="mini" id="univSel">tap a cell for channel + level</span>
-          <button id="btnUnivClose">Hide</button>
+          <b style="flex:1">Universe</b>
+          <span class="mini" id="capStat" style="margin:0"></span>
+          <button id="btnCap">Start capture</button>
+          <button id="btnUnivClose">Close</button>
+        </div>
+        <div class="ctlrow" style="margin-bottom:8px">
+          <button class="modechip active" data-um="live">Live</button>
+          <button class="modechip" data-um="min">Min</button>
+          <button class="modechip" data-um="max">Max</button>
+          <button class="modechip" data-um="act">Activity</button>
         </div>
         <canvas id="univCanvas" style="border-radius:10px;
           border:1px solid var(--line);touch-action:none"></canvas>
+        <div id="univInfo" class="mini">tap a cell — channel, level, captured range</div>
       </div>
     </div>
+
+    <div class="card">
+      <div class="ctlrow">
+        <b style="flex:1">Flicker finder</b>
+        <span class="mini" id="flkStat" style="margin:0"></span>
+        <button id="btnFlk">Arm</button>
+      </div>
+      <div id="flkList" class="mini" style="margin-top:8px">Arm it, then every
+        channel-value change on the wire is logged here — the 2am ghost-flicker
+        catcher. Survives leaving this tab.</div>
+    </div>
+
+    <div class="card">
+      <div class="ctlrow">
+        <b style="flex:1">RDM universe</b>
+        <button id="btnRdmStop" class="hidden">Stop</button>
+        <button id="btnRdmScan" class="primary">Scan</button>
+      </div>
+      <div class="mini" id="rdmPhase">Discover and edit every RDM fixture on the
+        thru line — address, personality, label, identify and sensors, like a
+        DMXcat. Scanning takes over the output line while active.</div>
+      <div id="rdmDevs"></div>
+    </div>
+
     <div class="card">
       <b>Port bus</b>
       <table id="diagBus"></table>
@@ -509,7 +576,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-07-24.cct";
+const APP_VER="2026-08-05.diag";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -719,6 +786,9 @@ $("pinFlash").onclick=()=>{
 // chunk parses standalone; ports merge by number.
 function onState(str){
   if(str.startsWith("JMBU;")){ onUniv(str); return; }
+  if(str.startsWith("JMBM;")||str.startsWith("JMBX;")){ onUnivMM(str); return; }
+  if(str.startsWith("JMBK")){ onFlick(str); return; }
+  if(str.startsWith("JMBR;")){ onRdm(str); return; }
   const cont = str.startsWith("JMB+;");
   if(!str.startsWith("JMB;") && !cont) return;
   if(!authed){
@@ -1494,83 +1564,290 @@ function renderPortInfo(){
 }
 
 // ---------- Diag tab ----------
+const SRC_NAMES=["—","Wired DMX","sACN","Art-Net"];
+let fpsHist=[], fpsLast=0;
+function fmtAge(ms){ if(ms==null||isNaN(ms)) return "—";
+  return ms<1500?ms+"ms":ms<90000?(ms/1000).toFixed(1)+"s":Math.round(ms/60000)+"m"; }
 function renderDiag(){
-  $("diagDmx").innerHTML=`
-    <tr><th>Status</th><td>${kv.DMX==="1"?"live":"no signal"} · ${kv.FPS??"—"} fps</td></tr>
-    <tr><th>Slots</th><td class="num">${kv.SL??"—"} · start code ${kv.SC??"—"}</td></tr>
-    <tr><th>ASC pkts</th><td class="num">${kv.ASC??"—"}</td></tr>
-    <tr><th>Errors</th><td class="num">${kv.ERR??"—"}</td></tr>
-    <tr><th>RDM</th><td class="num">${kv.RDM??"—"} requests · ${kv.ANS??"—"} answered</td></tr>`;
+  const live=kv.DMX==="1";
+  const pill=$("sigPill");
+  pill.textContent=live?"LIVE":"no signal";
+  pill.classList.toggle("live",live);
+  $("stSrc").textContent=live?(SRC_NAMES[+(kv.SRC||0)]||""):"";
+  $("stFps").textContent=kv.FPS??"—";
+  $("stSl").textContent=kv.SL??"—";
+  $("stSc").textContent=kv.SC??"—";
+  $("stAge").textContent=fmtAge(+kv.AGE);
+  $("stAsc").textContent=kv.ASC??"—";
+  $("stErr").textContent=kv.ERR??"—";
+  $("rdmLine").textContent=`RDM responder: ${kv.RDM??"—"} requests · ${kv.ANS??"—"} answered`;
+  // fps sparkline (sample at most 1/s, keep 90s)
+  const now=Date.now();
+  if(now-fpsLast>950){ fpsLast=now; fpsHist.push(live?+(kv.FPS||0):0);
+    if(fpsHist.length>90) fpsHist.shift(); drawSpark(); }
+  // capture + flicker chrome
+  $("btnCap").textContent = kv.CAPON==="1"?"Reset capture":"Start capture";
+  $("capStat").textContent = kv.CAPON==="1"
+      ? `capturing ${Math.round((+kv.CAPMS||0)/1000)}s · fps ${kv.CFL||0}–${kv.CFH||0}` : "";
+  $("btnFlk").textContent = kv.FLKON==="1"?"Disarm":"Arm";
+  $("flkStat").textContent = kv.FLKON==="1"
+      ? `armed${+kv.FLKL?` · ${kv.FLKL} dropped`:""}` : "";
+  // port bus
   let rows="<tr><th>Port</th><th>rx</th><th>crc err</th><th>fault</th></tr>";
   ports.forEach((m,i)=>{
     rows+=`<tr><td>P${i+1}</td><td class="num">${m.RX??"—"}</td>
            <td class="num">${m.CE??"—"}</td><td>${faultWords(m.F||0)||"—"}</td></tr>`;
   });
   $("diagBus").innerHTML=rows;
+  renderRdm();
+}
+function drawSpark(){
+  const cv=$("fpsSpark"); if(!cv||cv.offsetParent===null) return;
+  const W=cv.clientWidth||300,H=cv.clientHeight||38;
+  if(cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; }
+  const ctx=cv.getContext("2d");
+  ctx.clearRect(0,0,W,H);
+  const mx=Math.max(45,...fpsHist);
+  ctx.beginPath();
+  fpsHist.forEach((v,i)=>{
+    const x=W-(fpsHist.length-1-i)*(W/90), y=H-2-(v/mx)*(H-6);
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  });
+  ctx.strokeStyle="#4da3ff"; ctx.lineWidth=1.6; ctx.stroke();
 }
 
-// ---------- Universe viewer (Diag sub-view) ----------
-// 32×16 heatmap of all 512 channels, fed by "JMBU;O=<first>;<hex>" chunks
-// requested with UNIV while the view is open (~1s cadence). Tap for values.
-const univ=new Uint8Array(513);
-let univTimer=null;
+// ---------- Universe analyzer ----------
+// Live heatmap fed by "JMBU;O=<first>;<hex>" chunks; Min/Max fed by JMBM/JMBX
+// (firmware capture); Activity is app-side change tallies between polls.
+const univ=new Uint8Array(513), univPrev=new Uint8Array(513);
+const univMin=new Uint8Array(513), univMax=new Uint8Array(513);
+const actCnt=new Uint16Array(513);
+let univTimer=null, univMode="live", univSelCh=0, univTick=0;
 function univStop(){
   if(univTimer){ clearInterval(univTimer); univTimer=null; }
   const w=$("univWrap"), b=$("btnUniv");
   if(w) w.classList.add("hidden");
-  if(b) b.textContent="Show levels";
+  if(b) b.textContent="Open";
 }
 $("btnUniv").onclick=()=>{
   const w=$("univWrap");
   if(w.classList.contains("hidden")){
     w.classList.remove("hidden");
-    $("btnUniv").textContent="Hide";
+    $("btnUniv").textContent="Close";
+    actCnt.fill(0); univPrev.set(univ);
     send("UNIV");
-    univTimer=setInterval(()=>{ if(bleConnected()) send("UNIV"); },1000);
-  }else{
-    w.classList.add("hidden");
-    $("btnUniv").textContent="Show levels";
-    univStop();
-  }
+    univTimer=setInterval(()=>{ if(!bleConnected()) return;
+      send("UNIV");
+      if((univMode==="min"||univMode==="max") && (univTick++&1)) send("UNIVMM");
+    },1000);
+  }else univStop();
 };
-function onUniv(str){                        // "JMBU;O=1;<128 hex chars>"
+document.querySelectorAll(".modechip").forEach(b=>b.onclick=()=>{
+  univMode=b.dataset.um;
+  document.querySelectorAll(".modechip").forEach(x=>
+    x.classList.toggle("active",x===b));
+  if((univMode==="min"||univMode==="max") && bleConnected()) send("UNIVMM");
+  if(univMode==="act"){ actCnt.fill(0); univPrev.set(univ); }
+  drawUniv();
+});
+$("btnCap").onclick=()=>{ send("CAP=1"); };   // (re)start = reset envelope
+function onUniv(str){
   const m=str.match(/^JMBU;O=(\d+);([0-9A-Fa-f]+)/);
   if(!m) return;
   const base=+m[1], hex=m[2];
-  for(let i=0;i*2+1<hex.length && base+i<=512;i++)
-    univ[base+i]=parseInt(hex.substr(i*2,2),16);
+  for(let i=0;i*2+1<hex.length && base+i<=512;i++){
+    const ch=base+i, v=parseInt(hex.substr(i*2,2),16);
+    if(univ[ch]!==v){ if(univPrev[ch]!==v && actCnt[ch]<999) actCnt[ch]++; }
+    univPrev[ch]=univ[ch]; univ[ch]=v;
+  }
   drawUniv();
+}
+function onUnivMM(str){
+  const m=str.match(/^JMB([MX]);O=(\d+);([0-9A-Fa-f]+)/);
+  if(!m) return;
+  const dst=m[1]==="M"?univMin:univMax, base=+m[2], hex=m[3];
+  for(let i=0;i*2+1<hex.length && base+i<=512;i++)
+    dst[base+i]=parseInt(hex.substr(i*2,2),16);
+  if(univMode==="min"||univMode==="max") drawUniv();
+}
+function univSrc(){
+  return univMode==="min"?univMin:univMode==="max"?univMax:univ;
 }
 function drawUniv(){
   const cv=$("univCanvas");
   if(!cv || $("univWrap").classList.contains("hidden")) return;
   const COLSN=32, ROWS=16;
-  // Full-screen overlay: the canvas is flex-stretched, so honour BOTH
-  // dimensions instead of deriving height from width.
   const W=cv.clientWidth||320, H=cv.clientHeight||Math.round(W*ROWS/COLSN);
   if(cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; }
   const ctx=cv.getContext("2d"), cw=W/COLSN, chh=H/ROWS;
+  const src=univSrc();
   for(let ch=1;ch<=512;ch++){
-    const i=ch-1, x=(i%COLSN)*cw, y=Math.floor(i/COLSN)*chh, v=univ[ch];
-    if(v===0) ctx.fillStyle="#10151d";
-    else{
-      const f=v/255;                          // black → amber → white
-      const r=Math.round(80+175*f), g=Math.round(40+170*f),
-            b=Math.round(20+90*f*f);
-      ctx.fillStyle=`rgb(${r},${g},${b})`;
+    const i=ch-1, x=(i%COLSN)*cw, y=Math.floor(i/COLSN)*chh;
+    if(univMode==="act"){
+      const a=actCnt[ch];
+      if(!a) ctx.fillStyle="#10151d";
+      else{ const f=Math.min(1,Math.log2(1+a)/7);
+        ctx.fillStyle=`rgb(${Math.round(60+195*f)},${Math.round(30+60*f)},${Math.round(60+30*f)})`; }
+    }else{
+      const v=src[ch];
+      if(v===0) ctx.fillStyle="#10151d";
+      else{
+        const f=v/255;
+        const r=Math.round(80+175*f), g=Math.round(40+170*f),
+              b=Math.round(20+90*f*f);
+        ctx.fillStyle=`rgb(${r},${g},${b})`;
+      }
     }
     ctx.fillRect(x+0.5,y+0.5,cw-1,chh-1);
+    if(ch===univSelCh){ ctx.strokeStyle="#4da3ff"; ctx.lineWidth=1.5;
+      ctx.strokeRect(x+1,y+1,cw-2,chh-2); }
   }
+  updateUnivInfo();
+}
+const PERS_FOOT=[3,6,2,4,10];
+function updateUnivInfo(){
+  if(!univSelCh){ return; }
+  const ch=univSelCh, v=univ[ch];
+  let patch="";
+  ports.forEach((m,i)=>{
+    const a=+(m.A||0), f=PERS_FOOT[m.PE||0]||3;
+    if(ch>=a && ch<a+f) patch=` · P${i+1} ch${ch-a+1}`;
+  });
+  const mm=(univMax[ch]||univMin[ch])?` · min ${univMin[ch]} max ${univMax[ch]}`:"";
+  const act=actCnt[ch]?` · ${actCnt[ch]} changes`:"";
+  $("univInfo").textContent=
+    `ch ${ch} = ${v} (${Math.round(v/2.55)}%)${mm}${act}${patch}`;
 }
 $("univCanvas").addEventListener("pointerdown",ev=>{
   const cv=$("univCanvas"), r=cv.getBoundingClientRect();
   const cx=Math.floor((ev.clientX-r.left)/r.width*32),
         cy=Math.floor((ev.clientY-r.top)/r.height*16);
   const ch=cy*32+cx+1;
-  if(ch>=1&&ch<=512)
-    $("univSel").textContent=`ch ${ch} = ${univ[ch]} (${Math.round(univ[ch]/2.55)}%)`;
+  if(ch>=1&&ch<=512){ univSelCh=ch; drawUniv(); }
 });
 $("btnUnivClose").onclick=univStop;
+
+// ---------- Flicker finder ----------
+let flkEvts=[];
+$("btnFlk").onclick=()=>{
+  send(kv.FLKON==="1"?"FLK=0":"FLK=1");
+  if(kv.FLKON!=="1"){ flkEvts=[]; renderFlk(); }
+};
+function onFlick(str){                    // "JMBK;<ch>,<old>,<new>,<age>;…"
+  const now=Date.now();
+  str.split(";").slice(1).forEach(t=>{
+    const p=t.split(",").map(Number);
+    if(p.length>=4) flkEvts.unshift({t:now-p[3], ch:p[0], o:p[1], n:p[2]});
+  });
+  flkEvts=flkEvts.slice(0,30);
+  renderFlk();
+}
+function renderFlk(){
+  if(!flkEvts.length){ return; }
+  $("flkList").innerHTML=flkEvts.map(e=>
+    `<div class="evt"><span>${new Date(e.t).toLocaleTimeString()}</span>
+     <span class="ch">ch ${e.ch}</span><span>${e.o} → ${e.n}</span></div>`).join("");
+}
+
+// ---------- RDM universe controller ----------
+let rdmDevs={}, rdmOrder=[], rdmPhaseTxt="", rdmActive=false, rdmOpenUid=null,
+    rdmSens={};
+$("btnRdmScan").onclick=()=>{
+  if(!bleConnected()) return;
+  if(kv.DMX==="1" &&
+     !confirm("Upstream DMX is live. Scanning takes over the output line — "+
+              "fixtures will lose data during the scan. Continue?")) return;
+  rdmDevs={}; rdmOrder=[]; rdmSens={}; rdmOpenUid=null;
+  send(kv.DMX==="1"?"RDMSCAN!":"RDMSCAN");
+  rdmPhaseTxt="scanning…"; rdmActive=true; renderRdm();
+};
+$("btnRdmStop").onclick=()=>{ send("RDMSTOP"); };
+function onRdm(str){
+  const parts=str.split(";");
+  const tag=parts[1];
+  const f={};
+  parts.slice(2).forEach(t=>{ const i=t.indexOf("=");
+    if(i>0) f[t.slice(0,i)]=t.slice(i+1); else f[t]=1; });
+  if(tag==="PH"){
+    rdmActive = f.PH!=="OFF";
+    rdmPhaseTxt = f.PH==="SCAN" ? `discovering… ${f.N||0} found`
+      : f.PH==="INFO" ? `reading devices… ${f.I||0}/${f.N||0}`
+      : f.PH==="READY" ? `${f.N||0} device${f.N==="1"?"":"s"} on the line`
+      : "";
+  }else if(tag==="DEV"){
+    const d={uid:f.U, addr:+f.A||0, fp:+f.FP||0, pe:+f.PE||0, pt:+f.PT||0,
+             sn:+f.SN||0, model:hexDec(f.MD), label:hexDec(f.LB),
+             mfr:hexDec(f.MF)};
+    if(!rdmDevs[d.uid]) rdmOrder.push(d.uid);
+    rdmDevs[d.uid]=d;
+  }else if(tag==="SN"){
+    const u=f.U; (rdmSens[u]=rdmSens[u]||{})[+f.I]={v:+f.V,l:+f.L,h:+f.H};
+  }else if(tag==="OK"||tag==="NK"){
+    rdmPhaseTxt=(tag==="OK"?"✓ ":"✗ ")+(parts[2]||"").toLowerCase()+
+      (tag==="NK"?" failed":"");
+  }else if(tag==="ERR"){
+    rdmPhaseTxt = parts[2]==="LIVE" ? "refused — upstream DMX live (rescan to force)"
+      : parts[2]==="FULL" ? "device table full (16 max)" : "error";
+    rdmActive=false;
+  }
+  renderRdm();
+}
+function hexEnc(t){ let o=""; for(const c of t){ const v=c.codePointAt(0);
+  if(v>=32&&v<=126) o+=v.toString(16).padStart(2,"0").toUpperCase(); } return o||"0"; }
+function renderRdm(){
+  $("btnRdmStop").classList.toggle("hidden",!rdmActive);
+  $("btnRdmScan").textContent=rdmActive?"Rescan":"Scan";
+  if(rdmPhaseTxt) $("rdmPhase").textContent=rdmPhaseTxt;
+  const host=$("rdmDevs");
+  if(!rdmOrder.length){ host.innerHTML=""; return; }
+  host.innerHTML=rdmOrder.map(u=>{
+    const d=rdmDevs[u], open=rdmOpenUid===u;
+    const sens=rdmSens[u]||{};
+    return `<div class="devcard" data-uid="${u}">
+      <div class="dh" data-act="open">
+        <b>${d.label||d.model||"RDM device"}</b>
+        <span class="badge on">@${d.addr}</span>
+      </div>
+      <div class="uid">${d.model?d.model+" · ":""}${d.mfr?d.mfr+" · ":""}UID ${u}
+        · ${d.fp}ch · pers ${d.pe}/${d.pt}${d.sn?` · ${d.sn} sensors`:""}</div>
+      ${open?`<div class="devedit rows">
+        <div class="row"><label>Identify</label>
+          <label class="toggle"><input type="checkbox" data-act="ident">
+            <span></span></label></div>
+        <div class="row"><label>Address</label>
+          <input type="number" min="1" max="512" value="${d.addr}" data-f="addr">
+          <button data-act="addr">Set</button></div>
+        <div class="row"><label>Pers</label>
+          <select data-f="pers">${Array.from({length:d.pt||1},(_,i)=>
+            `<option value="${i+1}"${i+1===d.pe?" selected":""}>${i+1}</option>`)
+            .join("")}</select>
+          <button data-act="pers">Set</button></div>
+        <div class="row"><label>Label</label>
+          <input type="text" maxlength="32" value="${d.label||""}" data-f="label"
+                 style="flex:1">
+          <button data-act="label">Set</button></div>
+        <div class="row"><label>Sensors</label>
+          <button data-act="sens">Read</button>
+          <span class="mini" style="margin:0">${Object.entries(sens).map(
+            ([i,x])=>`#${i}: ${x.v}`).join("  ")||""}</span></div>
+      </div>`:""}
+    </div>`;
+  }).join("");
+  host.querySelectorAll("[data-act]").forEach(el=>{
+    const card=el.closest(".devcard"), uid=card.dataset.uid;
+    if(el.dataset.act==="open"&&el.classList.contains("dh"))
+      el.onclick=()=>{ rdmOpenUid=rdmOpenUid===uid?null:uid; renderRdm(); };
+    else if(el.dataset.act==="ident")
+      el.onchange=()=>send(`RDM.${uid}.IDENT=${el.checked?1:0}`);
+    else el.onclick=()=>{
+      const g=f=>card.querySelector(`[data-f="${f}"]`);
+      if(el.dataset.act==="addr")  send(`RDM.${uid}.ADDR=${+g("addr").value||1}`);
+      if(el.dataset.act==="pers")  send(`RDM.${uid}.PERS=${+g("pers").value||1}`);
+      if(el.dataset.act==="label") send(`RDM.${uid}.LABEL=${hexEnc(g("label").value)}`);
+      if(el.dataset.act==="sens")  send(`RDM.${uid}.SENS=1`);
+    };
+  });
+}
 
 // ---------- Setup tab ----------
 let setupTouched=0;
