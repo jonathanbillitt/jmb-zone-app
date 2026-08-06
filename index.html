@@ -60,6 +60,13 @@
                    padding:9px 8px; margin:0 -8px; border-radius:8px;
                    list-style:revert; user-select:none; }
   .adv > summary:active { background:var(--card2); }
+  /* The select's focus ring was being overlapped by the next row, so the
+     highlight looked like it was hiding behind the field. Give the rows real
+     vertical space and let the focused control paint above its neighbours. */
+  .adv .rows { gap:14px; }
+  .adv .row { padding:2px 0; position:relative; }
+  .adv .row select, .adv .row input { position:relative; z-index:1; }
+  .adv .row select:focus, .adv .row input:focus { z-index:2; outline-offset:2px; }
   .adv[open] > summary { color:var(--text); }
   .adv .row button.danger { width:100%; }
   .unit { color:var(--dim); font-size:13px; width:auto; }
@@ -488,6 +495,15 @@
       <div class="row" style="justify-content:space-between">
         <label style="font-weight:600">Effects</label>
       </div>
+      <div class="row"><label>Tempo</label>
+        <button id="fxTap" style="min-width:92px">Tap</button>
+        <input type="number" id="fxBpm" min="60" max="240" step="1" style="width:76px">
+        <span class="unit">BPM</span>
+        <button id="fxBpmSet">Set</button>
+      </div>
+      <div class="mini" id="fxTapHint">Tap 4+ times in time with the music, or
+        type a BPM. 128 = the designed tempo. Beat effects (Party, Club, Pulse)
+        follow it rig-wide, and the ports' Speed wheels move with it.</div>
       <div class="row"><label>Spread</label>
         <input type="range" id="fxSpread" min="0" max="100" step="5" style="flex:1">
         <span id="fxSpreadV" style="width:38px;text-align:right"></span>
@@ -588,7 +604,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-06e.review";
+const APP_VER="2026-08-06f.tempo";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1893,6 +1909,7 @@ function renderSetup(){
   if(document.activeElement!==$("netUni")) $("netUni").value=kv.NUN??"1";
   if(document.activeElement!==$("setFold")) $("setFold").value=kv.TF??"1";
   // Effects: spread
+  if(document.activeElement!==$("fxBpm")) $("fxBpm").value=kv.BPM??"128";
   if(document.activeElement!==$("fxSpread")){ $("fxSpread").value=kv.SPR??"0";
     $("fxSpreadV").textContent=(kv.SPR??"0")+"%"; }
   // CRMX: CX 0=not linked 1=linking 2=linked/no data 3=linked+data
@@ -1916,6 +1933,53 @@ $("chBlack").onclick=()=>send("CHLOOK=1");
 $("chFull").onclick=()=>send("CHLOOK=9");
 $("chDmx").onclick=()=>send("CHLOOK=0");
 // ---------- Effects: spread ----------
+// ---------- FX tap tempo ----------
+// The rig tempo (BPM) and a port's Speed channel are two views of the same
+// thing: Speed 128 = the designed 128 BPM, and the scale is exponential with
+// 255 = 8x and 0 = 1/8x (three octaves either side). Converting between them
+// lets a tap move the Speed wheels so the encoder always shows what you tapped.
+const FX_BASE_BPM = 128;
+function bpmToSpeed(bpm){
+  const mult = Math.max(0.125, Math.min(8, bpm / FX_BASE_BPM));
+  return Math.max(0, Math.min(255,
+    Math.round(128 + 127 * Math.log2(mult) / 3)));
+}
+function speedToBpm(sp){
+  return Math.round(FX_BASE_BPM * Math.pow(2, ((sp - 128) * 3) / 127));
+}
+function applyTempo(bpm){
+  bpm = Math.max(60, Math.min(240, Math.round(bpm)));
+  $("fxBpm").value = bpm;
+  send("BPM=" + bpm);
+  // Move every port's Speed encoder (and the controller) to match, so the
+  // wheel reads the tapped tempo instead of drifting out of step with it.
+  const sp = bpmToSpeed(bpm);
+  ports.forEach((m, i) => {
+    const p = i + 1;
+    if (wheels[p + ".S"]) wheels[p + ".S"].set(sp);
+    hot[p + ".S"] = Date.now() + HOT_MS;
+    sendThrottled(p + ".FXS", `P${p}.FXS=${sp}`);
+  });
+  $("fxTapHint").textContent =
+    `${bpm} BPM — speed ${sp} on every port` +
+    (bpm === FX_BASE_BPM ? " (the designed tempo)" : "");
+}
+let tapTimes = [];
+$("fxTap").onclick = () => {
+  const now = Date.now();
+  if (tapTimes.length && now - tapTimes[tapTimes.length - 1] > 2000) tapTimes = [];
+  tapTimes.push(now);
+  if (tapTimes.length > 6) tapTimes.shift();
+  if (tapTimes.length < 2){
+    $("fxTapHint").textContent = "keep tapping…";
+    return;
+  }
+  let iv = 0;
+  for (let i = 1; i < tapTimes.length; i++) iv += tapTimes[i] - tapTimes[i - 1];
+  iv /= (tapTimes.length - 1);
+  applyTempo(60000 / iv);
+};
+$("fxBpmSet").onclick = () => { tapTimes = []; applyTempo(+$("fxBpm").value || FX_BASE_BPM); };
 $("fxSpread").oninput=()=>{ $("fxSpreadV").textContent=$("fxSpread").value+"%"; };
 $("fxSpread").onchange=()=>{ setupTouched=Date.now(); send("SPREAD="+ +$("fxSpread").value); };
 $("crmxLink").onclick=()=>{ send("CRMXLINK");
