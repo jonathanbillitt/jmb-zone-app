@@ -60,6 +60,13 @@
                    padding:9px 8px; margin:0 -8px; border-radius:8px;
                    list-style:revert; user-select:none; }
   .adv > summary:active { background:var(--card2); }
+  /* The select's focus ring was being overlapped by the next row, so the
+     highlight looked like it was hiding behind the field. Give the rows real
+     vertical space and let the focused control paint above its neighbours. */
+  .adv .rows { gap:14px; }
+  .adv .row { padding:2px 0; position:relative; }
+  .adv .row select, .adv .row input { position:relative; z-index:1; }
+  .adv .row select:focus, .adv .row input:focus { z-index:2; outline-offset:2px; }
   .adv[open] > summary { color:var(--text); }
   .adv .row button.danger { width:100%; }
   .unit { color:var(--dim); font-size:13px; width:auto; }
@@ -488,6 +495,15 @@
       <div class="row" style="justify-content:space-between">
         <label style="font-weight:600">Effects</label>
       </div>
+      <div class="row"><label>Tempo</label>
+        <button id="fxTap" style="min-width:92px">Tap</button>
+        <input type="number" id="fxBpm" min="60" max="240" step="1" style="width:76px">
+        <span class="unit">BPM</span>
+        <button id="fxBpmSet">Set</button>
+      </div>
+      <div class="mini" id="fxTapHint">Tap 4+ times in time with the music, or
+        type a BPM. 128 = the designed tempo. Beat effects (Party, Club, Pulse)
+        follow it rig-wide, and the ports' Speed wheels move with it.</div>
       <div class="row"><label>Spread</label>
         <input type="range" id="fxSpread" min="0" max="100" step="5" style="flex:1">
         <span id="fxSpreadV" style="width:38px;text-align:right"></span>
@@ -588,7 +604,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-06d.variant";
+const APP_VER="2026-08-06g.univ";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -725,7 +741,7 @@ async function onDisconnected(){
 // promise chain with a retry; ordering is guaranteed.
 let wq=Promise.resolve();
 function send(s){
-  if(demoOn){ demoCmd(s); return wq; }
+  if(demoOn && !cmdChar && !NBLE()){ demoCmd(s); return wq; }
   if(NBLE()){
     if(!NBLE().connected) return wq;
     wq=wq.then(()=>NBLE().write(s).catch(()=>{}));
@@ -881,7 +897,7 @@ function esc(s){ return String(s).replace(/[&<>"]/g,
   c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function setChip(id,label,val,cls){
   const el=$(id);
-  el.innerHTML=label+" <b>"+val+"</b>";
+  el.innerHTML=esc(label)+" <b>"+esc(val)+"</b>";
   el.className="chip"+(cls?" "+cls:"");
 }
 function faultWords(f){ return FAULTS.filter(([b])=>f&b).map(([,t])=>t).join("+")||""; }
@@ -1655,10 +1671,14 @@ $("btnUniv").onclick=()=>{
     $("btnUniv").textContent="Close";
     actCnt.fill(0); univPrev.set(univ);
     send("UNIV");
+    // 250ms while the viewer is open: the firmware answers a request in a
+    // handful of loop passes, so the old 1s poll — not the link — was what
+    // made this look steppy. Min/Max come from a capture buffer that only
+    // changes slowly, so they stay on a ~1s cadence.
     univTimer=setInterval(()=>{ if(!bleConnected() && !demoOn) return;
       send("UNIV");
-      if((univMode==="min"||univMode==="max") && (univTick++&1)) send("UNIVMM");
-    },1000);
+      if((univMode==="min"||univMode==="max") && (univTick++ & 3)===0) send("UNIVMM");
+    },250);
   }else univStop();
 };
 document.querySelectorAll(".modechip").forEach(b=>b.onclick=()=>{
@@ -1794,6 +1814,7 @@ function onRdm(str){
       : f.PH==="READY" ? `${f.N||0} device${f.N==="1"?"":"s"} on the line`
       : "";
   }else if(tag==="DEV"){
+    if(!/^[0-9A-Fa-f]{1,16}$/.test(f.U||"")) return;   // wire data, not trusted
     const d={uid:f.U, addr:+f.A||0, fp:+f.FP||0, pe:+f.PE||0, pt:+f.PT||0,
              sn:+f.SN||0, model:hexDec(f.MD), label:hexDec(f.LB),
              mfr:hexDec(f.MF)};
@@ -1829,12 +1850,12 @@ function renderRdm(){
   host.innerHTML=rdmOrder.map(u=>{
     const d=rdmDevs[u], open=rdmOpenUid===u;
     const sens=rdmSens[u]||{};
-    return `<div class="devcard" data-uid="${u}">
+    return `<div class="devcard" data-uid="${esc(u)}">
       <div class="dh" data-act="open">
-        <b>${d.label||d.model||"RDM device"}</b>
+        <b>${esc(d.label||d.model||"RDM device")}</b>
         <span class="badge on">@${d.addr}</span>
       </div>
-      <div class="uid">${d.model?d.model+" · ":""}${d.mfr?d.mfr+" · ":""}UID ${u}
+      <div class="uid">${d.model?esc(d.model)+" · ":""}${d.mfr?esc(d.mfr)+" · ":""}UID ${esc(u)}
         · ${d.fp}ch · pers ${d.pe}/${d.pt}${d.sn?` · ${d.sn} sensors`:""}</div>
       ${open?`<div class="devedit rows">
         <div class="row"><label>Identify</label>
@@ -1849,7 +1870,7 @@ function renderRdm(){
             .join("")}</select>
           <button data-act="pers">Set</button></div>
         <div class="row"><label>Label</label>
-          <input type="text" maxlength="32" value="${d.label||""}" data-f="label"
+          <input type="text" maxlength="32" value="${esc(d.label||"")}" data-f="label"
                  style="flex:1">
           <button data-act="label">Set</button></div>
         <div class="row"><label>Sensors</label>
@@ -1892,6 +1913,7 @@ function renderSetup(){
   if(document.activeElement!==$("netUni")) $("netUni").value=kv.NUN??"1";
   if(document.activeElement!==$("setFold")) $("setFold").value=kv.TF??"1";
   // Effects: spread
+  if(document.activeElement!==$("fxBpm")) $("fxBpm").value=kv.BPM??"128";
   if(document.activeElement!==$("fxSpread")){ $("fxSpread").value=kv.SPR??"0";
     $("fxSpreadV").textContent=(kv.SPR??"0")+"%"; }
   // CRMX: CX 0=not linked 1=linking 2=linked/no data 3=linked+data
@@ -1915,6 +1937,53 @@ $("chBlack").onclick=()=>send("CHLOOK=1");
 $("chFull").onclick=()=>send("CHLOOK=9");
 $("chDmx").onclick=()=>send("CHLOOK=0");
 // ---------- Effects: spread ----------
+// ---------- FX tap tempo ----------
+// The rig tempo (BPM) and a port's Speed channel are two views of the same
+// thing: Speed 128 = the designed 128 BPM, and the scale is exponential with
+// 255 = 8x and 0 = 1/8x (three octaves either side). Converting between them
+// lets a tap move the Speed wheels so the encoder always shows what you tapped.
+const FX_BASE_BPM = 128;
+function bpmToSpeed(bpm){
+  const mult = Math.max(0.125, Math.min(8, bpm / FX_BASE_BPM));
+  return Math.max(0, Math.min(255,
+    Math.round(128 + 127 * Math.log2(mult) / 3)));
+}
+function speedToBpm(sp){
+  return Math.round(FX_BASE_BPM * Math.pow(2, ((sp - 128) * 3) / 127));
+}
+function applyTempo(bpm){
+  bpm = Math.max(60, Math.min(240, Math.round(bpm)));
+  $("fxBpm").value = bpm;
+  send("BPM=" + bpm);
+  // Move every port's Speed encoder (and the controller) to match, so the
+  // wheel reads the tapped tempo instead of drifting out of step with it.
+  const sp = bpmToSpeed(bpm);
+  ports.forEach((m, i) => {
+    const p = i + 1;
+    if (wheels[p + ".S"]) wheels[p + ".S"].set(sp);
+    hot[p + ".S"] = Date.now() + HOT_MS;
+    sendThrottled(p + ".FXS", `P${p}.FXS=${sp}`);
+  });
+  $("fxTapHint").textContent =
+    `${bpm} BPM — speed ${sp} on every port` +
+    (bpm === FX_BASE_BPM ? " (the designed tempo)" : "");
+}
+let tapTimes = [];
+$("fxTap").onclick = () => {
+  const now = Date.now();
+  if (tapTimes.length && now - tapTimes[tapTimes.length - 1] > 2000) tapTimes = [];
+  tapTimes.push(now);
+  if (tapTimes.length > 6) tapTimes.shift();
+  if (tapTimes.length < 2){
+    $("fxTapHint").textContent = "keep tapping…";
+    return;
+  }
+  let iv = 0;
+  for (let i = 1; i < tapTimes.length; i++) iv += tapTimes[i] - tapTimes[i - 1];
+  iv /= (tapTimes.length - 1);
+  applyTempo(60000 / iv);
+};
+$("fxBpmSet").onclick = () => { tapTimes = []; applyTempo(+$("fxBpm").value || FX_BASE_BPM); };
 $("fxSpread").oninput=()=>{ $("fxSpreadV").textContent=$("fxSpread").value+"%"; };
 $("fxSpread").onchange=()=>{ setupTouched=Date.now(); send("SPREAD="+ +$("fxSpread").value); };
 $("crmxLink").onclick=()=>{ send("CRMXLINK");
@@ -2090,7 +2159,14 @@ $("btnPin").onclick=()=>{
     alert("PIN changed. Reconnections must use the new PIN.");
   }
 };
-$("btnConnect").onclick=connect;
+$("btnConnect").onclick=()=>{
+  // Leaving demo for real hardware: stop the simulator before connecting, or
+  // every command (PIN included) would be swallowed by demoCmd.
+  if(demoOn){ demoOn=false; clearInterval(demoTimer); demoTimer=null;
+    clearInterval(demoFlkTimer); ports=[]; kv={};
+    $("demoBar").classList.add("hidden"); }
+  connect();
+};
 // ---------- DEMO MODE ----------
 // Browse the whole app with example data and no hardware: store reviewers and
 // prospective users can explore every tab. send() already no-ops while
@@ -2098,11 +2174,11 @@ $("btnConnect").onclick=connect;
 let demoTimer=null, demoOn=false, demoFlkTimer=null;
 // Mutable demo model: everything the user edits in demo sticks, and every
 // analyzer has example data — the whole Diag tab works without hardware.
-const demoP=[{a:1,pe:0,r:100,g:40,b:0,x:0},{a:4,pe:0,r:0,g:80,b:100,x:0},
-             {a:7,pe:2,r:100,g:35,b:0,x:0},{a:10,pe:4,r:100,g:100,b:100,x:9}];
-const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1};
+const demoP=[{a:1,pe:0,r:100,g:40,b:0,x:0,s:128},{a:4,pe:0,r:0,g:80,b:100,x:0,s:128},
+             {a:7,pe:2,r:100,g:35,b:0,x:0,s:128},{a:10,pe:4,r:100,g:100,b:100,x:9,s:128}];
+const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1,bpm:128};
 function demoState(){
-  const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S128,H${n},`+
+  const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S${d.s??128},H${n},`+
     `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6750,OT80,L0;`;
   onState(
     "JMB;FW=demo;PORTS=4;CID=7;DMX=1;FPS=44;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=3;ERR=0;"+
@@ -2111,7 +2187,7 @@ function demoState(){
     `FLKON=${demoF.flkon};FLKL=0;`+
     `NET=${demoF.net};NW=${demoF.net};NUN=${demoF.nun};SRC=${demoF.net?1:0};`+
     "NIP=192.168.1.42;NRS=-52;TF=1;PB=0;CX=3;CA=1;"+
-    "SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=128;SPR=30;"+
+    `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+
     "CN="+Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join("")+";"+
     demoP.map((d,i)=>P(i+1,d)).join(""));
 }
@@ -2166,6 +2242,8 @@ function demoCmd(s){
   if(m=s.match(/^P(\d)\.(R|G|B)=(\d+)/)){ demoP[+m[1]-1][m[2].toLowerCase()]=+m[3]; return; }
   if(m=s.match(/^ALL\.RGB=(\d+),(\d+),(\d+)/)){ demoP.forEach(d=>{d.r=+m[1];d.g=+m[2];d.b=+m[3];}); return; }
   if(m=s.match(/^P(\d)\.FX=(\d+)/)){ demoP[+m[1]-1].x=+m[2]; demoState(); return; }
+  if(m=s.match(/^BPM=(\d+)/)){ demoF.bpm=+m[1]; demoState(); return; }
+  if(m=s.match(/^P(\d)\.FXS=(\d+)/)){ demoP[+m[1]-1].s=+m[2]; return; }
   if(m=s.match(/^NET=(\d)/)){ demoF.net=+m[1]; demoState(); return; }
   if(m=s.match(/^WUNI=(\d+)/)){ demoF.nun=+m[1]; demoState(); return; }
   if(s.startsWith("WSSID=")||s.startsWith("WPASS=")) return;  // accepted quietly
