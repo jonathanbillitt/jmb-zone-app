@@ -376,7 +376,7 @@
       </div>
       <div class="mini" id="rdmPhase">Discover and edit every RDM fixture on the
         thru line — address, personality, label, identify and sensors, like a
-        DMXcat. Scanning takes over the output line while active.</div>
+        RDM tester. Scanning takes over the output line while active.</div>
       <div id="rdmDevs"></div>
     </div>
 
@@ -604,7 +604,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-06g.univ";
+const APP_VER="2026-08-06h.rdmstop";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1800,7 +1800,14 @@ $("btnRdmScan").onclick=()=>{
   send(kv.DMX==="1"?"RDMSCAN!":"RDMSCAN");
   rdmPhaseTxt="scanning…"; rdmActive=true; renderRdm();
 };
-$("btnRdmStop").onclick=()=>{ send("RDMSTOP"); };
+$("btnRdmStop").onclick=()=>{
+  send("RDMSTOP");
+  // Reflect it immediately: the controller confirms with JMBR;PH=OFF, but the
+  // button must never look stuck if that notify is slow or dropped.
+  rdmActive=false; rdmPend=null;
+  rdmPhaseTxt="stopped — thru released";
+  renderRdm();
+};
 function onRdm(str){
   const parts=str.split(";");
   const tag=parts[1];
@@ -1833,9 +1840,17 @@ function onRdm(str){
     }
     rdmPend=null;
   }else if(tag==="ERR"){
-    rdmPhaseTxt = parts[2]==="LIVE" ? "refused — upstream DMX live (rescan to force)"
-      : parts[2]==="FULL" ? "device table full (16 max)" : "error";
-    rdmActive=false;
+    const why=parts[2];
+    if(why==="BUSY"){
+      rdmPhaseTxt="already scanning — press Stop first";   // session still live
+    }else{
+      rdmPhaseTxt = why==="LIVE"  ? "refused — upstream DMX live (rescan to force)"
+                  : why==="FULL"  ? "device table full (16 max)"
+                  : why==="NOISY" ? "aborted — too much traffic on the line "+
+                                    "(unplug the desk, then scan)"
+                  : "error";
+      rdmActive=false;
+    }
   }
   renderRdm();
 }
@@ -2225,14 +2240,21 @@ function demoDevRow(d){
   onState(`JMBR;DEV;U=${d.u};A=${d.a};FP=${d.fp};PE=${d.pe};PT=${d.pt};SN=${d.sn};`+
           `MD=${hexEnc(d.md)};LB=${hexEnc(d.lb)};MF=${hexEnc(d.mf)}`);
 }
+let demoRdmTimers=[];
+function demoRdmCancel(){
+  demoRdmTimers.forEach(clearTimeout);
+  demoRdmTimers=[];
+}
 function demoRdmScan(){
+  demoRdmCancel();                       // a rescan replaces the old sequence
+  const at=(t,fn)=>demoRdmTimers.push(setTimeout(fn,t));
   let q=[[300,"JMBR;PH=SCAN;N=0;Q=3"],[900,"JMBR;PH=SCAN;N=1;Q=4"],
          [1500,"JMBR;PH=SCAN;N=2;Q=2"],[2100,"JMBR;PH=SCAN;N=3;Q=0"],
          [2500,"JMBR;PH=INFO;N=3;I=0"]];
-  q.forEach(([t,m])=>setTimeout(()=>onState(m),t));
-  DEMO_DEVS.forEach((d,i)=>setTimeout(()=>{ demoDevRow(d);
-    onState(`JMBR;PH=INFO;N=3;I=${i+1}`); },2900+i*500));
-  setTimeout(()=>onState("JMBR;PH=READY;N=3"),4600);
+  q.forEach(([t,m])=>at(t,()=>onState(m)));
+  DEMO_DEVS.forEach((d,i)=>at(2900+i*500,()=>{ demoDevRow(d);
+    onState(`JMBR;PH=INFO;N=3;I=${i+1}`); }));
+  at(4600,()=>onState("JMBR;PH=READY;N=3"));
 }
 function demoCmd(s){
   let m;
@@ -2259,7 +2281,7 @@ function demoCmd(s){
   if(s==="UNIVMM"){ demoUnivMM(); return; }
   if(s==="UNIV"){ demoUniv(); return; }
   if(s.startsWith("RDMSCAN")){ demoRdmScan(); return; }
-  if(s==="RDMSTOP"){ onState("JMBR;PH=OFF"); return; }
+  if(s==="RDMSTOP"){ demoRdmCancel(); onState("JMBR;PH=OFF"); return; }
   if(m=s.match(/^RDM\.([0-9A-Fa-f]{12})\.([A-Z]+)=(.*)/)){
     const op=m[2];
     if(op==="SENS"){ const d=DEMO_DEVS.find(x=>x.u===m[1]);
