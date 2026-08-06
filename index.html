@@ -538,13 +538,16 @@
         <button id="btnDisc" class="danger">Disconnect</button>
       </div>
       <div class="mini" id="fwLine"></div>
-      <div class="row" style="margin-top:8px"><label>Variant</label>
-        <select id="varSel" style="width:110px">
-          <option value="1">1-port</option><option value="4">4-port</option>
-          <option value="8">8-port</option></select>
-        <button id="varApply">Set</button>
-        <span class="mini" style="margin:0">reboots the controller</span>
+      <div class="row" style="margin-top:8px"><label>Hardware</label>
+        <span id="varLine" class="mini" style="margin:0;flex:1"></span>
       </div>
+      <div class="row"><label>BT name</label>
+        <input type="text" id="setBtName" maxlength="24" style="flex:1"
+               placeholder="JMB Zone" autocomplete="off">
+        <button id="btNameApply">Set</button>
+      </div>
+      <div class="mini">The Bluetooth name is what you see when connecting.
+        It changes at the controller's next restart.</div>
     </div>
   </div>
 </main>
@@ -604,7 +607,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-06h.rdmstop";
+const APP_VER="2026-08-07.autovar";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1944,7 +1947,15 @@ function renderSetup(){
       : "connecting…";
   $("fwLine").textContent="Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+
     " ports · "+(kv.HRS??0)+" h powered · app "+APP_VER;
-  if(document.activeElement!==$("varSel")) $("varSel").value=kv.VAR??kv.PORTS??"4";
+  {
+    const n=kv.VAR??kv.PORTS;
+    $("varLine").textContent = n
+      ? `${n}-port controller — detected automatically`+
+        (kv.VARM==="1"?" (pinned on the bench)":"")
+      : "—";
+  }
+  if(document.activeElement!==$("setBtName"))
+    $("setBtName").value=hexDec(kv.BTN)||"";
 }
 $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.value); };
 // ---------- Chain broadcast (factory look index: 0=DMX In, 1=Off, 9=White) ----------
@@ -2007,11 +2018,14 @@ $("crmxUnlink").onclick=()=>{ if(confirm("Unlink from the paired transmitter?"))
   send("CRMXUNLINK"); };
 $("crmxAnt").onchange=e=>{ setupTouched=Date.now(); send("CRMXANT="+ +e.target.value); };
 $("netEn").onchange=e=>{ setupTouched=Date.now(); send("NET="+ +e.target.value); };
-$("varApply").onclick=()=>{
-  const n=+$("varSel").value;
-  if(confirm(`Reprovision this controller as a ${n}-port?\nIt will reboot and `+
-             `re-size everything — ports, screens, RDM — to ${n}.`))
-    send("VARIANT="+n);
+$("btNameApply").onclick=()=>{
+  const t=$("setBtName").value.trim();
+  setupTouched=Date.now();
+  send("BTNAME="+hexEnc(t));
+  alert(t ? `Bluetooth name set to "${t}". It takes effect when the `+
+            `controller next restarts.`
+          : "Bluetooth name reset to the default. It takes effect when the "+
+            "controller next restarts.");
 };
 $("btnUniApply").onclick=()=>{ setupTouched=Date.now();
   send("WUNI="+Math.max(1,Math.min(63999,+$("netUni").value||1))); };
@@ -2191,7 +2205,7 @@ let demoTimer=null, demoOn=false, demoFlkTimer=null;
 // analyzer has example data — the whole Diag tab works without hardware.
 const demoP=[{a:1,pe:0,r:100,g:40,b:0,x:0,s:128},{a:4,pe:0,r:0,g:80,b:100,x:0,s:128},
              {a:7,pe:2,r:100,g:35,b:0,x:0,s:128},{a:10,pe:4,r:100,g:100,b:100,x:9,s:128}];
-const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1,bpm:128};
+const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1,bpm:128,btn:'44656D6F20526967'};
 function demoState(){
   const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S${d.s??128},H${n},`+
     `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6750,OT80,L0;`;
@@ -2199,6 +2213,7 @@ function demoState(){
     "JMB;FW=demo;PORTS=4;CID=7;DMX=1;FPS=44;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=3;ERR=0;"+
     "RDM=42;ANS=42;AGE=23;"+
     `CAPON=${demoF.capon};CAPMS=${demoF.capon?Date.now()-demoF.capt0:0};CFL=43;CFH=45;`+
+    `VAR=4;VARM=0;BTN=${demoF.btn};`+
     `FLKON=${demoF.flkon};FLKL=0;`+
     `NET=${demoF.net};NW=${demoF.net};NUN=${demoF.nun};SRC=${demoF.net?1:0};`+
     "NIP=192.168.1.42;NRS=-52;TF=1;PB=0;CX=3;CA=1;"+
@@ -2264,6 +2279,7 @@ function demoCmd(s){
   if(m=s.match(/^P(\d)\.(R|G|B)=(\d+)/)){ demoP[+m[1]-1][m[2].toLowerCase()]=+m[3]; return; }
   if(m=s.match(/^ALL\.RGB=(\d+),(\d+),(\d+)/)){ demoP.forEach(d=>{d.r=+m[1];d.g=+m[2];d.b=+m[3];}); return; }
   if(m=s.match(/^P(\d)\.FX=(\d+)/)){ demoP[+m[1]-1].x=+m[2]; demoState(); return; }
+  if(s.startsWith("BTNAME=")){ demoF.btn=s.slice(7); demoState(); return; }
   if(m=s.match(/^BPM=(\d+)/)){ demoF.bpm=+m[1]; demoState(); return; }
   if(m=s.match(/^P(\d)\.FXS=(\d+)/)){ demoP[+m[1]-1].s=+m[2]; return; }
   if(m=s.match(/^NET=(\d)/)){ demoF.net=+m[1]; demoState(); return; }
