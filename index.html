@@ -36,7 +36,7 @@
            background:var(--card); border-bottom:1px solid var(--line);
            position:sticky; top:0; z-index:5; }
   header .logo { width:34px; height:34px; display:block; }
-  h1 { font-size:16px; margin:0; flex:1; font-weight:600; }
+  h1 { font-size:16px; margin:0; font-weight:600; line-height:1.15; }
   button { background:var(--card2); color:var(--text); border:1px solid var(--line);
            border-radius:8px; padding:9px 14px; font-size:14px; cursor:pointer; }
   button.primary { background:var(--acc); border-color:var(--acc); color:#04121f;
@@ -227,17 +227,27 @@
 
 <header>
   <svg class="logo" viewBox="0 0 128 128" aria-hidden="true">
-    <rect width="128" height="128" rx="26" fill="#0E1116"/>
-<g transform="translate(7.7,7.7) scale(0.88)">
-    <rect x="14" y="14" width="100" height="100" rx="22" fill="none" stroke="#E6EDF3" stroke-width="8"/>
-    <rect x="32" y="32" width="64" height="11" rx="5.5" fill="#E6EDF3"/>
-    <rect x="56" y="58" width="40" height="11" rx="5.5" fill="#2EE6A8"/>
-    <rect x="32" y="84" width="64" height="11" rx="5.5" fill="#E6EDF3"/>
-    <path d="M94 44 L58 57" stroke="#E6EDF3" stroke-width="6.5" stroke-linecap="round" fill="none"/>
-    <path d="M94 70 L34 83" stroke="#E6EDF3" stroke-width="6.5" stroke-linecap="round" fill="none"/>
-  </g>
+    <defs>
+      <linearGradient id="lgP" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#c53cff"/><stop offset="1" stop-color="#6a2cf5"/>
+      </linearGradient>
+      <linearGradient id="lgC" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#5fd7ff"/><stop offset="1" stop-color="#1f8fe0"/>
+      </linearGradient>
+    </defs>
+    <rect x="6" y="6" width="116" height="116" rx="26" fill="#0b0b18"/>
+    <rect x="14" y="14" width="100" height="100" rx="20" fill="none"
+          stroke="url(#lgP)" stroke-width="9"/>
+    <rect x="32" y="33" width="64" height="11" rx="3" fill="url(#lgP)"/>
+    <rect x="32" y="84" width="64" height="11" rx="3" fill="url(#lgP)"/>
+    <text x="64" y="75" font-family="system-ui,Segoe UI,Roboto,sans-serif"
+          font-size="30" font-weight="800" letter-spacing="1"
+          fill="url(#lgC)" text-anchor="middle">JMB</text>
   </svg>
-  <h1 id="title">JMB Zone</h1>
+  <div style="flex:1;min-width:0">
+    <h1 id="title">JMB Zone</h1>
+    <span id="prodMark" style="display:block;color:var(--text);opacity:.95"></span>
+  </div>
   <button id="btnConnect" class="primary">Connect</button>
 </header>
 
@@ -600,7 +610,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-07b.brand";
+const APP_VER="2026-08-07d.wordmark";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -872,6 +882,7 @@ function onState(str){
     $("title").textContent=(cn||devName()||"JMB Zone")+" · "+n+"-port"; }
   if(n && n!==colPortsN){ renderColourTargets(n); colPortsN=n; }
   renderControl(); renderPortInfo(); renderDiag(); renderSetup();
+  renderProductMark();
 }
 function hexEnc(s){
   let o="";
@@ -1592,6 +1603,21 @@ function renderPortInfo(){
         <tr><th>Source</th><td>${kv.DMX==="1"?"DMX":(m.X?FX_NAMES[m.X]:(m.M?"manual":"hold"))}</td></tr>
       </table>`;
   });
+}
+
+// ---------- product wordmark ----------
+// The controller tells us how many ports it has, so the header names itself:
+// zONe / 4OUr / 8IGHt. Drawn as geometry, so there is no font to load.
+const PROD_MARKS = {
+  1: '<svg viewBox="-6 -14 358 128" preserveAspectRatio="xMinYMid meet" aria-hidden="true" style="height:26px;width:auto;vertical-align:middle"><g transform="translate(0,0) scale(1.0)" fill="none" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter"><g transform="translate(0,0)" stroke="currentColor"><path d="M0 36 H56"/><path d="M56 36 L0 92"/><path d="M0 92 H56"/></g><g transform="translate(70,0)" stroke="#A78BFA"><circle cx="50" cy="50" r="42"/></g><g transform="translate(184,0)" stroke="#A78BFA"><path d="M8 100 V0"/><path d="M68 100 V0"/><path d="M8 0 L68 100"/></g><g transform="translate(274,0)" stroke="#A78BFA"><g transform="rotate(-12 36.0 64.0)"><path d="M8 64 H64"/><path d="M64 64 A28 28 0 1 0 52.06 86.94"/></g></g></g></svg>',
+  4: '<svg viewBox="-6 -14 354 128" preserveAspectRatio="xMinYMid meet" aria-hidden="true" style="height:26px;width:auto;vertical-align:middle"><g transform="translate(0,0) scale(1.0)" fill="none" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter"><g transform="translate(0,0)" stroke="#A78BFA"><g transform="translate(76.0,0) scale(-1,1)"><path d="M56 4 V100"/><path d="M56 4 L6 68"/><path d="M6 68 H74"/></g></g><g transform="translate(90,0)" stroke="currentColor"><circle cx="50" cy="50" r="42"/></g><g transform="translate(204,0)" stroke="currentColor"><path d="M8 0 V62 A30 30 0 0 0 68 62 V0"/></g><g transform="translate(294,0)" stroke="currentColor"><g transform="rotate(-12 24.0 64.0)"><path d="M8 100 V28"/><path d="M8 48 A22 22 0 0 1 44 36"/></g></g></g></svg>',
+  8: '<svg viewBox="-6 -14 380 128" preserveAspectRatio="xMinYMid meet" aria-hidden="true" style="height:26px;width:auto;vertical-align:middle"><g transform="translate(0,0) scale(1.0)" fill="none" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter"><g transform="translate(0,0)" stroke="#A78BFA"><circle cx="38" cy="26" r="20"/><circle cx="38" cy="68" r="26"/></g><g transform="translate(90,0)" stroke="currentColor"><path d="M8 0 V100"/></g><g transform="translate(120,0)" stroke="currentColor"><path d="M79.7 20.3 A42 42 0 1 0 89.5 64.4"/><path d="M89.5 64.4 H62"/></g><g transform="translate(234,0)" stroke="currentColor"><path d="M8 0 V100"/><path d="M68 0 V100"/><path d="M8 50 H68"/></g><g transform="translate(324,0)" stroke="currentColor"><g transform="rotate(-12 22.0 64.0)"><path d="M20 10 V100"/><path d="M2 32 H38"/></g></g></g></svg>'
+};
+function renderProductMark(){
+  const host = $("prodMark");
+  if(!host) return;
+  const n = +(kv.VAR ?? kv.PORTS ?? 0);
+  host.innerHTML = PROD_MARKS[n] || "";
 }
 
 // ---------- Diag tab ----------
