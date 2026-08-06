@@ -588,7 +588,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-06d.variant";
+const APP_VER="2026-08-06e.review";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -725,7 +725,7 @@ async function onDisconnected(){
 // promise chain with a retry; ordering is guaranteed.
 let wq=Promise.resolve();
 function send(s){
-  if(demoOn){ demoCmd(s); return wq; }
+  if(demoOn && !cmdChar && !NBLE()){ demoCmd(s); return wq; }
   if(NBLE()){
     if(!NBLE().connected) return wq;
     wq=wq.then(()=>NBLE().write(s).catch(()=>{}));
@@ -881,7 +881,7 @@ function esc(s){ return String(s).replace(/[&<>"]/g,
   c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function setChip(id,label,val,cls){
   const el=$(id);
-  el.innerHTML=label+" <b>"+val+"</b>";
+  el.innerHTML=esc(label)+" <b>"+esc(val)+"</b>";
   el.className="chip"+(cls?" "+cls:"");
 }
 function faultWords(f){ return FAULTS.filter(([b])=>f&b).map(([,t])=>t).join("+")||""; }
@@ -1794,6 +1794,7 @@ function onRdm(str){
       : f.PH==="READY" ? `${f.N||0} device${f.N==="1"?"":"s"} on the line`
       : "";
   }else if(tag==="DEV"){
+    if(!/^[0-9A-Fa-f]{1,16}$/.test(f.U||"")) return;   // wire data, not trusted
     const d={uid:f.U, addr:+f.A||0, fp:+f.FP||0, pe:+f.PE||0, pt:+f.PT||0,
              sn:+f.SN||0, model:hexDec(f.MD), label:hexDec(f.LB),
              mfr:hexDec(f.MF)};
@@ -1829,12 +1830,12 @@ function renderRdm(){
   host.innerHTML=rdmOrder.map(u=>{
     const d=rdmDevs[u], open=rdmOpenUid===u;
     const sens=rdmSens[u]||{};
-    return `<div class="devcard" data-uid="${u}">
+    return `<div class="devcard" data-uid="${esc(u)}">
       <div class="dh" data-act="open">
-        <b>${d.label||d.model||"RDM device"}</b>
+        <b>${esc(d.label||d.model||"RDM device")}</b>
         <span class="badge on">@${d.addr}</span>
       </div>
-      <div class="uid">${d.model?d.model+" · ":""}${d.mfr?d.mfr+" · ":""}UID ${u}
+      <div class="uid">${d.model?esc(d.model)+" · ":""}${d.mfr?esc(d.mfr)+" · ":""}UID ${esc(u)}
         · ${d.fp}ch · pers ${d.pe}/${d.pt}${d.sn?` · ${d.sn} sensors`:""}</div>
       ${open?`<div class="devedit rows">
         <div class="row"><label>Identify</label>
@@ -1849,7 +1850,7 @@ function renderRdm(){
             .join("")}</select>
           <button data-act="pers">Set</button></div>
         <div class="row"><label>Label</label>
-          <input type="text" maxlength="32" value="${d.label||""}" data-f="label"
+          <input type="text" maxlength="32" value="${esc(d.label||"")}" data-f="label"
                  style="flex:1">
           <button data-act="label">Set</button></div>
         <div class="row"><label>Sensors</label>
@@ -2090,7 +2091,14 @@ $("btnPin").onclick=()=>{
     alert("PIN changed. Reconnections must use the new PIN.");
   }
 };
-$("btnConnect").onclick=connect;
+$("btnConnect").onclick=()=>{
+  // Leaving demo for real hardware: stop the simulator before connecting, or
+  // every command (PIN included) would be swallowed by demoCmd.
+  if(demoOn){ demoOn=false; clearInterval(demoTimer); demoTimer=null;
+    clearInterval(demoFlkTimer); ports=[]; kv={};
+    $("demoBar").classList.add("hidden"); }
+  connect();
+};
 // ---------- DEMO MODE ----------
 // Browse the whole app with example data and no hardware: store reviewers and
 // prospective users can explore every tab. send() already no-ops while
