@@ -1,8 +1,11 @@
 name: Deploy app to Pages
 
+# Manual only for now. GitHub's hosted runners were failing to pick this job
+# up ("job was not acquired by Runner of type hosted"), so every push produced
+# a failed-deployment email. Re-add the push trigger once Actions is healthy:
+#   push:
+#     branches: [main]
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
