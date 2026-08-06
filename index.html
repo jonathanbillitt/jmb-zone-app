@@ -522,6 +522,13 @@
         <button id="btnDisc" class="danger">Disconnect</button>
       </div>
       <div class="mini" id="fwLine"></div>
+      <div class="row" style="margin-top:8px"><label>Variant</label>
+        <select id="varSel" style="width:110px">
+          <option value="1">1-port</option><option value="4">4-port</option>
+          <option value="8">8-port</option></select>
+        <button id="varApply">Set</button>
+        <span class="mini" style="margin:0">reboots the controller</span>
+      </div>
     </div>
   </div>
 </main>
@@ -581,7 +588,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-06c.spacing";
+const APP_VER="2026-08-06d.variant";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1898,7 +1905,9 @@ function renderSetup(){
   $("netStatus").textContent = !netOn ? "off"
       : wifiUp ? `Wi-Fi ${kv.NIP||""} · ${kv.NRS||"?"}dBm · live: ${srcName}`
       : "connecting…";
-  $("fwLine").textContent="Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+" ports · app "+APP_VER;
+  $("fwLine").textContent="Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+
+    " ports · "+(kv.HRS??0)+" h powered · app "+APP_VER;
+  if(document.activeElement!==$("varSel")) $("varSel").value=kv.VAR??kv.PORTS??"4";
 }
 $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.value); };
 // ---------- Chain broadcast (factory look index: 0=DMX In, 1=Off, 9=White) ----------
@@ -1914,6 +1923,12 @@ $("crmxUnlink").onclick=()=>{ if(confirm("Unlink from the paired transmitter?"))
   send("CRMXUNLINK"); };
 $("crmxAnt").onchange=e=>{ setupTouched=Date.now(); send("CRMXANT="+ +e.target.value); };
 $("netEn").onchange=e=>{ setupTouched=Date.now(); send("NET="+ +e.target.value); };
+$("varApply").onclick=()=>{
+  const n=+$("varSel").value;
+  if(confirm(`Reprovision this controller as a ${n}-port?\nIt will reboot and `+
+             `re-size everything — ports, screens, RDM — to ${n}.`))
+    send("VARIANT="+n);
+};
 $("btnUniApply").onclick=()=>{ setupTouched=Date.now();
   send("WUNI="+Math.max(1,Math.min(63999,+$("netUni").value||1))); };
 $("btnWifiApply").onclick=()=>{ setupTouched=Date.now();
