@@ -55,9 +55,11 @@
   .port-head h2 { font-size:15px; margin:0; }
   .port-head h2 { flex:1; }
   .pilabel { font-weight:400; color:var(--dim); font-size:13px; }
-  .adv { margin-top:6px; border-top:1px solid var(--line); padding-top:4px; }
+  .adv { margin-top:14px; border-top:1px solid var(--line); padding-top:6px; }
   .adv > summary { cursor:pointer; font-size:13px; color:var(--dim);
-                   padding:6px 0; list-style:revert; user-select:none; }
+                   padding:9px 8px; margin:0 -8px; border-radius:8px;
+                   list-style:revert; user-select:none; }
+  .adv > summary:active { background:var(--card2); }
   .adv[open] > summary { color:var(--text); }
   .adv .row button.danger { width:100%; }
   .unit { color:var(--dim); font-size:13px; width:auto; }
@@ -579,7 +581,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-06b.demofix";
+const APP_VER="2026-08-06c.spacing";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
