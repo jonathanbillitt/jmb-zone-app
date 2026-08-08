@@ -610,7 +610,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-08d.header";
+const APP_VER="2026-08-08e.clrf";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1054,6 +1054,9 @@ function buildCard(p){
     send(`P${p}.CLRF=1`);
     const b=$("clrf"+p), t=b.textContent;
     b.textContent="Cleared"; setTimeout(()=>{ b.textContent=t; },1500);
+    // pull fresh state so the button swaps back to the green tick even on
+    // firmware that doesn't push fault transitions on its own
+    setTimeout(()=>send("GET"), 800);
   });
   d.querySelector("#addr"+p).addEventListener("change",e=>{
     const mx=maxAddr(+$("pers"+p).value||0);
