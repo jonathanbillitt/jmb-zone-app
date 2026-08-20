@@ -511,6 +511,24 @@
       looks + effects, and this phone's scenes — one shareable file.</div>
       <div class="mini" id="impStatus"></div>
     </div>
+    <div class="card" id="otaCard">
+      <div class="row" style="justify-content:space-between">
+        <label style="font-weight:600">Firmware update</label>
+        <span class="mini" id="otaState" style="margin:0">—</span>
+      </div>
+      <div class="ctlrow">
+        <button id="btnOtaPick">Choose .bin…</button>
+        <input type="file" id="otaFile" accept=".bin,application/octet-stream" class="hidden">
+        <button id="btnOtaGo" class="primary" disabled>Update over Bluetooth</button>
+        <button id="btnOtaCancel" class="danger hidden">Cancel</button>
+      </div>
+      <div id="otaBarWrap" class="hidden" style="margin-top:10px;height:10px;background:var(--card2);border-radius:6px;overflow:hidden">
+        <div id="otaBar" style="height:100%;width:0;background:linear-gradient(90deg,#6a2cf5,#5fd7ff);transition:width .15s"></div>
+      </div>
+      <div class="mini" id="otaMsg">Update the controller over Bluetooth — pick your
+      build's <code>firmware.bin</code>. Keep the app open and the phone unlocked
+      until it finishes; the controller reboots into the new firmware itself.</div>
+    </div>
     <div class="card">
       <div class="ctlrow">
         <button id="btnIdent">Flash to find</button>
@@ -569,6 +587,10 @@
 const SVC   = "a1b20001-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const CMD   = "a1b20002-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
 const STATE = "a1b20003-5c6d-4e8f-9a0b-1c2d3e4f5a6b";
+const OTAC  = "a1b20004-5c6d-4e8f-9a0b-1c2d3e4f5a6b";   // OTA control (write)
+const OTAD  = "a1b20005-5c6d-4e8f-9a0b-1c2d3e4f5a6b";   // OTA data (write)
+const OTAS  = "a1b20006-5c6d-4e8f-9a0b-1c2d3e4f5a6b";   // OTA status (notify)
+let otacChar=null, otadChar=null, otasChar=null;         // null until connected to OTA-capable fw
 const PERS_NAMES = ["RGB 8-bit","RGB 16-bit","CW/WW 8-bit","CW/WW 16-bit","FX 10ch"];
 // Swatch colour for a port: RGB ports show the mix; CW/WW ports blend warm
 // (2700K-ish) and cool (6500K-ish) white tones (WW rides the R value, CW the G).
@@ -597,7 +619,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-20e.nowifi";
+const APP_VER="2026-08-20f.bleota";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -668,6 +690,16 @@ async function gattSetup(){
       await stateChar.startNotifications();
       stateChar.removeEventListener("characteristicvaluechanged",stateHandler);
       stateChar.addEventListener("characteristicvaluechanged",stateHandler);
+      // OTA chars are optional — present only on OTA-capable firmware.
+      otacChar=otadChar=otasChar=null;
+      try{
+        otacChar=await svc.getCharacteristic(OTAC);
+        otadChar=await svc.getCharacteristic(OTAD);
+        otasChar=await svc.getCharacteristic(OTAS);
+        await otasChar.startNotifications();
+        otasChar.removeEventListener("characteristicvaluechanged",otaStatHandler);
+        otasChar.addEventListener("characteristicvaluechanged",otaStatHandler);
+      }catch(_){ otacChar=otadChar=otasChar=null; }
       dev.addEventListener("gattserverdisconnected",onDisconnected,{once:true});
       return;
     }catch(e){ lastErr=e; try{dev.gatt.disconnect();}catch(_){}; await sleep(500); }
@@ -708,6 +740,7 @@ async function onDisconnected(){
   if(busy){ cmdChar=null; return; }         // a connect/reconnect owns the link
   busy=true;
   authed=false; cmdChar=null;
+  otacChar=otadChar=otasChar=null; if(!otaBusy) renderOta();
   hideOverlay(); hideApp();
   univStop();
   try{
@@ -869,7 +902,7 @@ function onState(str){
     $("title").textContent=(cn||devName()||"JMB Lighting")+" · "+n+"-port"; }
   if(n && n!==colPortsN){ renderColourTargets(n); colPortsN=n; }
   renderControl(); renderPortInfo(); renderDiag(); renderSetup();
-  renderProductMark();
+  renderProductMark(); renderOta();
 }
 function hexEnc(s){
   let o="";
@@ -2187,6 +2220,84 @@ $("impFile").addEventListener("change",async ev=>{
   await applyQueue(q,"Applying");
   if(nsc){ saveScenes(data.scenes.slice(0,100)); renderScenes(); }
 });
+
+// ---------- BLE OTA (firmware update over Bluetooth) ----------
+function crc32(buf){
+  let c=0xFFFFFFFF; const u=new Uint8Array(buf);
+  for(let i=0;i<u.length;i++){ c^=u[i];
+    for(let k=0;k<8;k++) c=(c>>>1)^(0xEDB88320 & (-(c&1))); }
+  return (c^0xFFFFFFFF)>>>0;
+}
+const otaEnc=s=>new TextEncoder().encode(s);
+let otaSelFile=null, otaBusy=false, otaAbort=false, otaWaiter=null;
+function setOtaState(t){ $("otaState").textContent=t; }
+function setOtaMsg(t){ $("otaMsg").textContent=t; }
+function otaProgress(f){ $("otaBarWrap").classList.remove("hidden");
+  $("otaBar").style.width=Math.round(Math.max(0,Math.min(1,f))*100)+"%"; }
+function otaHideBar(){ $("otaBarWrap").classList.add("hidden"); $("otaBar").style.width="0"; }
+function renderOta(){
+  const ok=!!otacChar;                     // connected to OTA-capable firmware
+  $("btnOtaPick").disabled=!ok||otaBusy;
+  $("btnOtaGo").disabled=!ok||!otaSelFile||otaBusy;
+  if(!otaBusy) setOtaState(ok?(otaSelFile?"ready":"pick a .bin"):"connect first");
+}
+function otaStatHandler(e){
+  const msg=new TextDecoder().decode(e.target.value).trim();
+  const m=msg.match(/^RX (\d+)\/(\d+)/);
+  if(m){ otaProgress(+m[1]/+m[2]); setOtaState(Math.round(100*m[1]/m[2])+"%"); }
+  else if(msg==="READY") setOtaState("uploading…");
+  else if(msg==="DONE"){ otaProgress(1); setOtaState("done — rebooting"); }
+  else if(msg==="ABORTED") setOtaState("cancelled");
+  else if(msg.startsWith("ERR")) setOtaState("error");
+  if(otaWaiter) otaWaiter(msg);
+}
+function waitOta(pred,timeout){ return new Promise((res,rej)=>{
+  const to=setTimeout(()=>{ otaWaiter=null; rej(new Error("timeout")); }, timeout||8000);
+  otaWaiter=(m)=>{ if(pred(m)){ clearTimeout(to); otaWaiter=null; res(m);} };
+}); }
+$("btnOtaPick").onclick=()=>$("otaFile").click();
+$("otaFile").addEventListener("change",ev=>{
+  const f=ev.target.files[0]; ev.target.value="";
+  if(!f) return;
+  otaSelFile=f; setOtaMsg(`Selected ${f.name} — ${(f.size/1024).toFixed(0)} KB. Tap "Update over Bluetooth".`);
+  renderOta();
+});
+$("btnOtaCancel").onclick=()=>{ otaAbort=true; };
+$("btnOtaGo").onclick=()=>runOta(otaSelFile);
+async function runOta(file){
+  if(!file||!otacChar||!otadChar){ setOtaMsg("Connect to an update-capable controller first."); return; }
+  const buf=await file.arrayBuffer(), size=buf.byteLength;
+  if(new Uint8Array(buf)[0]!==0xE9){ setOtaMsg("That isn't an ESP32 firmware .bin (bad magic byte)."); return; }
+  const crc=crc32(buf);
+  if(!confirm(`Flash ${file.name} (${(size/1024).toFixed(0)} KB) to this controller?\nIt reboots into the new firmware when done.`)) return;
+  otaBusy=true; otaAbort=false; renderOta();
+  $("btnOtaCancel").classList.remove("hidden");
+  setOtaState("starting…"); otaProgress(0);
+  try{
+    await otacChar.writeValueWithResponse(otaEnc(`BEGIN ${size} ${crc.toString(16)}`));
+    let r=await waitOta(m=>m==="READY"||m.startsWith("ERR"),8000);
+    if(r.startsWith("ERR")) throw new Error("controller "+r);
+    const CH=240, u=new Uint8Array(buf);
+    for(let off=0; off<size; off+=CH){
+      if(otaAbort) throw new Error("cancelled");
+      await otadChar.writeValueWithResponse(u.subarray(off,Math.min(off+CH,size)));
+      if((off & 0x1FFF)<CH) otaProgress(off/size);
+    }
+    otaProgress(1);
+    await otacChar.writeValueWithResponse(otaEnc("END"));
+    r=await waitOta(m=>m==="DONE"||m.startsWith("ERR"),20000);
+    if(r.startsWith("ERR")) throw new Error("controller "+r);
+    setOtaState("done"); otaSelFile=null;
+    setOtaMsg("✓ Update complete — the controller is rebooting into the new firmware. Reconnect in a few seconds.");
+  }catch(e){
+    try{ await otacChar.writeValueWithResponse(otaEnc("ABORT")); }catch(_){}
+    setOtaState("failed"); otaHideBar();
+    setOtaMsg("Update "+(e&&e.message==="cancelled"?"cancelled.":"failed: "+((e&&e.message)||e))
+      +" — the old firmware is untouched.");
+  }finally{
+    otaBusy=false; $("btnOtaCancel").classList.add("hidden"); renderOta();
+  }
+}
 
 $("btnRefresh").onclick=()=>send("GET");
 $("btnDisc").onclick=()=>{ if(NBLE()){ NBLE().disconnect(); onDisconnected(); return; }
