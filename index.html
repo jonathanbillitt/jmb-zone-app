@@ -619,7 +619,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-20g.otaroll";
+const APP_VER="2026-08-20h.otaconfirm";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -740,7 +740,7 @@ async function onDisconnected(){
   if(busy){ cmdChar=null; return; }         // a connect/reconnect owns the link
   busy=true;
   authed=false; cmdChar=null;
-  otacChar=otadChar=otasChar=null; if(!otaBusy) renderOta();
+  otacChar=otadChar=otasChar=null; otaProbationSeen=false; if(!otaBusy) renderOta();
   hideOverlay(); hideApp();
   univStop();
   try{
@@ -2229,7 +2229,7 @@ function crc32(buf){
   return (c^0xFFFFFFFF)>>>0;
 }
 const otaEnc=s=>new TextEncoder().encode(s);
-let otaSelFile=null, otaBusy=false, otaAbort=false, otaWaiter=null;
+let otaSelFile=null, otaBusy=false, otaAbort=false, otaWaiter=null, otaProbationSeen=false;
 function setOtaState(t){ $("otaState").textContent=t; }
 function setOtaMsg(t){ $("otaMsg").textContent=t; }
 function otaProgress(f){ $("otaBarWrap").classList.remove("hidden");
@@ -2239,7 +2239,21 @@ function renderOta(){
   const ok=!!otacChar;                     // connected to OTA-capable firmware
   $("btnOtaPick").disabled=!ok||otaBusy;
   $("btnOtaGo").disabled=!ok||!otaSelFile||otaBusy;
-  if(!otaBusy) setOtaState(ok?(otaSelFile?"ready":"pick a .bin"):"connect first");
+  if(otaBusy) return;                      // an upload in progress owns the status line
+  if(ok && kv.RB==="1"){                   // freshly-flashed image on probation
+    otaProbationSeen=true;
+    setOtaState("confirming new firmware…");
+    setOtaMsg("The new firmware is on probation — it confirms itself after running "
+      +"stably for a few seconds. If it were faulty it would auto-revert to the "
+      +"previous version.");
+    return;
+  }
+  if(otaProbationSeen){                     // just came off probation → confirmed (sticky)
+    setOtaState("✓ firmware confirmed");
+    setOtaMsg("New firmware confirmed and running normally.");
+    return;
+  }
+  setOtaState(ok?(otaSelFile?"ready":"pick a .bin"):"connect first");
 }
 function otaStatHandler(e){
   const msg=new TextDecoder().decode(e.target.value).trim();
@@ -2259,7 +2273,8 @@ $("btnOtaPick").onclick=()=>$("otaFile").click();
 $("otaFile").addEventListener("change",ev=>{
   const f=ev.target.files[0]; ev.target.value="";
   if(!f) return;
-  otaSelFile=f; setOtaMsg(`Selected ${f.name} — ${(f.size/1024).toFixed(0)} KB. Tap "Update over Bluetooth".`);
+  otaSelFile=f; otaProbationSeen=false;
+  setOtaMsg(`Selected ${f.name} — ${(f.size/1024).toFixed(0)} KB. Tap "Update over Bluetooth".`);
   renderOta();
 });
 $("btnOtaCancel").onclick=()=>{ otaAbort=true; };
