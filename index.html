@@ -224,10 +224,11 @@
           text-shadow:0 1px 2px #000; pointer-events:none; }
   /* launch splash — the neon JMB badge, fades out once the app is ready */
   #splash{ position:fixed; inset:0; z-index:9999; background:#000006;
-    display:flex; align-items:center; justify-content:center;
+    overflow:hidden; display:flex; align-items:center; justify-content:center;
     transition:opacity .45s ease; }
-  #splash img{ width:min(64vw,300px); height:auto;
-    filter:drop-shadow(0 0 34px rgba(120,60,255,.40)); }
+  /* biggest the square badge can go while staying whole; the image's own dark
+     background blends into #000006, so the top/bottom read as one dark screen */
+  #splash img{ width:min(100vw,100vh); height:auto; }
   #splash.gone{ opacity:0; pointer-events:none; }
 </style>
 </head>
@@ -627,7 +628,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-20n.splash";
+const APP_VER="2026-08-20o.splash-big";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
