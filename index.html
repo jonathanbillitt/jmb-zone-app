@@ -421,7 +421,10 @@
       (e.g. Aurora); Unlink forgets it. Status is data-truth: "linked &#8212; no data"
       means paired but the transmitter isn't sending.</div>
     </div>
-    <div class="card">
+    <!-- Network DMX (sACN/Art-Net over Wi-Fi) PARKED 2026-08-20 — hidden; the
+         controller no longer starts WiFi. Elements kept so existing JS is inert
+         rather than erroring. Un-hide (and set firmware JMB_WIFI=1) to restore. -->
+    <div class="card hidden">
       <div class="row" style="justify-content:space-between">
         <label style="font-weight:600">Network DMX</label>
         <span class="mini" id="netStatus" style="margin:0">—</span>
@@ -594,7 +597,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-20d.rebrand";
+const APP_VER="2026-08-20e.nowifi";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
