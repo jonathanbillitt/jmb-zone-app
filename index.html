@@ -222,9 +222,17 @@
   .elab { position:absolute; bottom:6px; left:0; right:0; text-align:center;
           font-size:9px; letter-spacing:1.4px; color:var(--dim);
           text-shadow:0 1px 2px #000; pointer-events:none; }
+  /* launch splash — the neon JMB badge, fades out once the app is ready */
+  #splash{ position:fixed; inset:0; z-index:9999; background:#000006;
+    display:flex; align-items:center; justify-content:center;
+    transition:opacity .45s ease; }
+  #splash img{ width:min(64vw,300px); height:auto;
+    filter:drop-shadow(0 0 34px rgba(120,60,255,.40)); }
+  #splash.gone{ opacity:0; pointer-events:none; }
 </style>
 </head>
 <body>
+<div id="splash" aria-hidden="true"><img src="jmb-splash.png" alt="JMB Lighting"></div>
 
 <header>
   <span class="lockup">
@@ -619,12 +627,15 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-20m.jmb-baseline";
+const APP_VER="2026-08-20n.splash";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
 if("serviceWorker" in navigator)
   addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+// dismiss the launch splash once loaded (min ~650ms so it never just flashes)
+addEventListener("load",()=>setTimeout(()=>{const s=document.getElementById("splash");
+  if(s){s.classList.add("gone"); setTimeout(()=>s.remove(),500);}},650));
 let ports=[], kv={};
 const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
