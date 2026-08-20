@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- =========================================================================
-  JMB Zone — companion app (Web Bluetooth, single file)
+  JMB Lighting — companion app (Web Bluetooth, single file)
 
   Chrome/Edge on Android + desktop (iOS: use the Bluefy browser).
   Tabs: Control · Scenes · Ports · Diag · Setup.
@@ -21,7 +21,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>JMB Zone</title>
+<title>JMB Lighting</title>
 <style>
   :root {
     --bg:#0e1116; --card:#161b23; --card2:#1d242f; --line:#2a3442;
@@ -231,7 +231,7 @@
     <svg viewBox="0 0 190 164" preserveAspectRatio="xMinYMid meet" aria-hidden="true" style="height:44px;width:auto;display:block;vertical-align:middle"><defs><linearGradient id="jmbP" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c53cff"/><stop offset="1" stop-color="#6a2cf5"/></linearGradient><linearGradient id="jmbC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5fd7ff"/><stop offset="1" stop-color="#1f8fe0"/></linearGradient></defs><rect x="0" y="0" width="190" height="24" fill="url(#jmbP)"/><rect x="0" y="140" width="190" height="24" fill="url(#jmbP)"/><text x="95" y="87" text-anchor="middle" dominant-baseline="central" fill="url(#jmbC)" font-family="system-ui,Segoe UI,Roboto,Arial,sans-serif" font-weight="800" font-size="86" letter-spacing="1">JMB</text></svg>
     <span id="prodMark"></span>
   </span>
-  <h1 id="title">JMB Zone</h1>
+  <h1 id="title">JMB Lighting</h1>
   <button id="btnConnect" class="primary">Connect</button>
 </header>
 
@@ -244,7 +244,7 @@
 <main>
   <div id="hello" class="card">
     <b>Not connected.</b>
-    <div class="mini">Tap Connect and pick your controller (“JMB Zone #ID-XXXX”).
+    <div class="mini">Tap Connect and pick your controller (“JMB one #ID-XXXX”).
     Chrome/Edge only — on iPhone use the Bluefy browser. Bluetooth on.</div>
     <div class="ctlrow" style="margin-top:10px">
       <button id="btnDemo">Explore in demo mode</button>
@@ -530,7 +530,7 @@
       </div>
       <div class="row"><label>BT name</label>
         <input type="text" id="setBtName" maxlength="24" style="flex:1"
-               placeholder="JMB Zone" autocomplete="off">
+               placeholder="JMB one" autocomplete="off">
         <button id="btNameApply">Set</button>
       </div>
       <div class="mini">The Bluetooth name is what you see when connecting.
@@ -594,7 +594,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-20b.lockup";
+const APP_VER="2026-08-20c.jmblighting";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -691,7 +691,7 @@ async function connect(){
         "disconnect, and retry here.</div>");
       return;
     }
-    $("title").textContent=devName()||"JMB Zone";
+    $("title").textContent=devName()||"JMB Lighting";
     $("btnConnect").classList.add("hidden");
     $("hello").classList.add("hidden");
     authed=false;
@@ -863,7 +863,7 @@ function onState(str){
   setChip("chipFps","fps", kv.FPS??"—");
   setChip("chipCid","ID",  kv.CID??"—");
   if(n){ const cn=hexDec(kv.CN);
-    $("title").textContent=(cn||devName()||"JMB Zone")+" · "+n+"-port"; }
+    $("title").textContent=(cn||devName()||"JMB Lighting")+" · "+n+"-port"; }
   if(n && n!==colPortsN){ renderColourTargets(n); colPortsN=n; }
   renderControl(); renderPortInfo(); renderDiag(); renderSetup();
   renderProductMark();
@@ -2172,7 +2172,7 @@ $("impFile").addEventListener("change",async ev=>{
   try{ data=JSON.parse(await f.text()); }
   catch(e){ $("impStatus").textContent="Not a valid settings file."; return; }
   if(data.app!=="jmb-zone"||!Array.isArray(data.ports)){
-    $("impStatus").textContent="Not a JMB Zone settings file."; return; }
+    $("impStatus").textContent="Not a JMB Lighting settings file."; return; }
   const nsc=Array.isArray(data.scenes)?data.scenes.length:0;
   if(!confirm(`Apply "${f.name}" to this controller?\n`+
               `${data.ports.length} ports`+(nsc?`, ${nsc} scenes`:"")+
@@ -2257,7 +2257,7 @@ function demoUnivMM(){
 }
 const DEMO_DEVS=[
   {u:"4C50000123AB",a:1,fp:8,pe:2,pt:6,sn:1,md:"LED PAR QUAD",lb:"Stage L Par",mf:"LiteCo"},
-  {u:"4A4D00C0FFEE",a:101,fp:10,pe:5,pt:5,sn:8,md:"JMB Zone ONE",lb:"Booth strip",mf:"JMB Zone"},
+  {u:"4A4D00C0FFEE",a:101,fp:10,pe:5,pt:5,sn:8,md:"JMB one",lb:"Booth strip",mf:"JMB Lighting"},
   {u:"48590000BEEF",a:200,fp:3,pe:1,pt:2,sn:2,md:"Hazer 900",lb:"",mf:"HazeWorks"}];
 function demoDevRow(d){
   onState(`JMBR;DEV;U=${d.u};A=${d.a};FP=${d.fp};PE=${d.pe};PT=${d.pt};SN=${d.sn};`+
@@ -2319,7 +2319,7 @@ $("btnDemo").onclick=()=>{
   demoOn=true;
   demoState();
   $("demoBar").classList.remove("hidden");
-  $("title").textContent="JMB Zone · demo";
+  $("title").textContent="JMB Lighting · demo";
   showApp();
   clearInterval(demoTimer);
   demoTimer=setInterval(demoState,3000);   // keep state fresh across tab hops
