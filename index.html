@@ -619,7 +619,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-20f.bleota";
+const APP_VER="2026-08-20g.otaroll";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2288,7 +2288,9 @@ async function runOta(file){
     r=await waitOta(m=>m==="DONE"||m.startsWith("ERR"),20000);
     if(r.startsWith("ERR")) throw new Error("controller "+r);
     setOtaState("done"); otaSelFile=null;
-    setOtaMsg("✓ Update complete — the controller is rebooting into the new firmware. Reconnect in a few seconds.");
+    setOtaMsg("✓ Update sent — the controller is rebooting into the new firmware. "
+      +"If the new build fails to start, it automatically reverts to the previous "
+      +"version. Reconnect in a few seconds.");
   }catch(e){
     try{ await otacChar.writeValueWithResponse(otaEnc("ABORT")); }catch(_){}
     setOtaState("failed"); otaHideBar();
