@@ -223,17 +223,17 @@
           font-size:9px; letter-spacing:1.4px; color:var(--dim);
           text-shadow:0 1px 2px #000; pointer-events:none; }
   /* launch splash — the neon JMB badge, fades out once the app is ready */
-  #splash{ position:fixed; inset:0; z-index:9999; background:#000006;
-    overflow:hidden; display:flex; align-items:center; justify-content:center;
-    transition:opacity .45s ease; }
-  /* zoomed so the badge fills edge-to-edge — its side edges bleed just past the
-     screen; the image's dark background blends into #000006 top/bottom */
-  #splash img{ width:min(114vw,114vh); height:auto; }
-  #splash.gone{ opacity:0; pointer-events:none; }
+  /* connect-screen splash: the neon badge below the connect/demo card. While
+     the connect card is showing, the whole page background goes to the badge's
+     near-black so the badge blends in and it reads as one image. */
+  body:has(#hello:not(.hidden)){ background:#000006; }
+  #connectSplash{ display:flex; justify-content:center; overflow:hidden;
+    margin:14px calc(50% - 50vw) 0; }
+  #connectSplash img{ width:min(112vw,560px); height:auto; display:block; }
+  #hello.hidden ~ #connectSplash{ display:none; }
 </style>
 </head>
 <body>
-<div id="splash" aria-hidden="true"><img src="jmb-splash.png" alt="JMB Lighting"></div>
 
 <header>
   <span class="lockup">
@@ -261,6 +261,8 @@
     <div class="mini">Browse every tab with example data — no controller needed.
     Nothing you tap is sent anywhere.</div>
   </div>
+
+  <div id="connectSplash"><img src="jmb-splash.png" alt="JMB Lighting"></div>
 
   <div id="demoBar" class="hidden" style="background:#1e2a3d;border:1px solid #4a6da8;
        color:#9cc0f5;border-radius:12px;padding:8px 12px;margin-bottom:12px;font-size:13px;
@@ -628,15 +630,12 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-21.splash-zoom";
+const APP_VER="2026-08-21b.connect-splash";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
 if("serviceWorker" in navigator)
   addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
-// dismiss the launch splash once loaded (min ~650ms so it never just flashes)
-addEventListener("load",()=>setTimeout(()=>{const s=document.getElementById("splash");
-  if(s){s.classList.add("gone"); setTimeout(()=>s.remove(),500);}},650));
 let ports=[], kv={};
 const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
