@@ -20,7 +20,7 @@
 <meta name="theme-color" content="#0e1116">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-512.png">
 <title>JMB Lighting</title>
 <style>
   :root {
@@ -647,6 +647,9 @@ const FX_NAMES = ["Off","Candle","Fire","Fireworks","Water","Siren","Laser","Clu
                   "Lightning","Rainbow","Aurora","Sunset","TV Sim","Strobe","Police",
                   "Pulse","Party","Traffic","Fluoro","Paparazzi","Explosion","Clouds"];
 const CURVES = ["Linear","Soft 1.6","Theatre 2.2"];
+// Effects that read on a white-only (CW/WW) strip — intensity/warm based. On a
+// CCT port the colour-only effects (Rainbow, Aurora, Police, Party…) are hidden.
+const CCT_FX = new Set([0,1,2,8,12,13,15,18,19,20]);
 const AMODES = ["Same","Seq","Offset"];
 const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
                 [0x10,"GROUND"],[0x20,"LINK"],[0x40,"24V"],[0x80,"LATCHED"]];
@@ -654,7 +657,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-24a.brand-bars";
+const APP_VER="2026-08-24b.cct-fx-icon";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1015,6 +1018,9 @@ function renderControl(){
       if(rr) rr.classList.toggle("ww", cct);   // amber track for warm white
       if(rg) rg.classList.toggle("cw", cct);   // ice track for cool white
       if(rb) rb.classList.toggle("hidden", cct);
+      // On a CCT port, only offer effects that read on a white strip.
+      const xs=$("x"+p);
+      if(xs) for(const o of xs.options) o.hidden = cct && !CCT_FX.has(+o.value);
     }
     setIf(p,"X",   el=>el.value=m.X??0);
     setIf(p,"PWM", el=>el.value=m.PW??0);
