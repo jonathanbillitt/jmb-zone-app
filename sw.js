@@ -3,14 +3,20 @@
 // with no signal (handy at a venue). Strategy is NETWORK-FIRST so an online
 // launch always gets the freshest build, falling back to the cached copy only
 // when the network is unreachable. Bump CACHE on each deploy to evict old copies.
-const CACHE="jmb-2026-08-24f-domain";
+const CACHE="jmb-2026-08-24j-docs";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest",
                 "./icon.svg", "./icon-maskable.svg", "./icon-512.png",
-                "./icon-512-maskable.png", "./privacy.html", "./jmb-splash.png"];
+                "./icon-512-maskable.png", "./privacy.html", "./jmb-splash.png",
+                // Docs precached so the manual + DMX chart open with no signal.
+                "./manual.html", "./dmx-chart.html",
+                "./manual.pdf", "./dmx-chart.pdf"];
 
 self.addEventListener("install", e => {
   self.skipWaiting();                                   // take over ASAP
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(() => {}));
+  // Cache each asset independently — a single 404 must not sink the whole
+  // precache (atomic addAll would leave the cache empty and break offline).
+  e.waitUntil(caches.open(CACHE).then(c =>
+    Promise.all(ASSETS.map(a => c.add(a).catch(() => {})))));
 });
 
 self.addEventListener("activate", e => {

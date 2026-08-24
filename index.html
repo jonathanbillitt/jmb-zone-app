@@ -603,12 +603,12 @@
     <div class="card">
       <b>Documentation</b>
       <div class="ctlrow" style="margin-top:8px">
-        <a class="dbtn" href="https://jmblighting.co.uk/manual.html" target="_blank" rel="noopener">User manual</a>
-        <a class="dbtn" href="https://jmblighting.co.uk/dmx-chart.html" target="_blank" rel="noopener">DMX chart</a>
-        <a class="dbtn" href="https://jmblighting.co.uk/manual.pdf" target="_blank" rel="noopener">Manual PDF</a>
+        <a class="dbtn" href="./manual.html" target="_blank" rel="noopener">User manual</a>
+        <a class="dbtn" href="./dmx-chart.html" target="_blank" rel="noopener">DMX chart</a>
+        <a class="dbtn" href="./manual.pdf" target="_blank" rel="noopener">Manual PDF</a>
       </div>
-      <div class="mini">The full user manual and DMX channel chart, online. Opens
-        in your browser — needs an internet connection.</div>
+      <div class="mini">The full user manual and DMX channel chart. Bundled with
+        the app — they open even with no internet, once the app has loaded once.</div>
     </div>
   </div>
 </main>
@@ -675,7 +675,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-24i.adv-order";
+const APP_VER="2026-08-24j.offline-docs";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.

@@ -1,0 +1,237 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>JMB Lighting — DMX Personality Chart</title><style>
+@page { size: A4; margin: 18mm 16mm; }
+body { font: 10.5pt/1.55 'Segoe UI', system-ui, sans-serif; color: #1a2230; max-width: 175mm; margin: 0 auto; }
+h1 { font-size: 21pt; color: #14203a; border-bottom: 3px solid #6a2cf5; padding-bottom: 6px; margin: 0 0 2px; }
+h1 + p { color: #667; margin-top: 2px; }
+h2 { font-size: 13.5pt; color: #2a1d66; margin: 22px 0 8px; border-bottom: 1px solid #d8d4ee; padding-bottom: 3px; }
+h3 { font-size: 11pt; color: #333; margin: 14px 0 6px; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; font-size: 9.8pt; page-break-inside: avoid; }
+th { background: #eeeafb; color: #2a1d66; text-align: left; }
+th, td { border: 1px solid #cfc9e8; padding: 4px 8px; vertical-align: top; }
+tr:nth-child(even) td { background: #f7f5fd; }
+td:last-child { min-width: 34px; }
+code { background: #f0eef8; padding: 1px 4px; border-radius: 3px; font: 9.5pt Consolas, monospace; }
+strong { color: #14203a; }
+hr { border: none; border-top: 1px solid #ddd; margin: 16px 0; }
+ul, ol { margin: 6px 0; padding-left: 22px; }
+a { color: #4636b8; }
+blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #b7ade6; background: #f7f5fd; color: #444; }
+.page-break { page-break-before: always; }
+.footer { margin-top: 26px; font-size: 8.5pt; color: #99a; text-align: center; }
+</style></head><body>
+<h1>JMB Lighting — DMX Personality Chart</h1>
+<p>JMB one / 4our / 8ight · Firmware 2.x · 2026-08-20</p>
+<h2>Personalities (per port)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Name</th>
+<th>Footprint</th>
+<th>Channels</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>RGB 8-bit</td>
+<td>3</td>
+<td>R, G, B</td>
+</tr>
+<tr>
+<td>2</td>
+<td>RGB 16-bit</td>
+<td>6</td>
+<td>R, Rf, G, Gf, B, Bf</td>
+</tr>
+<tr>
+<td>3</td>
+<td>CW/WW 8-bit</td>
+<td>2</td>
+<td>CW, WW</td>
+</tr>
+<tr>
+<td>4</td>
+<td>CW/WW 16-bit</td>
+<td>4</td>
+<td>CWc, CWf, WWc, WWf</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>FX 10ch</strong></td>
+<td>10</td>
+<td>see below</td>
+</tr>
+</tbody>
+</table>
+<p>Each port's whole footprint must fit inside the universe, so the start
+address caps at <strong>513 − footprint</strong>: RGB 8-bit → 510, RGB 16-bit → 507,
+CW/WW 8-bit → 511, CW/WW 16-bit → 509, <strong>FX 10ch → 503</strong>. Changing a port to
+a larger personality re-clamps its start down if it would overhang. Offset
+apply mode spaces ports by the widest footprint (10ch → 40ch across a
+4-port, 80ch across an 8-port).</p>
+<h2>FX 10ch personality</h2>
+<table>
+<thead>
+<tr>
+<th>CH</th>
+<th>Function</th>
+<th>Values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Dimmer</td>
+<td>0–255 master</td>
+</tr>
+<tr>
+<td>2–3</td>
+<td>Red coarse + fine</td>
+<td>16-bit</td>
+</tr>
+<tr>
+<td>4–5</td>
+<td>Green coarse + fine</td>
+<td>16-bit</td>
+</tr>
+<tr>
+<td>6–7</td>
+<td>Blue coarse + fine</td>
+<td>16-bit</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Effect select</td>
+<td>ranges below</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Effect speed</td>
+<td>128 = designed tempo; exponential — 0 ≈ ⅛×, 255 = 8×</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Strobe</td>
+<td>0 = open · 1–128 fixed rate ~0.8→14 Hz · 129–255 random, mean 1 s→60 ms</td>
+</tr>
+</tbody>
+</table>
+<p>When CH8 selects an effect it replaces the RGB channels as the colour
+source; the strobe shutter chops whatever is playing; the dimmer scales last.</p>
+<div class="page-break"></div>
+
+<h2>Effect ranges (CH8)</h2>
+<p>21 effects, each an <strong>11-value band</strong> from 10 up (the last extends to 255):</p>
+<table>
+<thead>
+<tr>
+<th>Range</th>
+<th>Effect</th>
+<th>Range</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0–9</td>
+<td>Off (safe park)</td>
+<td>120–130</td>
+<td>Sunset</td>
+</tr>
+<tr>
+<td>10–20</td>
+<td>Candle</td>
+<td>131–141</td>
+<td>TV Sim</td>
+</tr>
+<tr>
+<td>21–31</td>
+<td>Fire</td>
+<td>142–152</td>
+<td>Strobe</td>
+</tr>
+<tr>
+<td>32–42</td>
+<td>Fireworks</td>
+<td>153–163</td>
+<td>Police</td>
+</tr>
+<tr>
+<td>43–53</td>
+<td>Water</td>
+<td>164–174</td>
+<td>Pulse</td>
+</tr>
+<tr>
+<td>54–64</td>
+<td>Siren</td>
+<td>175–185</td>
+<td>Party</td>
+</tr>
+<tr>
+<td>65–75</td>
+<td>Laser</td>
+<td>186–196</td>
+<td>Traffic</td>
+</tr>
+<tr>
+<td>76–86</td>
+<td>Club</td>
+<td>197–207</td>
+<td>Fluoro</td>
+</tr>
+<tr>
+<td>87–97</td>
+<td>Lightning</td>
+<td>208–218</td>
+<td>Paparazzi</td>
+</tr>
+<tr>
+<td>98–108</td>
+<td>Rainbow</td>
+<td>219–229</td>
+<td>Explosion</td>
+</tr>
+<tr>
+<td>109–119</td>
+<td>Aurora</td>
+<td>230–255</td>
+<td>Clouds</td>
+</tr>
+</tbody>
+</table>
+<p>Notes: Siren and Police alternate phase across ports (lightbar feel);
+Club and Party run a 128 BPM clock by default (Party hops hue every 4th
+beat and renders greens as mint — never black, never strobes); Traffic
+plays passing-headlight sweeps with independent random timing per port;
+Water, Pulse and Clouds never go fully dark; effect speed (CH9) does not
+affect the CH10 strobe rate. The film gags: <strong>Fluoro</strong> is a failing
+fluorescent tube (rapid failed strikes, then it catches and holds with a
+faint mains buzz); <strong>Paparazzi</strong> fires irregular hard white pops,
+independent per port, like a press pit; <strong>Explosion</strong> is a white-hot
+flash blooming to an orange fireball with an ember-flicker decay;
+<strong>Clouds</strong> drifts daylight slowly dimmer and cooler as cloud passes the
+sun, then back.</p>
+<p>Rig-wide FX controls (config, not DMX): <strong>FX Tempo</strong> (60–240 BPM,
+tap-settable from the app or set in panel Setup) scales every beat
+effect, and <strong>FX Spread</strong> (0–100%) staggers the effect clock across
+ports. Defaults (128 BPM, 0%) reproduce the behaviour above.</p>
+<h2>Sources</h2>
+<p>The rig accepts <strong>wired DMX (5-pin)</strong> and <strong>CRMX wireless</strong> (LumenRadio).
+One source owns the decode at a time, selected in the Sources hub (panel
+or app).</p>
+<p><strong>Hold-on-loss:</strong> if the active source drops, every port holds its last
+look — nothing ever auto-runs on signal loss; changes made after the
+loss apply immediately. Runt packets (under 25 slots) are rejected as
+line noise rather than treated as a new look.</p>
+<h2>RDM</h2>
+<p>Root device (sub 0): rack footprint, start address = port 1; SET fans out
+per the Apply mode (JMB parameter 0x8001: 1=Same 2=Seq 3=Offset). Each port
+is a sub-device (1–N) with its own start address, personality and identify.
+E1.37-1 CURVE (dimmer curve) and MODULATION_FREQUENCY (PWM 1=Smooth 8 kHz,
+2=Silent 20 kHz, 3=Camera 62.5 kHz — the flicker-free default) are
+supported on the root. The root also
+exposes each port's temperature and output current as E1.20 sensors, and
+personality is settable at the root for sub-0-only consoles.</p>
+</body></html>
