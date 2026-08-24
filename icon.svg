@@ -16,10 +16,8 @@
   <!-- Full-bleed: the OS applies its own corner mask, so baking a radius here
        (and leaving transparent corners) is what showed edges on the home screen. -->
   <rect width="128" height="128" fill="url(#bg)"/>
-  <rect x="14" y="14" width="100" height="100" rx="20" fill="none"
-        stroke="url(#p)" stroke-width="9"/>
-  <rect x="32" y="33" width="64" height="11" rx="3" fill="url(#p)"/>
-  <rect x="32" y="84" width="64" height="11" rx="3" fill="url(#p)"/>
+  <rect x="30" y="34" width="68" height="12" rx="3" fill="url(#p)"/>
+  <rect x="30" y="82" width="68" height="12" rx="3" fill="url(#p)"/>
   <text x="64" y="75" font-family="system-ui,'Segoe UI',Roboto,sans-serif"
         font-size="30" font-weight="800" letter-spacing="1"
         fill="url(#c)" text-anchor="middle">JMB</text>

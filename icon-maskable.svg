@@ -16,13 +16,11 @@
   <!-- Full-bleed background: the launcher mask supplies the rounding, so no
        corner radius here or the mask would reveal dark gaps. -->
   <rect width="128" height="128" fill="url(#bg)"/>
-  <!-- Widened frame: 8px inset (was 14) + heavier stroke so it fills the badge
-       edge-to-edge yet stays inside the maskable safe zone. -->
-  <rect x="10" y="10" width="108" height="108" rx="24" fill="none"
-        stroke="url(#p)" stroke-width="11"/>
-  <rect x="30" y="30" width="68" height="11" rx="3" fill="url(#p)"/>
-  <rect x="30" y="87" width="68" height="11" rx="3" fill="url(#p)"/>
+  <!-- No frame box: the launcher circle-mask clipped its corners oddly. Just the
+       JMB logo (bars + wordmark), kept inside the maskable safe zone. -->
+  <rect x="30" y="38" width="68" height="12" rx="3" fill="url(#p)"/>
+  <rect x="30" y="78" width="68" height="12" rx="3" fill="url(#p)"/>
   <text x="64" y="76" font-family="system-ui,'Segoe UI',Roboto,sans-serif"
-        font-size="33" font-weight="800" letter-spacing="1"
+        font-size="30" font-weight="800" letter-spacing="1"
         fill="url(#c)" text-anchor="middle">JMB</text>
 </svg>
