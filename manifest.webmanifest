@@ -2,7 +2,7 @@
   "name": "JMB Lighting",
   "short_name": "JMB Lighting",
   "description": "Companion controller for JMB LED lighting: patch, colour, effects, scenes and telemetry over Bluetooth.",
-  "id": "/jmb-zone-app/",
+  "id": "/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
