@@ -18,9 +18,9 @@
   <rect width="128" height="128" fill="url(#bg)"/>
   <!-- No frame box: the launcher circle-mask clipped its corners oddly. Just the
        JMB logo (bars + wordmark), kept inside the maskable safe zone. -->
-  <rect x="30" y="38" width="68" height="12" rx="3" fill="url(#p)"/>
-  <rect x="30" y="78" width="68" height="12" rx="3" fill="url(#p)"/>
-  <text x="64" y="76" font-family="system-ui,'Segoe UI',Roboto,sans-serif"
-        font-size="30" font-weight="800" letter-spacing="1"
+  <rect x="18" y="22" width="92" height="14" rx="4" fill="url(#p)"/>
+  <rect x="18" y="92" width="92" height="14" rx="4" fill="url(#p)"/>
+  <text x="64" y="80" font-family="system-ui,'Segoe UI',Roboto,sans-serif"
+        font-size="46" font-weight="800" letter-spacing="1"
         fill="url(#c)" text-anchor="middle">JMB</text>
 </svg>

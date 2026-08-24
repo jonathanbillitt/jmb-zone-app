@@ -16,9 +16,11 @@
   <!-- Full-bleed: the OS applies its own corner mask, so baking a radius here
        (and leaving transparent corners) is what showed edges on the home screen. -->
   <rect width="128" height="128" fill="url(#bg)"/>
-  <rect x="30" y="34" width="68" height="12" rx="3" fill="url(#p)"/>
-  <rect x="30" y="82" width="68" height="12" rx="3" fill="url(#p)"/>
-  <text x="64" y="75" font-family="system-ui,'Segoe UI',Roboto,sans-serif"
-        font-size="30" font-weight="800" letter-spacing="1"
+  <!-- Logo scaled up to fill the tile — JMB kept within the mask's safe circle
+       so the letters never clip when the launcher rounds the icon. -->
+  <rect x="18" y="22" width="92" height="14" rx="4" fill="url(#p)"/>
+  <rect x="18" y="92" width="92" height="14" rx="4" fill="url(#p)"/>
+  <text x="64" y="80" font-family="system-ui,'Segoe UI',Roboto,sans-serif"
+        font-size="46" font-weight="800" letter-spacing="1"
         fill="url(#c)" text-anchor="middle">JMB</text>
 </svg>
