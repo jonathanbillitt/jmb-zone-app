@@ -674,7 +674,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-27a.review-fixes";
+const APP_VER="2026-08-27b.ocp-6500";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1038,7 +1038,7 @@ function renderControl(){
     }
     setIf(p,"X",   el=>el.value=m.X??0);
     setIf(p,"PWM", el=>el.value=m.PW??0);
-    setIf(p,"OCP", el=>el.value=((m.OC??6750)/1000).toFixed(2));
+    setIf(p,"OCP", el=>el.value=((m.OC??6500)/1000).toFixed(2));
     setIf(p,"OT",  el=>el.value=m.OT??80);
     setIf(p,"CRV", el=>el.value=m.CV??0);
     for(const c of ["R","G","B"]){
@@ -1099,9 +1099,9 @@ function buildCard(p){
             <option value="2">Camera 62.5 kHz</option>
           </select></div>
         <div class="row"><label>Current</label>
-          <input type="number" id="ocp${p}" min="0.25" max="6.75" step="0.25">
+          <input type="number" id="ocp${p}" min="0.25" max="6.5" step="0.25">
           <span class="unit">A</span>
-          <span class="mini" style="margin:0 0 0 8px;color:var(--dim)">max 6.75 A</span></div>
+          <span class="mini" style="margin:0 0 0 8px;color:var(--dim)">max 6.5 A</span></div>
         <div class="row"><label>Temp trip</label>
           <input type="number" id="ot${p}" min="40" max="110" step="5">
           <span class="unit">°C</span>
@@ -1123,7 +1123,7 @@ function buildCard(p){
     touch("PWM"); send(`P${p}.PWM=${+e.target.value}`);
   });
   d.querySelector("#ocp"+p).addEventListener("change",e=>{
-    let a=Math.max(0.25,Math.min(6.75,+e.target.value||6.75));
+    let a=Math.max(0.25,Math.min(6.5,+e.target.value||6.5));
     a=Math.round(a/0.25)*0.25; e.target.value=a;
     touch("OCP"); send(`P${p}.OCP=${Math.round(a*1000)}`);
   });
@@ -2275,7 +2275,7 @@ $("btnExport").onclick=()=>{
     ports:ports.map(m=>({a:m.A??1,h:m.H??0,pe:m.PE??0,m:m.M??0,
                          r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
                          x:m.X??0,s:m.S??128,l:m.L||"",
-                         pw:m.PW??0,oc:m.OC??6750,ot:m.OT??80,cv:m.CV??0})),
+                         pw:m.PW??0,oc:m.OC??6500,ot:m.OT??80,cv:m.CV??0})),
     scenes:loadScenes() };
   // octet-stream (not application/json) so the browser keeps the .jmb name as-is
   // instead of appending ".json" → the file was saving as "...jmb.json".
@@ -2433,7 +2433,7 @@ const demoP=[{a:1,pe:0,r:100,g:40,b:0,x:0,s:128},{a:4,pe:0,r:0,g:80,b:100,x:0,s:
 const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1,bpm:128,btn:'44656D6F20526967'};
 function demoState(){
   const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S${d.s??128},H${n},`+
-    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6750,OT80,L0;`;
+    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6500,OT80,L0;`;
   onState(
     "JMB;FW=demo;PORTS=4;CID=7;DMX=1;FPS=44;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=3;ERR=0;"+
     "RDM=42;ANS=42;AGE=23;"+
