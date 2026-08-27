@@ -3,7 +3,7 @@
 // with no signal (handy at a venue). Strategy is NETWORK-FIRST so an online
 // launch always gets the freshest build, falling back to the cached copy only
 // when the network is unreachable. Bump CACHE on each deploy to evict old copies.
-const CACHE="jmb-2026-08-24k-docs";
+const CACHE="jmb-2026-08-27a-fixes";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest",
                 "./icon.svg", "./icon-maskable.svg", "./icon-512.png",
                 "./icon-512-maskable.png", "./privacy.html", "./jmb-splash.png",
@@ -39,7 +39,12 @@ self.addEventListener("fetch", e => {
         }
         return resp;
       })
-      .catch(() =>                                      // offline: cached, else app shell
-        caches.match(req).then(r => r || caches.match("./index.html")))
+      .catch(() =>                                      // offline: cached copy; the
+        caches.match(req).then(r => {                   // app-shell fallback is for
+          if (r) return r;                              // NAVIGATIONS only — a missed
+          if (req.mode === "navigate")                  // subresource (say a PDF) must
+            return caches.match("./index.html");        // fail, not open as HTML
+          return Response.error();
+        }))
   );
 });

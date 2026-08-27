@@ -664,7 +664,6 @@ const maxAddr = pe => 513 - (PERS_CH[pe] ?? 1);
 const FX_NAMES = ["Off","Candle","Fire","Fireworks","Water","Siren","Laser","Club",
                   "Lightning","Rainbow","Aurora","Sunset","TV Sim","Strobe","Police",
                   "Pulse","Party","Traffic","Fluoro","Paparazzi","Explosion","Clouds"];
-const CURVES = ["Linear","Soft 1.6","Theatre 2.2"];
 // Effects that read on a white-only (CW/WW) strip — intensity/warm based. On a
 // CCT port the colour-only effects (Rainbow, Aurora, Police, Party…) are hidden.
 const CCT_FX = new Set([0,1,2,8,12,13,15,18,19,20]);
@@ -675,7 +674,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-24k.copy-fix";
+const APP_VER="2026-08-27a.review-fixes";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -946,7 +945,7 @@ function onState(str){
       // A-F are valid key letters, so a greedy [A-Z]+ parsed "FA0" as key
       // "FA" and the LATCHED fault bit vanished from every badge (agent
       // review — safety-display bug).
-      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
+      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
       if(mm) m[mm[1]] = mm[1]==="F" ? parseInt(mm[2],16) : +mm[2];
     }
     ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
@@ -960,11 +959,8 @@ function onState(str){
   renderControl(); renderPortInfo(); renderDiag(); renderSetup();
   renderProductMark(); renderOta();
 }
-function hexEnc(s){
-  let o="";
-  for(const c of s) o+=c.charCodeAt(0).toString(16).padStart(2,"0").toUpperCase();
-  return o;
-}
+// (hexEnc lives later in the file — the printable-filtering version; a plain
+// duplicate here used to shadow-fight it.)
 function hexDec(hx){
   hx=String(hx||"");
   if(!/^(?:[0-9A-Fa-f]{2})+$/.test(hx)) return "";   // "0" / empty / odd = none
@@ -1100,7 +1096,7 @@ function buildCard(p){
           <select id="pwm${p}">
             <option value="0">Smooth 8 kHz</option>
             <option value="1">Silent 20 kHz</option>
-            <option value="2">Custom</option>
+            <option value="2">Camera 62.5 kHz</option>
           </select></div>
         <div class="row"><label>Current</label>
           <input type="number" id="ocp${p}" min="0.25" max="6.75" step="0.25">
@@ -1164,6 +1160,16 @@ function buildCard(p){
     // firmware re-clamps too, but reflect it immediately so the field is honest.
     if(+af.value>mx){ af.value=mx; touch("ADDR"); send(`P${p}.ADDR=${mx}`); }
     touch("PERS"); send(`P${p}.PERS=${pe}`);
+    // Switching to a CCT personality hides the colour-only effects — but a
+    // hidden option can stay SELECTED, leaving e.g. Rainbow silently running
+    // on a white strip. Stop any effect the new personality doesn't offer.
+    {
+      const cct=(pe===2||pe===3), xs=$("x"+p);
+      if(cct && xs && !CCT_FX.has(+xs.value)){
+        xs.value=0; touch("X"); if(ports[p-1]) ports[p-1].X=0;
+        send(`P${p}.FX=0`);
+      }
+    }
     // Optimistic: flip the Control-tab sliders to CCT/RGB immediately instead
     // of waiting for the state echo (which demo mode never sends).
     if(ports[p-1]){ ports[p-1].PE=pe; renderControl(); }
@@ -1801,7 +1807,7 @@ document.querySelectorAll(".modechip").forEach(b=>b.onclick=()=>{
   univMode=b.dataset.um;
   document.querySelectorAll(".modechip").forEach(x=>
     x.classList.toggle("active",x===b));
-  if((univMode==="min"||univMode==="max") && bleConnected()) send("UNIVMM");
+  if((univMode==="min"||univMode==="max") && (bleConnected()||demoOn)) send("UNIVMM");
   if(univMode==="act"){ actCnt.fill(0); univPrev.set(univ); }
   drawUniv();
 });
