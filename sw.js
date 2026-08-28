@@ -3,7 +3,7 @@
 // with no signal (handy at a venue). Strategy is NETWORK-FIRST so an online
 // launch always gets the freshest build, falling back to the cached copy only
 // when the network is unreachable. Bump CACHE on each deploy to evict old copies.
-const CACHE="jmb-2026-08-28i-gconf";
+const CACHE="jmb-2026-08-28j-eguard";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest",
                 "./icon.svg", "./icon-maskable.svg", "./icon-512.png",
                 "./icon-512-maskable.png", "./privacy.html", "./jmb-splash.png",

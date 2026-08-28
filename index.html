@@ -683,7 +683,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28i.guard-confirm";
+const APP_VER="2026-08-28j.edit-guard";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -992,6 +992,11 @@ function faultWords(f){ return FAULTS.filter(([b])=>f&b).map(([,t])=>t).join("+"
 function setIf(p,key,apply){
   const el=$(key.toLowerCase()+p);
   if(!el) return;
+  // NEVER stomp a field the user is editing: on mobile, `change` only fires on
+  // blur — a state echo landing mid-type used to silently revert the value
+  // first, so the change event saw "no change" and nothing was ever sent
+  // ("addresses can't be changed", bench 2026-08-28).
+  if(document.activeElement===el) return;
   if(Date.now()-(hot[p+"."+key]||0) < HOT_MS) return;
   apply(el);
 }
