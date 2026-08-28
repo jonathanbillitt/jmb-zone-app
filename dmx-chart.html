@@ -62,11 +62,29 @@ blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #b7ade6; 
 <td>10</td>
 <td>see below</td>
 </tr>
+<tr>
+<td>6</td>
+<td>Dim 1ch</td>
+<td>1</td>
+<td>Level</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Dim 2ch (16-bit)</td>
+<td>2</td>
+<td>Level coarse, fine</td>
+</tr>
 </tbody>
 </table>
+<p><strong>Dim personalities</strong> patch a port like a classic dimmer channel: the one
+DMX level scales the port's <em>set colour</em> (chosen in the app). With no colour
+set it acts as white — all three outputs carry the level — so a
+single-colour or <strong>IR strip</strong> lights straight from its one patched channel,
+whichever output terminal it's wired to.</p>
 <p>Each port's whole footprint must fit inside the universe, so the start
 address caps at <strong>513 − footprint</strong>: RGB 8-bit → 510, RGB 16-bit → 507,
-CW/WW 8-bit → 511, CW/WW 16-bit → 509, <strong>FX 10ch → 503</strong>. Changing a port to
+CW/WW 8-bit → 511, CW/WW 16-bit → 509, <strong>FX 10ch → 503</strong>, Dim 1ch → 512,
+Dim 2ch → 511. Changing a port to
 a larger personality re-clamps its start down if it would overhang. Offset
 apply mode spaces ports by the widest footprint (10ch → 40ch across a
 4-port, 80ch across an 8-port).</p>

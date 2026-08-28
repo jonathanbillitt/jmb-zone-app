@@ -121,6 +121,8 @@
   .row.b input[type=range] { accent-color:var(--b); }
   .row.w input[type=range] { accent-color:#f5f5f5; }   /* dim + speed: white */
   .row.r.ww input[type=range] { accent-color:#ffc477; }  /* warm white: amber */
+  .row.r.uv input[type=range] { accent-color:#b16aff; }  /* Dim level: UV purple */
+  .row.uv label { color:var(--text); }
   .row.g.cw input[type=range] { accent-color:#cfe8ff; }  /* cool white: ice   */
   .row.ww label, .row.cw label { color:var(--text); }
   .row .val { width:38px; text-align:right; font-variant-numeric:tabular-nums;
@@ -543,9 +545,14 @@
         <button id="chFull">Full chain</button>
         <button id="chDmx">DMX In</button>
       </div>
+      <div class="row" style="margin-top:8px"><label style="width:auto">Listen</label>
+        <label class="toggle"><input type="checkbox" id="chArm"><span></span></label>
+        <span class="mini" id="chArmStat" style="margin:0"></span>
+      </div>
       <div class="mini">Sets a look on this unit <em>and</em> every <b>armed</b> unit down
-      the DMX line. Arm each downstream unit first on its panel: menu → Setup →
-      <b>Chain Listen → ARMED</b>. Deploy from the first controller in the chain.</div>
+      the DMX line. Arm each downstream unit here (or on its panel: Setup →
+      <b>Chain Listen</b>) — one baton per arming, auto-disarms after it fires.
+      Deploy from the first controller in the chain.</div>
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between">
@@ -657,7 +664,7 @@ const OTAC  = "a1b20004-5c6d-4e8f-9a0b-1c2d3e4f5a6b";   // OTA control (write)
 const OTAD  = "a1b20005-5c6d-4e8f-9a0b-1c2d3e4f5a6b";   // OTA data (write)
 const OTAS  = "a1b20006-5c6d-4e8f-9a0b-1c2d3e4f5a6b";   // OTA status (notify)
 let otacChar=null, otadChar=null, otasChar=null;         // null until connected to OTA-capable fw
-const PERS_NAMES = ["RGB 8-bit","RGB 16-bit","CW/WW 8-bit","CW/WW 16-bit","FX 10ch"];
+const PERS_NAMES = ["RGB 8-bit","RGB 16-bit","CW/WW 8-bit","CW/WW 16-bit","FX 10ch","Dim 1ch","Dim 2ch (16-bit)"];
 // Swatch colour for a port: RGB ports show the mix; CW/WW ports blend warm
 // (2700K-ish) and cool (6500K-ish) white tones (WW rides the R value, CW the G).
 function swatchRGB(pe, r, g, b){          // r,g,b in 0-100
@@ -672,7 +679,7 @@ function swatchRGB(pe, r, g, b){          // r,g,b in 0-100
 }
 // Channels per personality (index = PE). The whole footprint must fit the
 // universe, so the last legal start address is 513 - footprint (10ch → 503).
-const PERS_CH = [3,6,2,4,10];
+const PERS_CH = [3,6,2,4,10,1,2];
 const maxAddr = pe => 513 - (PERS_CH[pe] ?? 1);
 const FX_NAMES = ["Off","Candle","Fire","Fireworks","Water","Siren","Laser","Club",
                   "Lightning","Rainbow","Aurora","Sunset","TV Sim","Strobe","Police",
@@ -687,7 +694,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28k.amber-overlap";
+const APP_VER="2026-08-28l.dim-pers";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1042,17 +1049,19 @@ function renderControl(){
     // Slider identity follows the personality: CW/WW ports get Warm/Cool
     // (firmware maps WW to the R output, CW to the G output; B is unused).
     {
-      const cct=(m.PE===2||m.PE===3);
+      const cct=(m.PE===2||m.PE===3), dim1=(m.PE===5||m.PE===6);
       const lr=$("lR"+p), lg=$("lG"+p), rb=$("rowB"+p);
       const rr=$("rowR"+p), rg=$("rowG"+p);
-      if(lr) lr.textContent = cct ? "Warm" : "Red";
+      if(lr) lr.textContent = dim1 ? "Level" : cct ? "Warm" : "Red";
       if(lg) lg.textContent = cct ? "Cool" : "Green";
       if(rr) rr.classList.toggle("ww", cct);   // amber track for warm white
+      if(rr) rr.classList.toggle("uv", dim1);  // UV/purple track for Dim level
       if(rg) rg.classList.toggle("cw", cct);   // ice track for cool white
-      if(rb) rb.classList.toggle("hidden", cct);
-      // On a CCT port, only offer effects that read on a white strip.
+      if(rg) rg.classList.toggle("hidden", dim1);   // Dim = one Level slider
+      if(rb) rb.classList.toggle("hidden", cct||dim1);
+      // Monochrome ports (CCT + Dim) only offer effects that read on them.
       const xs=$("x"+p);
-      if(xs) for(const o of xs.options) o.hidden = cct && !CCT_FX.has(+o.value);
+      if(xs) for(const o of xs.options) o.hidden = (cct||dim1) && !CCT_FX.has(+o.value);
     }
     setIf(p,"X",   el=>el.value=m.X??0);
     setIf(p,"PWM", el=>el.value=m.PW??0);
@@ -1202,7 +1211,7 @@ function buildCard(p){
     // hidden option can stay SELECTED, leaving e.g. Rainbow silently running
     // on a white strip. Stop any effect the new personality doesn't offer.
     {
-      const cct=(pe===2||pe===3), xs=$("x"+p);
+      const cct=(pe===2||pe===3||pe===5||pe===6), xs=$("x"+p);
       if(cct && xs && !CCT_FX.has(+xs.value)){
         xs.value=0; touch("X"); if(ports[p-1]) ports[p-1].X=0;
         send(`P${p}.FX=0`);
@@ -1239,7 +1248,15 @@ function buildCard(p){
       }else{
         touch(field);
         ensureMan(p);    // touching a colour IS the intent — no toggle needed
-        sendThrottled(p+"."+field,`P${p}.${field}=${e.target.value}`);
+        const dimPers=((m.PE===5)||(m.PE===6));
+        if(dimPers && field==="R"){
+          // Dim personality: the single Level slider drives ALL outputs so a
+          // single-colour/IR strip lights whichever terminal it is wired to.
+          const v=e.target.value;
+          sendThrottled(p+".RGB",`P${p}.RGB=${v},${v},${v}`);
+        }else{
+          sendThrottled(p+"."+field,`P${p}.${field}=${e.target.value}`);
+        }
       }
     });
   }
@@ -1925,7 +1942,7 @@ function paintUniv(){
   }
   updateUnivInfo();
 }
-const PERS_FOOT=[3,6,2,4,10];
+const PERS_FOOT=[3,6,2,4,10,1,2];
 function updateUnivInfo(){
   if(!univSelCh){ return; }
   const ch=univSelCh, v=univ[ch];
@@ -2115,6 +2132,13 @@ function renderSetup(){
     st.style.fontWeight = cx>=2 ? "600" : "400";
     if(document.activeElement!==$("crmxAnt")) $("crmxAnt").value=kv.CA??"1";
   }
+  // Chain-listen arm state (CHL) — armed reads amber like the panel banner
+  if(kv.CHL!=null && document.activeElement!==$("chArm")){
+    $("chArm").checked = kv.CHL==="1";
+    const st=$("chArmStat");
+    st.textContent = kv.CHL==="1" ? "ARMED — waiting for baton" : "off";
+    st.style.color = kv.CHL==="1" ? "var(--warn)" : "var(--dim)";
+  }
   const srcName=["off","DMX","sACN","Art-Net"][+(kv.SRC||0)]||"—";
   const netOn=(kv.NET==="1"), wifiUp=(kv.NW==="1");
   $("netStatus").textContent = !netOn ? "off"
@@ -2134,6 +2158,7 @@ function renderSetup(){
 }
 $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.value); };
 // ---------- Chain broadcast (factory look index: 0=DMX In, 1=Off, 9=White) ----------
+$("chArm").addEventListener("change",e=>{ send("CHARM="+(e.target.checked?1:0)); });
 $("chBlack").onclick=()=>{ if(confirm("Blackout the whole chain?\nThis unit and every armed unit down the DMX line go dark.")) send("CHLOOK=1"); };
 $("chFull").onclick=()=>{ if(confirm("Full on across the whole chain?\nThis unit and every armed unit down the DMX line go to full.")) send("CHLOOK=9"); };
 $("chDmx").onclick=()=>send("CHLOOK=0");
