@@ -125,6 +125,10 @@
   .row.ww label, .row.cw label { color:var(--text); }
   .row .val { width:38px; text-align:right; font-variant-numeric:tabular-nums;
               color:var(--dim); font-size:12.5px; }
+  /* Address-overlap nudge: amber ring on a start address whose footprint
+     collides with another port's (different start). Informational only. */
+  .row input.clash { border-color:var(--warn) !important;
+                     box-shadow:0 0 0 1.5px var(--warn); }
   .row input[type=number], .row select, .row input[type=text] {
       background:var(--card2); color:var(--text); border:1px solid var(--line);
       border-radius:7px; padding:6px 8px; font-size:14px; width:82px; }
@@ -683,7 +687,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28j.edit-guard";
+const APP_VER="2026-08-28k.amber-overlap";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1067,6 +1071,24 @@ function renderControl(){
     sw.style.background=`rgb(${cr},${cg},${cb})`;
     sw.style.boxShadow=(cr+cg+cb>40)?`0 0 14px rgba(${cr},${cg},${cb},.55)`:"none";
   });
+  // Overlap indicator: an address whose footprint collides with another
+  // port's (at a DIFFERENT start) gets an amber outline on its field — a
+  // nudge, never a block, since overlap can be deliberate. Identical starts
+  // = mirroring, no mark. Both sides of a clash get marked.
+  for(let i=0;i<ports.length;i++){
+    const el=$("addr"+(i+1)); if(!el) continue;
+    const a=+(ports[i].A||0), f=PERS_FOOT[ports[i].PE||0]||3;
+    let clash=false;
+    if(a) for(let j=0;j<ports.length;j++){
+      if(j===i) continue;
+      const b=+(ports[j].A||0);
+      if(!b || b===a) continue;
+      const g=PERS_FOOT[ports[j].PE||0]||3;
+      if(a<b+g && b<a+f){ clash=true; break; }
+    }
+    el.classList.toggle("clash",clash);
+    el.title=clash?"Overlaps another port's channels":"";
+  }
 }
 function buildCard(p){
   const d=document.createElement("div");
@@ -1159,31 +1181,11 @@ function buildCard(p){
     setTimeout(()=>send("GET"), 800);
   });
   d.querySelector("#addr"+p).addEventListener("change",e=>{
-    const pe=+$("pers"+p).value||0, mx=maxAddr(pe);
+    const mx=maxAddr(+$("pers"+p).value||0);
     let v=Math.max(1,Math.min(mx,+e.target.value||1));
-    // Address-clash guard: block a start whose footprint OVERLAPS another
-    // port's footprint — unless it's EXACTLY the same start address, which
-    // is deliberate mirroring (two ports driven by the same channels).
-    // Partial overlap is never intentional; it's the classic patch mistake.
-    const foot=PERS_FOOT[pe]||3;
-    for(let i=0;i<ports.length;i++){
-      if(i===p-1) continue;
-      const m=ports[i]||{}, oa=+(m.A||0);
-      if(!oa || v===oa) continue;              // same start = mirror, allowed
-      const of=PERS_FOOT[m.PE||0]||3;
-      if(v<oa+of && oa<v+foot){
-        // Confirm rather than hard-block: mid-re-patch you often have to pass
-        // THROUGH an overlapping state (can't move P2 clear until P4 has moved).
-        if(!confirm(`Address ${v} overlaps Port ${i+1} (${oa}–${oa+of-1}).\n`+
-              `Same start = mirroring; partial overlap is usually a patch mistake.\n\n`+
-              `Set it anyway?`)){
-          e.target.value=(ports[p-1]&&ports[p-1].A)||1;   // snap back
-          return;
-        }
-        break;                                            // user overrode — send it
-      }
-    }
     e.target.value=v; touch("ADDR"); send(`P${p}.ADDR=${v}`);
+    // No popups: overlapping footprints are MARKED (amber outline, see
+    // renderControl) rather than blocked — overlap can be deliberate.
   });
   d.querySelector("#head"+p).addEventListener("change",e=>{
     let v=Math.max(0,Math.min(9999,+e.target.value||0));
