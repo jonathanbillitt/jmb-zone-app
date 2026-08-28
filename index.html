@@ -683,7 +683,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28f.press-anim";
+const APP_VER="2026-08-28g.adv-ranges";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1110,11 +1110,11 @@ function buildCard(p){
         <div class="row"><label>Current</label>
           <input type="number" id="ocp${p}" min="0.25" max="6.5" step="0.25">
           <span class="unit">A</span>
-          <span class="mini" style="margin:0 0 0 8px;color:var(--dim)">max 6.5 A</span></div>
+          <span class="mini" style="margin:0 0 0 8px;color:var(--dim)">0.25&nbsp;&ndash;&nbsp;6.5&nbsp;A</span></div>
         <div class="row"><label>Temp trip</label>
           <input type="number" id="ot${p}" min="40" max="110" step="5">
           <span class="unit">°C</span>
-          <span class="mini" style="margin:0 0 0 8px;color:var(--dim)">max 110 °C</span></div>
+          <span class="mini" style="margin:0 0 0 8px;color:var(--dim)">40&nbsp;&ndash;&nbsp;110&nbsp;&deg;C</span></div>
         <div class="row">
           <button class="danger hidden" id="clrf${p}">Clear fault &amp; re-enable</button>
           <span class="mini" id="nof${p}" style="margin:0;color:var(--ok);font-weight:600">&#10003; No faults</span>
