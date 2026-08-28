@@ -142,8 +142,11 @@
                color:var(--dim); font-size:12px; padding:9px 0 10px; }
   nav button.active { color:var(--acc); font-weight:600; }
   nav button .ico { display:block; font-size:17px; margin-bottom:1px; }
+  /* PIN box sits in the TOP part of the screen, not centred — a centred box
+     lands under the phone's number pad and needs a scroll to reach Unlock. */
   #overlay { position:fixed; inset:0; background:rgba(5,8,12,.82); display:flex;
-             align-items:center; justify-content:center; z-index:10; }
+             align-items:flex-start; justify-content:center; z-index:10;
+             padding-top:max(24px,6vh); overflow-y:auto; }
   #overlay .box { background:var(--card); border:1px solid var(--line);
                   border-radius:16px; padding:26px; width:min(340px,90vw);
                   text-align:center; }
@@ -674,7 +677,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28d.jmbset-time";
+const APP_VER="2026-08-28e.pin-top";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
