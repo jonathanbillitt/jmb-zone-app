@@ -683,7 +683,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28g.adv-ranges";
+const APP_VER="2026-08-28h.addr-guard";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1154,8 +1154,25 @@ function buildCard(p){
     setTimeout(()=>send("GET"), 800);
   });
   d.querySelector("#addr"+p).addEventListener("change",e=>{
-    const mx=maxAddr(+$("pers"+p).value||0);
+    const pe=+$("pers"+p).value||0, mx=maxAddr(pe);
     let v=Math.max(1,Math.min(mx,+e.target.value||1));
+    // Address-clash guard: block a start whose footprint OVERLAPS another
+    // port's footprint — unless it's EXACTLY the same start address, which
+    // is deliberate mirroring (two ports driven by the same channels).
+    // Partial overlap is never intentional; it's the classic patch mistake.
+    const foot=PERS_FOOT[pe]||3;
+    for(let i=0;i<ports.length;i++){
+      if(i===p-1) continue;
+      const m=ports[i]||{}, oa=+(m.A||0);
+      if(!oa || v===oa) continue;              // same start = mirror, allowed
+      const of=PERS_FOOT[m.PE||0]||3;
+      if(v<oa+of && oa<v+foot){
+        alert(`Address ${v} clashes with Port ${i+1} (${oa}–${oa+of-1}).\n`+
+              `Pick a clear range — or use the SAME start address to mirror that port.`);
+        e.target.value=(ports[p-1]&&ports[p-1].A)||1;   // snap back
+        return;
+      }
+    }
     e.target.value=v; touch("ADDR"); send(`P${p}.ADDR=${v}`);
   });
   d.querySelector("#head"+p).addEventListener("change",e=>{
