@@ -1207,7 +1207,14 @@ function buildCard(p){
   }
   wheels[p+".D"]=makeWheel(d.querySelector("#wd"+p),{
     label:"DIMMER", min:0, max:100, value:100, fmt:v=>v+"%",
-    onInput:v=>{ touch("D"); sendThrottled(p+".DIM",`P${p}.DIM=${v}`); }});
+    onInput:v=>{
+      // Dimmer touch = manual intent too — without this, a fresh-booted port
+      // (manual off, no effect) ignores the wheel and the rig looks dead until
+      // something else asserts MAN. But never stomp a RUNNING effect: the
+      // dimmer rides on top of effects, so only claim manual when idle.
+      const m=ports[p-1]||{};
+      if(!((m.X||0)>0)) ensureMan(p);
+      touch("D"); sendThrottled(p+".DIM",`P${p}.DIM=${v}`); }});
   wheels[p+".S"]=makeWheel(d.querySelector("#ws"+p),{
     label:"FX SPEED", min:0, max:255, value:128, fmt:v=>String(v),
     onInput:v=>{ touch("S"); sendThrottled(p+".FXS",`P${p}.FXS=${v}`); }});
