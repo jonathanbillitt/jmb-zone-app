@@ -156,10 +156,11 @@
   nav button .ico { display:block; font-size:17px; margin-bottom:1px; }
   /* PIN box sits in the TOP part of the screen, not centred — a centred box
      lands under the phone's number pad and needs a scroll to reach Unlock. */
-  #overlay { position:fixed; inset:0; background:rgba(5,8,12,.82); display:flex;
+  #overlay, #cfOv { position:fixed; inset:0; background:rgba(5,8,12,.82); display:flex;
              align-items:flex-start; justify-content:center; z-index:10;
              padding-top:max(24px,6vh); overflow-y:auto; }
-  #overlay .box { background:var(--card); border:1px solid var(--line);
+  #cfOv { z-index:12; }
+  #overlay .box, #cfOv .box { background:var(--card); border:1px solid var(--line);
                   border-radius:16px; padding:26px; width:min(340px,90vw);
                   text-align:center; }
   #overlay input { width:100%; margin:14px 0; padding:11px; font-size:18px;
@@ -643,6 +644,15 @@
   <button data-tab="setup"><span class="ico">⚙️</span>Setup</button>
 </nav>
 
+<div id="cfOv" class="hidden"><div class="box">
+  <b id="cfTitle"></b>
+  <div class="mini" id="cfMsg" style="white-space:pre-line;text-align:left;margin-top:8px"></div>
+  <div class="ctlrow" style="margin-top:16px">
+    <button id="cfNo" style="flex:1">Cancel</button>
+    <button id="cfYes" class="primary" style="flex:1">OK</button>
+  </div>
+</div></div>
+
 <div id="overlay" class="hidden">
   <div class="box">
     <b>Enter PIN</b>
@@ -698,7 +708,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28n.pers-order";
+const APP_VER="2026-08-28o.clean-prompts";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -889,6 +899,63 @@ function askPin(){
   setTimeout(()=>$("pinInput").focus(),50);
 }
 function hideOverlay(){ $("overlay").classList.add("hidden"); }
+// In-app dialogs replacing window.confirm/alert — no browser chrome, no
+// "app.jmblighting.co.uk says" header, styled like the rest of the app.
+function askConfirm(msg,opt){
+  const o=opt||{};
+  return new Promise(res=>{
+    $("cfTitle").textContent=o.title||"Are you sure?";
+    $("cfMsg").textContent=msg;
+    const y=$("cfYes"), n=$("cfNo");
+    y.textContent=o.ok||"OK"; y.className=o.danger?"danger":"primary";
+    n.classList.remove("hidden");
+    $("cfOv").classList.remove("hidden");
+    const done=v=>{ $("cfOv").classList.add("hidden");
+                    y.onclick=n.onclick=null; res(v); };
+    y.onclick=()=>done(true); n.onclick=()=>done(false);
+  });
+}
+function askText(msg,opt){
+  const o=opt||{};
+  return new Promise(res=>{
+    $("cfTitle").textContent=o.title||"";
+    $("cfMsg").textContent=msg||"";
+    let inp=$("cfInput");
+    if(!inp){
+      inp=document.createElement("input");
+      inp.id="cfInput"; inp.type="text"; inp.autocomplete="off";
+      inp.style.cssText="width:100%;margin-top:10px;padding:10px;font-size:16px;"+
+        "background:var(--card2);color:var(--text);border:1px solid var(--line);"+
+        "border-radius:8px;box-sizing:border-box";
+      $("cfMsg").after(inp);
+    }
+    inp.classList.remove("hidden");
+    inp.value=o.value||""; inp.placeholder=o.placeholder||"";
+    if(o.maxlength) inp.maxLength=o.maxlength; else inp.removeAttribute("maxlength");
+    const y=$("cfYes"), n=$("cfNo");
+    y.textContent=o.ok||"OK"; y.className="primary";
+    n.classList.remove("hidden");
+    $("cfOv").classList.remove("hidden");
+    setTimeout(()=>inp.focus(),50);
+    const done=v=>{ $("cfOv").classList.add("hidden");
+                    inp.classList.add("hidden");
+                    y.onclick=n.onclick=null; inp.onkeydown=null; res(v); };
+    inp.onkeydown=e=>{ if(e.key==="Enter") done(inp.value); };
+    y.onclick=()=>done(inp.value); n.onclick=()=>done(null);
+  });
+}
+function tellUser(msg,opt){
+  const o=opt||{};
+  return new Promise(res=>{
+    $("cfTitle").textContent=o.title||"";
+    $("cfMsg").textContent=msg;
+    const y=$("cfYes"), n=$("cfNo");
+    y.textContent="OK"; y.className="primary"; n.classList.add("hidden");
+    $("cfOv").classList.remove("hidden");
+    y.onclick=()=>{ $("cfOv").classList.add("hidden");
+                    n.classList.remove("hidden"); y.onclick=null; res(); };
+  });
+}
 let pinPending="";
 async function tryPin(){
   const pin=$("pinInput").value.trim();
@@ -1361,8 +1428,8 @@ function renderScenes(){
     };
     fadeIn.addEventListener("change",commitFade);
     fadeIn.addEventListener("wheel",e=>e.preventDefault(),{passive:false});
-    row.querySelector(".scname").onclick=()=>{
-      const v=prompt("Rename scene:",sc.name);
+    row.querySelector(".scname").onclick=async()=>{
+      const v=await askText("",{title:"Rename scene",value:sc.name,ok:"Rename",maxlength:24});
       if(v===null) return;
       const nm=v.trim(); if(!nm) return;
       const all=loadScenes(); all[i].name=nm; saveScenes(all); renderScenes();
@@ -1372,9 +1439,9 @@ function renderScenes(){
     list.appendChild(row);
   });
 }
-$("btnSaveScene").onclick=()=>{
-  if(loadScenes().length>=SCENE_MAX){ alert("Scene limit reached ("+SCENE_MAX+") — delete some first."); return; }
-  const name=prompt("Scene name:");
+$("btnSaveScene").onclick=async()=>{
+  if(loadScenes().length>=SCENE_MAX){ tellUser("Scene limit reached ("+SCENE_MAX+") — delete some first.",{title:"Scenes full"}); return; }
+  const name=await askText("",{title:"Save scene",placeholder:"scene name",ok:"Save",maxlength:24});
   if(!name) return;
   const snap=ports.map(m=>({r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
                             x:m.X??0,s:m.S??128}));
@@ -1384,7 +1451,7 @@ $("btnSaveScene").onclick=()=>{
 };
 // One-tap capture of the current look — no prompt, auto-named by time.
 $("btnCapture").onclick=()=>{
-  if(loadScenes().length>=SCENE_MAX){ alert("Scene limit reached ("+SCENE_MAX+") — delete some first."); return; }
+  if(loadScenes().length>=SCENE_MAX){ tellUser("Scene limit reached ("+SCENE_MAX+") — delete some first.",{title:"Scenes full"}); return; }
   const snap=ports.map(m=>({r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
                             x:m.X??0,s:m.S??128}));
   const t=new Date(), hh=String(t.getHours()).padStart(2,"0"),
@@ -1987,11 +2054,11 @@ function renderFlk(){
 // ---------- RDM universe controller ----------
 let rdmDevs={}, rdmOrder=[], rdmPhaseTxt="", rdmActive=false, rdmOpenUid=null,
     rdmSens={}, rdmPend=null;
-$("btnRdmScan").onclick=()=>{
+$("btnRdmScan").onclick=async()=>{
   if(!bleConnected() && !demoOn) return;
   if(!demoOn && kv.DMX==="1" &&
-     !confirm("Upstream DMX is live. Scanning takes over the output line — "+
-              "fixtures will lose data during the scan. Continue?")) return;
+     !await askConfirm("Fixtures lose data while the scan takes over the "+
+              "output line.",{title:"Scan with DMX live?",ok:"Scan"})) return;
   rdmDevs={}; rdmOrder=[]; rdmSens={}; rdmOpenUid=null;
   send(kv.DMX==="1"?"RDMSCAN!":"RDMSCAN");
   rdmPhaseTxt="scanning…"; rdmActive=true; renderRdm();
@@ -2163,8 +2230,8 @@ function renderSetup(){
 $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.value); };
 // ---------- Chain broadcast (factory look index: 0=DMX In, 1=Off, 9=White) ----------
 $("chArm").addEventListener("change",e=>{ send("CHARM="+(e.target.checked?1:0)); });
-$("chBlack").onclick=()=>{ if(confirm("Blackout the whole chain?\nThis unit and every armed unit down the DMX line go dark.")) send("CHLOOK=1"); };
-$("chFull").onclick=()=>{ if(confirm("Full on across the whole chain?\nThis unit and every armed unit down the DMX line go to full.")) send("CHLOOK=9"); };
+$("chBlack").onclick=async()=>{ if(await askConfirm("This unit and every armed unit down the DMX line go dark.",{title:"Blackout the chain?",ok:"Blackout",danger:true})) send("CHLOOK=1"); };
+$("chFull").onclick=async()=>{ if(await askConfirm("This unit and every armed unit down the DMX line go to full.",{title:"Full on across the chain?",ok:"Full on"})) send("CHLOOK=9"); };
 $("chDmx").onclick=()=>send("CHLOOK=0");
 // ---------- Effects: spread ----------
 // ---------- FX tap tempo ----------
@@ -2218,7 +2285,7 @@ $("fxSpread").oninput=()=>{ $("fxSpreadV").textContent=$("fxSpread").value+"%"; 
 $("fxSpread").onchange=()=>{ setupTouched=Date.now(); send("SPREAD="+ +$("fxSpread").value); };
 $("crmxLink").onclick=()=>{ send("CRMXLINK");
   $("crmxStatus").textContent="linking…"; };
-$("crmxUnlink").onclick=()=>{ if(confirm("Unlink from the paired transmitter?"))
+$("crmxUnlink").onclick=async()=>{ if(await askConfirm("The controller forgets its paired transmitter.",{title:"Unlink CRMX?",ok:"Unlink",danger:true}))
   send("CRMXUNLINK"); };
 $("crmxAnt").onchange=e=>{ setupTouched=Date.now(); send("CRMXANT="+ +e.target.value); };
 $("netEn").onchange=e=>{ setupTouched=Date.now(); send("NET="+ +e.target.value); };
@@ -2226,10 +2293,9 @@ $("btNameApply").onclick=()=>{
   const t=$("setBtName").value.trim();
   setupTouched=Date.now();
   send("BTNAME="+hexEnc(t));
-  alert(t ? `Bluetooth name set to "${t}". It takes effect when the `+
-            `controller next restarts.`
-          : "Bluetooth name reset to the default. It takes effect when the "+
-            "controller next restarts.");
+  tellUser(t ? `Set to "${t}" — takes effect when the controller next restarts.`
+             : "Reset to the default — takes effect when the controller next restarts.",
+           {title:"Bluetooth name"});
 };
 $("btnUniApply").onclick=()=>{ setupTouched=Date.now();
   send("WUNI="+Math.max(1,Math.min(63999,+$("netUni").value||1))); };
@@ -2252,8 +2318,8 @@ $("setAmode").onchange=e=>{ setupTouched=Date.now(); send("AMODE="+ +e.target.va
 $("btnHoldApply").onclick=()=>{ setupTouched=Date.now();
   send("HOLD="+Math.max(0,Math.min(60,+$("setHold").value||5))); };
 // ---------- prep / reset-all / undo ----------
-$("btnPrep").onclick=()=>{
-  if(!confirm("Clear all ports?\nEvery port → full white, effects off, dimmer down.")) return;
+$("btnPrep").onclick=async()=>{
+  if(!await askConfirm("Every port goes to full white, effects off, dimmer down.",{title:"Clear all ports?",ok:"Clear all",danger:true})) return;
   // Clear to a clean programming base: effect OFF, colour full, speed at
   // designed tempo, dimmer down — nothing lights until you raise a wheel.
   ports.forEach((m,i)=>{ const p=i+1;
@@ -2318,8 +2384,9 @@ function portQueue(list){
   return q;
 }
 $("btnResetAll").onclick=async()=>{
-  if(!confirm("Reset ALL ports?\nDMX 001, head 0001, RGB 100%, FX off, "+
-              "speed 128, dimmer 0%.\nUndo will restore the current state."))
+  if(!await askConfirm("DMX 001, head 0001, RGB 100%, FX off, speed 128, "+
+              "dimmer 0%.\nUndo will restore the current state.",
+              {title:"Reset all ports?",ok:"Reset",danger:true}))
     return;
   localStorage.setItem("jmb_undo",JSON.stringify(snapshotPorts()));
   const q=[];
@@ -2335,7 +2402,7 @@ $("btnUndo").onclick=async()=>{
   let snap; try{ snap=JSON.parse(localStorage.getItem("jmb_undo")||""); }
   catch(_){ $("impStatus").textContent="Nothing to undo."; return; }
   if(!Array.isArray(snap)){ $("impStatus").textContent="Nothing to undo."; return; }
-  if(!confirm("Restore all ports to the state saved before the last reset?"))
+  if(!await askConfirm("All ports return to the state saved before the last reset.",{title:"Undo reset?",ok:"Restore"}))
     return;
   await applyQueue(portQueue(snap),"Undo");
 };
@@ -2378,9 +2445,9 @@ $("impFile").addEventListener("change",async ev=>{
   if(data.app!=="jmb-zone"||!Array.isArray(data.ports)){
     $("impStatus").textContent="Not a JMB Lighting settings file."; return; }
   const nsc=Array.isArray(data.scenes)?data.scenes.length:0;
-  if(!confirm(`Apply "${f.name}" to this controller?\n`+
-              `${data.ports.length} ports`+(nsc?`, ${nsc} scenes`:"")+
-              ` — overwrites current settings.`)) return;
+  if(!await askConfirm(`${data.ports.length} ports`+(nsc?`, ${nsc} scenes`:"")+
+              ` — overwrites current settings.`,
+              {title:`Apply "${f.name}"?`,ok:"Apply",danger:true})) return;
   const nm=String(data.name||"").replace(/[^\x20-\x7E]/g,"").trim().slice(0,16);
   const q=["CID="+(data.cid||0),"CNAME="+(nm?hexEnc(nm):"0"),
            "AMODE="+(data.amode||0)].concat(portQueue(data.ports));
@@ -2451,7 +2518,7 @@ async function runOta(file){
   const buf=await file.arrayBuffer(), size=buf.byteLength;
   if(new Uint8Array(buf)[0]!==0xE9){ setOtaMsg("That isn't an ESP32 firmware .bin (bad magic byte)."); return; }
   const crc=crc32(buf);
-  if(!confirm(`Flash ${file.name} (${(size/1024).toFixed(0)} KB) to this controller?\nIt reboots into the new firmware when done.`)) return;
+  if(!await askConfirm(`${file.name} (${(size/1024).toFixed(0)} KB). The controller reboots into the new firmware when done.`,{title:"Flash firmware?",ok:"Flash"})) return;
   otaBusy=true; otaAbort=false; renderOta();
   $("btnOtaCancel").classList.remove("hidden");
   setOtaState("starting…"); otaProgress(0);
@@ -2486,12 +2553,12 @@ async function runOta(file){
 $("btnRefresh").onclick=()=>send("GET");
 $("btnDisc").onclick=()=>{ if(NBLE()){ NBLE().disconnect(); onDisconnected(); return; }
   const d0=dev; dev=null; if(d0&&d0.gatt.connected) d0.gatt.disconnect(); };
-$("btnPin").onclick=()=>{
-  const v=prompt("New PIN (4-16 characters, no spaces):");
+$("btnPin").onclick=async()=>{
+  const v=await askText("4\u201316 characters, no spaces.",{title:"New PIN",ok:"Set PIN",maxlength:16});
   if(v&&v.trim().length>=4){
     send("NEWPIN="+v.trim());
     localStorage.setItem("jmb_pin",v.trim());
-    alert("PIN changed. Reconnections must use the new PIN.");
+    tellUser("Reconnections must use the new PIN.",{title:"PIN changed"});
   }
 };
 $("btnConnect").onclick=()=>{
