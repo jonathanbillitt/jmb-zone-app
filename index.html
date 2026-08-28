@@ -728,7 +728,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28v.pwm-label";
+const APP_VER="2026-08-28w.setup-guard";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2232,9 +2232,12 @@ let setupTouched=0;
 function renderSetup(){
   if(Date.now()-setupTouched<HOT_MS) return;
   if(document.activeElement!==$("setName")) $("setName").value=hexDec(kv.CN);
-  $("setCid").value=kv.CID??"";
-  $("setAmode").value=kv.AM??"0";
-  $("setHold").value=kv.HOLD??"5";
+  // Guard EVERY field: on mobile `change` fires on blur, so an unguarded
+  // state echo rewrites the focused field first and the edit silently
+  // vanishes ("ID / DMX hold refuse to change", bench 2026-08-28).
+  if(document.activeElement!==$("setCid"))   $("setCid").value=kv.CID??"";
+  if(document.activeElement!==$("setAmode")) $("setAmode").value=kv.AM??"0";
+  if(document.activeElement!==$("setHold"))  $("setHold").value=kv.HOLD??"5";
   // Network DMX — don't stomp a field the user is editing
   if(document.activeElement!==$("netEn"))  $("netEn").value=kv.NET??"0";
   if(document.activeElement!==$("netUni")) $("netUni").value=kv.NUN??"1";
