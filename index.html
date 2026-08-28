@@ -681,6 +681,9 @@ function swatchRGB(pe, r, g, b){          // r,g,b in 0-100
 // Channels per personality (index = PE). The whole footprint must fit the
 // universe, so the last legal start address is 513 - footprint (10ch → 503).
 const PERS_CH = [3,6,2,4,10,1,2];
+// Display order for the personality picker (values stay firmware-matched):
+// FX 10ch first — the working personality — then colour, white, dimmers.
+const PERS_ORDER = [4,0,1,2,3,5,6];
 const maxAddr = pe => 513 - (PERS_CH[pe] ?? 1);
 const FX_NAMES = ["Off","Candle","Fire","Fireworks","Water","Siren","Laser","Club",
                   "Lightning","Rainbow","Aurora","Sunset","TV Sim","Strobe","Police",
@@ -695,7 +698,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28m.safety-doc";
+const APP_VER="2026-08-28n.pers-order";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1120,7 +1123,7 @@ function buildCard(p){
         <input type="number" id="head${p}" min="0" max="9999">
       </div>
       <div class="row"><label>Mode</label>
-        <select id="pers${p}">${PERS_NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join("")}</select>
+        <select id="pers${p}">${PERS_ORDER.map(i=>`<option value="${i}">${PERS_NAMES[i]}</option>`).join("")}</select>
       </div>
       <div class="row"><label>Effect</label>
         <select id="x${p}" style="width:148px">${FX_NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join("")}</select>
