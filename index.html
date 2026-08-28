@@ -708,7 +708,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28o.clean-prompts";
+const APP_VER="2026-08-28p.fw-fades";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1476,6 +1476,23 @@ async function recallScene(sc){
   // Hold the driven fields for the whole fade so incoming state can't stomp it.
   sc.ports.forEach((t,i)=>{ if(i>=ports.length) return; const p=i+1;
     for(const k of ["R","G","B","D","X","S"]) hot[p+"."+k]=Date.now()+T+500; });
+  // FIRMWARE-EXECUTED CROSSFADES for static→static ports: one FADE=<ms> arm
+  // + the targets sent ONCE — the controller interpolates in full 16-bit, so
+  // long fades no longer staircase through the BLE 0-100 grid. Ports with an
+  // effect on either end (and demo mode, which has no firmware) keep the
+  // stepped dip below. fwDone[] marks ports the timer must leave alone.
+  const fwDone=new Array(ports.length).fill(false);
+  const useFw = bleConnected() && !demoOn;
+  if(useFw) sc.ports.forEach((t,i)=>{
+    if(i>=from.length) return;
+    const p=i+1, f=from[i];
+    if(f.fx || t.x) return;                    // dips stay app-orchestrated
+    fwDone[i]=true;
+    send(`P${p}.MAN=1`); send(`P${p}.FX=0`); send(`P${p}.FXS=${t.s??128}`);
+    send(`P${p}.FADE=${T}`);
+    send(`P${p}.RGB=${t.r},${t.g},${t.b}`);
+    send(`P${p}.DIM=${t.d}`);
+  });
   let myTimer=null;
   const step=()=>{
     if(myGen!==recallGen){ clearInterval(myTimer); return; }  // superseded → stop THIS timer
@@ -1483,6 +1500,7 @@ async function recallScene(sc){
     const e=k*k*(3-2*k);                       // smoothstep
     sc.ports.forEach((t,i)=>{
       if(i>=from.length) return;               // scene saved on a bigger variant
+      if(fwDone[i]) return;                    // firmware is running this fade
       const p=i+1, f=from[i];
       const involvesFx = f.fx || t.x;          // effect on either end?
       if(involvesFx){
