@@ -2765,6 +2765,16 @@ $("btnDemoExit").onclick=()=>{
   if(q.has("demo")){
     setTimeout(()=>{
       $("btnDemo").onclick();
+      // Fresh profile (headless capture): seed example scenes so the Scenes
+      // tab demos properly, and mark one active to show the highlight.
+      if(!loadScenes().length){
+        saveScenes([
+          {name:"Evening wash", fade:3, ports:[{r:100,g:55,b:20,d:70,x:0,s:128},{r:100,g:55,b:20,d:70,x:0,s:128},{r:20,g:35,b:100,d:40,x:0,s:128},{r:100,g:80,b:60,d:55,x:0,s:128}]},
+          {name:"Party",        fade:1, ports:[{r:100,g:0,b:100,d:90,x:7,s:160},{r:0,g:100,b:100,d:90,x:7,s:160},{r:100,g:100,b:0,d:90,x:7,s:160},{r:100,g:0,b:0,d:90,x:7,s:160}]},
+          {name:"Interview key",fade:5, ports:[{r:100,g:90,b:75,d:85,x:0,s:128},{r:100,g:90,b:75,d:45,x:0,s:128},{r:0,g:0,b:0,d:0,x:0,s:128},{r:60,g:70,b:100,d:25,x:0,s:128}]}
+        ]);
+        activeSceneIdx=0; renderScenes();
+      }
       const t=q.get("tab");
       const b=t&&document.querySelector(`#nav button[data-tab="${t}"]`);
       if(b) b.onclick();
