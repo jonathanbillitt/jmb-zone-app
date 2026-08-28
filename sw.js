@@ -3,13 +3,14 @@
 // with no signal (handy at a venue). Strategy is NETWORK-FIRST so an online
 // launch always gets the freshest build, falling back to the cached copy only
 // when the network is unreachable. Bump CACHE on each deploy to evict old copies.
-const CACHE="jmb-2026-08-28l-dim";
+const CACHE="jmb-2026-08-28m-safety";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest",
                 "./icon.svg", "./icon-maskable.svg", "./icon-512.png",
                 "./icon-512-maskable.png", "./privacy.html", "./jmb-splash.png",
                 // Docs precached so the manual + DMX chart open with no signal.
                 "./manual.html", "./dmx-chart.html",
-                "./manual.pdf", "./dmx-chart.pdf"];
+                "./manual.pdf", "./dmx-chart.pdf",
+                "./safety.html", "./safety.pdf"];
 
 self.addEventListener("install", e => {
   self.skipWaiting();                                   // take over ASAP

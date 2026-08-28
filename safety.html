@@ -1,0 +1,146 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>JMB Lighting — Safety &amp; Safe Operation Guide</title><style>
+@page { size: A4; margin: 18mm 16mm; }
+body { font: 10.5pt/1.55 'Segoe UI', system-ui, sans-serif; color: #1a2230; max-width: 175mm; margin: 0 auto; }
+h1 { font-size: 21pt; color: #14203a; border-bottom: 3px solid #6a2cf5; padding-bottom: 6px; margin: 0 0 2px; }
+h1 + p { color: #667; margin-top: 2px; }
+h2 { font-size: 13.5pt; color: #2a1d66; margin: 22px 0 8px; border-bottom: 1px solid #d8d4ee; padding-bottom: 3px; }
+h3 { font-size: 11pt; color: #333; margin: 14px 0 6px; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; font-size: 9.8pt; page-break-inside: avoid; }
+th { background: #eeeafb; color: #2a1d66; text-align: left; }
+th, td { border: 1px solid #cfc9e8; padding: 4px 8px; vertical-align: top; }
+tr:nth-child(even) td { background: #f7f5fd; }
+td:last-child { min-width: 34px; }
+code { background: #f0eef8; padding: 1px 4px; border-radius: 3px; font: 9.5pt Consolas, monospace; }
+strong { color: #14203a; }
+hr { border: none; border-top: 1px solid #ddd; margin: 16px 0; }
+ul, ol { margin: 6px 0; padding-left: 22px; }
+a { color: #4636b8; }
+blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #b7ade6; background: #f7f5fd; color: #444; }
+.page-break { page-break-before: always; }
+.footer { margin-top: 26px; font-size: 8.5pt; color: #99a; text-align: center; }
+</style></head><body>
+<h1>JMB Lighting — Safety &amp; Safe Operation Guide</h1>
+<p>JMB one / 4our / 8ight LED lighting controllers · Read before installation
+and keep for future reference.</p>
+<blockquote>
+<p><strong>DRAFT — legal review required.</strong> Technical content reflects the shipped
+design. Passages marked <strong>[LEGAL]</strong> need wording confirmed or supplied by
+JMB Lighting's legal advisers before publication. Compliance markings
+(UKCA/CE, Bluetooth qualification) must be completed before sale.</p>
+</blockquote>
+<hr />
+<h2>1. Intended use</h2>
+<p>JMB controllers drive low-voltage constant-voltage LED strip and fixtures
+(RGB, tuneable white, single-colour and infrared) for film, TV, broadcast,
+stage and architectural use, controlled by DMX512, CRMX wireless or the
+companion Bluetooth app. They are professional equipment intended for
+installation and operation by competent persons.</p>
+<p><strong>Indoor, dry locations only.</strong> The units are not sealed against water or
+dust and must not be used outdoors unprotected, in wet or condensing
+environments, or where flammable vapours are present.</p>
+<p>Any other use — including driving non-LED loads, mains loads, or exceeding
+the ratings below — is outside the intended use. <strong>[LEGAL: liability wording
+for misuse.]</strong></p>
+<h2>2. Electrical safety</h2>
+<ul>
+<li><strong>JMB 4our and 8ight contain a mains power supply.</strong> Connect only to a
+  properly earthed mains outlet of the voltage stated on the rating plate.
+  Do not open the enclosure: no user-serviceable parts inside; hazardous
+  voltages are present when connected. Disconnect from the mains before any
+  cleaning, fuse replacement or cabling work.</li>
+<li><strong>JMB one</strong> is powered from an external 12 V or 24 V DC supply or battery
+  pack. Use a supply rated for the connected load, with the correct polarity;
+  the unit is not protected against reverse supply connection at the input.</li>
+<li>Output circuits are separated extra-low voltage (24 V DC). Route output
+  wiring away from mains cabling.</li>
+<li>Use conductor sizes rated for the configured port current (up to 6.5 A per
+  output). Undersized strip feed wiring is a fire risk that no controller
+  protection can fully remove.</li>
+</ul>
+<h2>3. Fuses</h2>
+<p>Each output is protected electronically (configurable current limit,
+microsecond short-circuit trip, over-temperature trip) <strong>and</strong> by a
+replaceable cartridge fuse.</p>
+<ul>
+<li>Replace only with the same type and rating: <strong>5 × 20 mm glass,
+  time-delay, T10A L 250 V (IEC 60127-2)</strong>.</li>
+<li>Never fit a higher rating, a fast-blow substitute, or bridge a fuse.</li>
+<li>A fuse that blows repeatedly indicates a wiring or load fault — find and
+  fix the cause; do not keep replacing the fuse.</li>
+</ul>
+<h2>4. Load limits and heat</h2>
+<ul>
+<li>Maximum per-output current: <strong>6.5 A</strong> (configurable lower; set the limit to
+  suit the connected strip). Total load must remain within the PSU rating.</li>
+<li>Mount with free airflow. Do not cover the enclosure, stack heat-producing
+  equipment on it, or enclose it without ventilation. Ambient operating
+  range: 0–40 °C. <strong>[Confirm final ambient rating before print.]</strong></li>
+<li>The unit reduces output automatically as fixtures approach their
+  configured temperature limit and shuts a port down on a hard
+  over-temperature; this protects the equipment and is not a substitute for
+  correct installation.</li>
+</ul>
+<h2>5. Flashing-light effects — photosensitive epilepsy warning</h2>
+<p>Several built-in effects (Strobe, Lightning, Police, Paparazzi, Explosion,
+Club and others) and DMX-driven strobe control produce <strong>intense flashing
+light</strong>. A small percentage of people may experience seizures when exposed
+to flashing light, even with no prior history.</p>
+<ul>
+<li>Warn cast, crew and audience before using strobe effects.</li>
+<li>Do not aim strobing fixtures at stairways, exits or moving-machinery areas.</li>
+<li>Stop use immediately if anyone experiences dizziness, disorientation or
+  involuntary movement. <strong>[LEGAL: standard PSE warning wording.]</strong></li>
+</ul>
+<h2>6. Infrared (IR) fixtures — invisible radiation</h2>
+<p>The controller can drive infrared LED strip and fixtures (Dim personality).
+<strong>IR output is invisible: a fixture can be at full power while appearing
+dark.</strong></p>
+<ul>
+<li>Treat any connected IR fixture as ON whenever the system is powered.</li>
+<li>Do not stare into IR emitters at close range; position high-power IR
+  sources so that prolonged close viewing is not possible. Fixture
+  photobiological classification (IEC 62471) is the fixture manufacturer's
+  responsibility — observe the fixture's own safety group and distances.</li>
+<li>Remember that camera monitoring shows IR that the eye cannot see — use a
+  camera to confirm an IR rig is actually off before working close to it.</li>
+</ul>
+<h2>7. Radio equipment</h2>
+<p>The unit contains Bluetooth® Low Energy and, when fitted, a CRMX™ 2.4 GHz
+radio. Do not use where radio transmitters are prohibited. The radio link is
+not a safety-of-life channel: do not build safety functions (e.g. emergency
+blackout for egress lighting) solely on the wireless path.
+<strong>[Compliance: Radio Equipment Regulations / RED assessment + Bluetooth SIG
+qualification to be completed before sale.]</strong></p>
+<h2>8. Installation practice</h2>
+<ul>
+<li>Secure mounting only; do not suspend by cables.</li>
+<li>Strain-relieve all output wiring; chafed strip wiring is the most common
+  cause of output faults.</li>
+<li>After installation, verify each port's current limit and temperature trip
+  are set appropriately for the connected fixture, and function-test the
+  fault clear path.</li>
+<li>The DMX/CRMX input, app and front panel all change live output. Establish
+  who has control before working on fixtures — a port can light at any time
+  while the system is powered. <strong>Isolate power before touching wiring.</strong></li>
+</ul>
+<h2>9. Maintenance, service and modification</h2>
+<p>No user-serviceable parts inside any unit. Cleaning: dry or slightly damp
+cloth, mains disconnected, no solvents. Repairs only by JMB Lighting or its
+authorised agents; unauthorised opening, repair or modification ends the
+warranty <strong>[LEGAL: warranty terms reference]</strong> and may render the equipment
+unsafe.</p>
+<h2>10. Disposal</h2>
+<p>Do not dispose of in general waste. The unit is electrical and electronic
+equipment (WEEE): recycle through an appropriate collection scheme.
+<strong>[Confirm WEEE producer registration + crossed-bin marking before sale.]</strong></p>
+<h2>11. Markings and compliance</h2>
+<p><strong>[To complete before sale — tracked in the launch checklist:]</strong> UKCA/CE
+marking and Declaration of Conformity (Electrical Equipment (Safety)
+Regulations 2016 / LVD, EMC, RED, RoHS), Bluetooth SIG qualification, CRMX
+licensing acknowledgement, rating plate (voltage, frequency, power, fuse
+rating), and this guide's inclusion in the box or by QR link.</p>
+<hr />
+<p><em>JMB Lighting · jmblighting.co.uk · support@jmblighting.co.uk</em>
+<em>Bluetooth® is a registered trademark of Bluetooth SIG, Inc. CRMX™ is a
+trademark of LumenRadio AB.</em> <strong>[LEGAL: final trademark + disclaimer block.]</strong></p>
+</body></html>
