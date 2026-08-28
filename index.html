@@ -206,6 +206,8 @@
   .scene b { flex:1; font-weight:600; font-size:14px; }
   .scname { cursor:pointer; }
   .scname:active { color:var(--acc); }
+  .scene.active { border-left:3px solid var(--acc); padding-left:8px; }
+  .scene.active .scname { color:var(--acc); }
   .scfade { display:flex; align-items:center; gap:4px; font-size:12px;
             color:var(--dim); white-space:nowrap; }
   .scene input { width:56px; background:var(--card2); color:var(--text);
@@ -555,6 +557,19 @@
       <b>Chain Listen</b>) — one baton per arming, auto-disarms after it fires.
       Deploy from the first controller in the chain.</div>
     </div>
+
+    <div class="card">
+      <label style="font-weight:600">Test sequences</label>
+      <div class="ctlrow" style="margin-top:6px">
+        <button id="tsFade">Fade</button>
+        <button id="tsStep">Step RGBW</button>
+        <button id="tsOff">Off</button>
+      </div>
+      <div class="mini">The panel's Test menu, remotely: <b>Fade</b> = smooth
+      rainbow sweep, <b>Step RGBW</b> = full-drive R→G→B→White snap steps.
+      Runs on <em>all</em> ports and overrides every source —
+      <b>including live DMX</b> — until switched Off.</div>
+    </div>
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <label style="font-weight:600">Effects</label>
@@ -708,7 +723,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28r.blend";
+const APP_VER="2026-08-28s.tests-scenes";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1404,11 +1419,13 @@ function saveScenes(s){
   catch(e){ const el=$("impStatus");
             if(el) el.textContent="Scene storage full — not saved."; }
 }
+let activeSceneIdx=-1;          // last-recalled scene this session
 function renderScenes(){
   const list=$("sceneList"); list.innerHTML="";
   loadScenes().forEach((sc,i)=>{
     const row=document.createElement("div");
     row.className="scene";
+    if(i===activeSceneIdx) row.classList.add("active");
     const fv=(sc.fade==null)?2:Math.min(60,Math.max(0,+sc.fade||0));   // sanitise
     row.innerHTML=`<b class="scname" title="Tap to rename">${esc(sc.name)}</b>
       <span class="scfade">Fade
@@ -1434,8 +1451,12 @@ function renderScenes(){
       const nm=v.trim(); if(!nm) return;
       const all=loadScenes(); all[i].name=nm; saveScenes(all); renderScenes();
     };
-    btnGo.onclick=()=>{ commitFade(); recallScene(sc); };   // fade already persisted
-    btnDel.onclick=()=>{ const all=loadScenes(); all.splice(i,1); saveScenes(all); renderScenes(); };
+    btnGo.onclick=()=>{ commitFade(); activeSceneIdx=i;
+                        recallScene(sc); renderScenes(); };
+    btnDel.onclick=()=>{ const all=loadScenes(); all.splice(i,1); saveScenes(all);
+      if(activeSceneIdx===i) activeSceneIdx=-1;
+      else if(activeSceneIdx>i) activeSceneIdx--;
+      renderScenes(); };
     list.appendChild(row);
   });
 }
@@ -2223,12 +2244,20 @@ function renderSetup(){
     st.style.fontWeight = cx>=2 ? "600" : "400";
     if(document.activeElement!==$("crmxAnt")) $("crmxAnt").value=kv.CA??"1";
   }
-  // Chain-listen arm state (CHL) — armed reads amber like the panel banner
-  if(kv.CHL!=null && document.activeElement!==$("chArm")){
+  // Chain-listen arm state (CHL) — armed reads amber like the panel banner.
+  // Skip refreshes for 2.5s after the user flips it so an in-flight state
+  // notify can't snap the toggle back before the controller has applied it.
+  if(kv.CHL!=null && Date.now()-chArmPend>2500){
     $("chArm").checked = kv.CHL==="1";
     const st=$("chArmStat");
     st.textContent = kv.CHL==="1" ? "ARMED — waiting for baton" : "off";
     st.style.color = kv.CHL==="1" ? "var(--warn)" : "var(--dim)";
+  }
+  // Test-sequence state — highlight the running sequence's button
+  if(kv.TSEQ!=null){
+    const t=+kv.TSEQ;
+    $("tsFade").className = t===1 ? "primary" : "";
+    $("tsStep").className = t===2 ? "primary" : "";
   }
   const srcName=["off","DMX","sACN","Art-Net"][+(kv.SRC||0)]||"—";
   const netOn=(kv.NET==="1"), wifiUp=(kv.NW==="1");
@@ -2249,7 +2278,18 @@ function renderSetup(){
 }
 $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.value); };
 // ---------- Chain broadcast (factory look index: 0=DMX In, 1=Off, 9=White) ----------
-$("chArm").addEventListener("change",e=>{ send("CHARM="+(e.target.checked?1:0)); });
+let chArmPend=0;
+$("chArm").addEventListener("change",e=>{
+  chArmPend=Date.now();
+  const on=e.target.checked;
+  send("CHARM="+(on?1:0));
+  const st=$("chArmStat");                 // optimistic — firmware confirms
+  st.textContent = on ? "ARMED — waiting for baton" : "off";
+  st.style.color = on ? "var(--warn)" : "var(--dim)";
+});
+$("tsFade").onclick=()=>send("TESTSEQ=1");
+$("tsStep").onclick=()=>send("TESTSEQ=2");
+$("tsOff").onclick =()=>send("TESTSEQ=0");
 $("chBlack").onclick=async()=>{ if(await askConfirm("This unit and every armed unit down the DMX line go dark.",{title:"Blackout the chain?",ok:"Blackout",danger:true})) send("CHLOOK=1"); };
 $("chFull").onclick=async()=>{ if(await askConfirm("This unit and every armed unit down the DMX line go to full.",{title:"Full on across the chain?",ok:"Full on"})) send("CHLOOK=9"); };
 $("chDmx").onclick=()=>send("CHLOOK=0");
@@ -2610,6 +2650,7 @@ function demoState(){
     `FLKON=${demoF.flkon};FLKL=0;`+
     `NET=${demoF.net};NW=${demoF.net};NUN=${demoF.nun};SRC=${demoF.net?1:0};`+
     "NIP=192.168.1.42;NRS=-52;TF=1;PB=0;CX=3;CA=1;"+
+    `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
     `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+
     "CN="+Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join("")+";"+
     demoP.map((d,i)=>P(i+1,d)).join(""));
@@ -2672,6 +2713,8 @@ function demoCmd(s){
   if(m=s.match(/^P(\d)\.(R|G|B)=(\d+)/)){ demoP[+m[1]-1][m[2].toLowerCase()]=+m[3]; return; }
   if(m=s.match(/^ALL\.RGB=(\d+),(\d+),(\d+)/)){ demoP.forEach(d=>{d.r=+m[1];d.g=+m[2];d.b=+m[3];}); return; }
   if(m=s.match(/^P(\d)\.FX=(\d+)/)){ demoP[+m[1]-1].x=+m[2]; demoState(); return; }
+  if(m=s.match(/^TESTSEQ=(\d)/)){ demoF.test=+m[1]; demoState(); return; }
+  if(m=s.match(/^CHARM=(\d)/)){ demoF.chl=+m[1]; demoState(); return; }
   if(s.startsWith("BTNAME=")){ demoF.btn=s.slice(7); demoState(); return; }
   if(m=s.match(/^BPM=(\d+)/)){ demoF.bpm=+m[1]; demoState(); return; }
   if(m=s.match(/^P(\d)\.FXS=(\d+)/)){ demoP[+m[1]-1].s=+m[2]; return; }
