@@ -423,6 +423,16 @@
 
   <div id="tab-setup" class="tab hidden">
     <div class="card">
+      <div class="ctlrow">
+        <button id="btnExport">Export settings</button>
+        <button id="btnImport">Import settings…</button>
+        <input type="file" id="impFile" accept=".jmb,.json,application/json" class="hidden">
+      </div>
+      <div class="mini">Everything: ID, curve, apply mode, all port patch +
+      looks + effects, and this phone's scenes — one shareable file.</div>
+      <div class="mini" id="impStatus"></div>
+    </div>
+    <div class="card">
       <div class="rows">
         <div class="row"><label>Name</label>
           <input type="text" id="setName" maxlength="16" placeholder="name this controller"
@@ -544,16 +554,6 @@
       <div class="mini">Spread offsets each port in time so effects sweep across
       the rig as a wave.</div>
     </div>
-    <div class="card">
-      <div class="ctlrow">
-        <button id="btnExport">Export settings</button>
-        <button id="btnImport">Import settings…</button>
-        <input type="file" id="impFile" accept=".jmb,.json,application/json" class="hidden">
-      </div>
-      <div class="mini">Everything: ID, curve, apply mode, all port patch +
-      looks + effects, and this phone's scenes — one shareable file.</div>
-      <div class="mini" id="impStatus"></div>
-    </div>
     <div class="card" id="otaCard">
       <div class="row" style="justify-content:space-between">
         <label style="font-weight:600">Firmware update</label>
@@ -674,7 +674,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28a.dimmer-man";
+const APP_VER="2026-08-28b.export-top";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
