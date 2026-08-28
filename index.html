@@ -683,7 +683,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28h.addr-guard";
+const APP_VER="2026-08-28i.guard-confirm";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1167,10 +1167,15 @@ function buildCard(p){
       if(!oa || v===oa) continue;              // same start = mirror, allowed
       const of=PERS_FOOT[m.PE||0]||3;
       if(v<oa+of && oa<v+foot){
-        alert(`Address ${v} clashes with Port ${i+1} (${oa}–${oa+of-1}).\n`+
-              `Pick a clear range — or use the SAME start address to mirror that port.`);
-        e.target.value=(ports[p-1]&&ports[p-1].A)||1;   // snap back
-        return;
+        // Confirm rather than hard-block: mid-re-patch you often have to pass
+        // THROUGH an overlapping state (can't move P2 clear until P4 has moved).
+        if(!confirm(`Address ${v} overlaps Port ${i+1} (${oa}–${oa+of-1}).\n`+
+              `Same start = mirroring; partial overlap is usually a patch mistake.\n\n`+
+              `Set it anyway?`)){
+          e.target.value=(ports[p-1]&&ports[p-1].A)||1;   // snap back
+          return;
+        }
+        break;                                            // user overrode — send it
       }
     }
     e.target.value=v; touch("ADDR"); send(`P${p}.ADDR=${v}`);
