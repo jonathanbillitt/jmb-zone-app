@@ -728,7 +728,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28w.setup-guard";
+const APP_VER="2026-08-28x.hot-fields";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2383,6 +2383,15 @@ $("setName").addEventListener("change",e=>{
   setupTouched=Date.now();
   const v=e.target.value.replace(/[^\x20-\x7E]/g,"").trim().slice(0,16);
   e.target.value=v; send("CNAME="+(v?hexEnc(v):"0"));
+});
+// Editing ANY setup field opens the hot window IMMEDIATELY (focus/typing),
+// not just on Apply: tapping Apply blurs the input first, and a state echo
+// landing in that blur->click gap rewrote the value before the handler read
+// it — "DMX hold STILL won't change" (bench 2026-08-28).
+["setCid","setHold","setName","netUni","fxBpm"].forEach(id=>{
+  const el=$(id); if(!el) return;
+  ["focus","input","keydown"].forEach(ev=>
+    el.addEventListener(ev,()=>{ setupTouched=Date.now(); }));
 });
 $("btnCidApply").onclick=()=>{ setupTouched=Date.now();
   send("CID="+Math.max(0,Math.min(9999,+$("setCid").value||0))); };
