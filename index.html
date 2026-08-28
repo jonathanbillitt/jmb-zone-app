@@ -249,6 +249,11 @@
   /* side-mounted jog wheels (dimmer / fx speed) — MQ-console intensity feel:
      a tick texture that scrolls under your thumb, fill rises with the value */
   .wheels { justify-content:space-evenly; align-items:flex-end; }
+  /* LIVE-DMX LOCKOUT: while the desk drives, output controls are inert -
+     patching (label/address/head/mode/advanced) stays live. */
+  .dmxlock .row.r, .dmxlock .row.g, .dmxlock .row.b,
+  .dmxlock .row.wheels, .dmxlock select[id^="x"] {
+    pointer-events:none; opacity:.45; }
   .wheelbox { position:relative; width:74px; height:150px; user-select:none;
               touch-action:none; cursor:ns-resize; border-radius:12px;
               border:1px solid var(--line); overflow:hidden;
@@ -723,7 +728,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28t.demo-link";
+const APP_VER="2026-08-28u.dmx-lock";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1111,11 +1116,15 @@ function renderControl(){
       $("dmxWarnSrc").textContent=src+(kv.FPS?` (${kv.FPS} fps)`:"");
     }
   }
+  const bp=$("btnPrep"); if(bp){ bp.disabled=dmxLive; bp.style.opacity=dmxLive?".45":""; }
   const root=$("ports");
   ports.forEach((m,idx)=>{
     const p=idx+1;
     let card=$("port"+p);
     if(!card){ card=buildCard(p); root.appendChild(card); }
+    // Output controls lock while live DMX outranks manual (the banner says
+    // why); patch fields stay editable - addressing with the desk up is normal.
+    card.classList.toggle("dmxlock", dmxLive);
     const on=m.O===1, flt=(m.F||0)!==0;
     const bOn=$("on"+p);
     bOn.textContent=on?"online":"offline";
