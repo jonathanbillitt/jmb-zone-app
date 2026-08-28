@@ -674,7 +674,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28b.export-top";
+const APP_VER="2026-08-28c.jmbset-names";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2289,7 +2289,11 @@ $("btnExport").onclick=()=>{
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/octet-stream"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
-  a.download="jmb-zone-"+(kv.CID||"0")+"-show.jmb";
+  {
+    const n=+(kv.VAR ?? kv.PORTS ?? 0);
+    const prod=n===1?"one":n===8?"8ight":"4our";
+    a.download="jmbset-"+prod+"-"+new Date().toISOString().slice(0,10)+".jmb";
+  }
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
   $("impStatus").textContent="Exported "+a.download;
