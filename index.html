@@ -728,7 +728,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-28x.hot-fields";
+const APP_VER="2026-08-29a.demo-unlock";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1116,15 +1116,17 @@ function renderControl(){
       $("dmxWarnSrc").textContent=src+(kv.FPS?` (${kv.FPS} fps)`:"");
     }
   }
-  const bp=$("btnPrep"); if(bp){ bp.disabled=dmxLive; bp.style.opacity=dmxLive?".45":""; }
+  const lk=dmxLive && !demoOn;
+  const bp=$("btnPrep"); if(bp){ bp.disabled=lk; bp.style.opacity=lk?".45":""; }
   const root=$("ports");
   ports.forEach((m,idx)=>{
     const p=idx+1;
     let card=$("port"+p);
     if(!card){ card=buildCard(p); root.appendChild(card); }
     // Output controls lock while live DMX outranks manual (the banner says
-    // why); patch fields stay editable - addressing with the desk up is normal.
-    card.classList.toggle("dmxlock", dmxLive);
+    // why); patch fields stay editable - addressing with the desk up is
+    // normal. DEMO mode never locks: it exists to let people play.
+    card.classList.toggle("dmxlock", dmxLive && !demoOn);
     const on=m.O===1, flt=(m.F||0)!==0;
     const bOn=$("on"+p);
     bOn.textContent=on?"online":"offline";
