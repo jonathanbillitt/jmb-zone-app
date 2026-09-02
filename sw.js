@@ -1,4 +1,4 @@
-// JMB Zone companion — service worker.
+// JMB Lighting companion — service worker.
 // Makes the installed PWA work offline: once you've opened it online, it runs
 // with no signal (handy at a venue). Strategy is NETWORK-FIRST so an online
 // launch always gets the freshest build, falling back to the cached copy only
