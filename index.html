@@ -633,6 +633,19 @@
       <div class="row" style="margin-top:8px"><label>Hardware</label>
         <span id="varLine" class="mini" style="margin:0;flex:1"></span>
       </div>
+      <div class="row"><label>Model</label>
+        <select id="setVariant" style="width:150px">
+          <option value="">auto-detect</option>
+          <option value="1">JMB one (1 port)</option>
+          <option value="4">JMB 4our (4 ports)</option>
+          <option value="8">JMB 8ight (8 ports)</option>
+        </select>
+        <button id="btnVariant">Set</button>
+      </div>
+      <div class="mini">Controllers detect their port count on the bus, but
+      detection only ever counts <em>up</em> — a unit that boots believing it is
+      bigger than it is (or a screenless <b>JMB one</b>, which has no panel to
+      set it from) needs pinning here once. The controller restarts.</div>
       <div class="row"><label>BT name</label>
         <input type="text" id="setBtName" maxlength="24" style="flex:1"
                placeholder="JMB one" autocomplete="off">
@@ -728,7 +741,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-08-29a.demo-unlock";
+const APP_VER="2026-09-02a.variant";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2284,13 +2297,24 @@ function renderSetup(){
     const n=kv.VAR??kv.PORTS;
     $("varLine").textContent = n
       ? `${n}-port controller — detected automatically`+
-        (kv.VARM==="1"?" (pinned on the bench)":"")
+        (kv.VARM==="1"?" (pinned)":"")
       : "—";
+    if(document.activeElement!==$("setVariant"))
+      $("setVariant").value = (kv.VARM==="1" && n) ? String(n) : "";
   }
   if(document.activeElement!==$("setBtName"))
     $("setBtName").value=hexDec(kv.BTN)||"";
 }
 $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.value); };
+$("btnVariant").onclick=async()=>{
+  const v=$("setVariant").value;
+  if(!v){ tellUser("Pick a model first, then tap Set.",{title:"Model"}); return; }
+  const names={1:"JMB one",4:"JMB 4our",8:"JMB 8ight"};
+  if(!await askConfirm(`This controller will be set to ${names[v]} and restart.`,
+                       {title:"Set model?",ok:"Set and restart"})) return;
+  setupTouched=Date.now();
+  send("VARIANT="+v);
+};
 // ---------- Chain broadcast (factory look index: 0=DMX In, 1=Off, 9=White) ----------
 let chArmPend=0;
 $("chArm").addEventListener("change",e=>{
