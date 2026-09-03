@@ -5,10 +5,10 @@
     ],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.jmbzone.control",
+      "package_name": "uk.co.jmblighting.app",
       "sha256_cert_fingerprints": [
         "44:D4:21:53:50:F3:FC:14:72:4E:E6:B7:17:3A:C5:35:B7:45:A3:0B:C2:99:50:D8:CA:4C:64:94:28:7B:5D:27",
-        "1E:6F:E5:22:0B:12:B3:AD:92:B3:3F:96:B1:1E:DE:7F:1E:AB:61:F4:CD:6B:A2:29:F7:81:96:6E:C2:8F:31:42"
+        "2A:C8:73:8F:D0:B8:28:D9:C1:33:31:8C:7F:B4:CE:B9:78:76:11:34:26:3C:57:1E:4F:BF:0A:6D:C8:4E:76:39"
       ]
     }
   }
