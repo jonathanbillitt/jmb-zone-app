@@ -485,6 +485,7 @@
         <label style="font-weight:600">CRMX Wireless</label>
         <span class="mini" id="crmxStatus" style="margin:0">&#8212;</span>
       </div>
+      <div class="row"><span class="mini" id="crmxRaw" style="margin:0;flex:1"></span></div>
       <div class="ctlrow" style="margin-top:6px">
         <button id="crmxLink" class="primary">Link</button>
         <button id="crmxUnlink" class="danger">Unlink</button>
@@ -741,7 +742,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-02a.variant";
+const APP_VER="2026-09-03a.crmx-diag";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2266,6 +2267,20 @@ function renderSetup(){
     const cx=+kv.CX, st=$("crmxStatus");
     st.textContent=["not linked","linking…",
       "linked — no data","linked · "+(kv.FPS??"?")+"Hz"][cx]||"—";
+    // Raw TiMo status lines — shows whether the module is talking to the
+    // controller AT ALL, not just the firmware's interpretation. The status
+    // inputs have no pull-ups, so an absent or badly-soldered module reads
+    // all-zero instead of masquerading as "linked".
+    const dbg=$("crmxRaw");
+    if(dbg){
+      if(kv.CXR==null) dbg.textContent="";
+      else{
+        const l=kv.CXL==="1", s2=kv.CXS==="1", rf=kv.CXF==="1";
+        dbg.textContent=`module lines — linked ${l?1:0} · status ${s2?1:0} · rf ${rf?1:0}`
+          + (!l&&!s2&&!rf ? "   (no module detected)" : "");
+        dbg.style.color=(!l&&!s2&&!rf)?"var(--warn)":"var(--dim)";
+      }
+    }
     // Linked (2 = paired, 3 = paired + data) reads green; linking amber; off dim.
     st.style.color = cx>=2 ? "var(--ok)" : cx===1 ? "var(--warn)" : "var(--dim)";
     st.style.fontWeight = cx>=2 ? "600" : "400";
