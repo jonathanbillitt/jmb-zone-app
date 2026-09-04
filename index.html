@@ -315,6 +315,10 @@
   <h1 id="title">JMB Lighting</h1>
   <button id="btnConnect" class="primary">Connect</button>
 </header>
+<div class="mini" id="appVerBar" style="text-align:right;margin:-6px 2px 8px 0">
+  <span id="appVerTxt"></span>
+  <a href="#" id="appRefresh" style="margin-left:8px">refresh app</a>
+</div>
 
 <div id="chips" class="hidden">
   <span class="chip" id="chipDmx">DMX <b>—</b></span>
@@ -796,7 +800,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04l.tab-state-crc-yield";
+const APP_VER="2026-09-04m.drop-diagnostics";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -927,6 +931,7 @@ async function connect(){
   }
 }
 async function onDisconnected(){
+  otaNoteDrop();                            // capture WHERE an update died
   if(busy){ cmdChar=null; return; }         // a connect/reconnect owns the link
   busy=true;
   authed=false; cmdChar=null;
@@ -2773,6 +2778,12 @@ let otaSelFile=null, otaBusy=false, otaAbort=false, otaWaiter=null, otaProbation
 // button instead of hunting for a .bin. Served from our own origin, so no CORS
 // and the service worker keeps a copy for a retry with no signal.
 let otaManifest=null, otaManifestTried=0, otaManifestErr="";
+let otaPhase="";                       // what the update is doing right now
+function otaSetPhase(p){ otaPhase=p; }
+function otaNoteDrop(){
+  if(!otaPhase) return;
+  try{ localStorage.setItem("jmbOtaDrop", otaPhase); }catch(_){}
+}
 async function loadOtaManifest(){
   otaManifestTried=Date.now();
   try{
@@ -2952,6 +2963,7 @@ async function fetchVerified(info, fallbackName){
 // Stage an STM image over BLE and program it. No confirm, no otaBusy — the
 // caller owns both, so this composes into the combined update.
 async function stmStageAndFlash(buf, crc){
+  otaSetPhase("sending the port module image");
   setStmState("sending…");
   const size=buf.byteLength;
   if(crc===undefined) crc=await crc32Async(buf);
@@ -2968,6 +2980,7 @@ async function stmStageAndFlash(buf, crc){
   await otacChar.writeValueWithResponse(otaEnc("STM END"));
   r=await waitOta(m=>m==="STORED"||m.startsWith("ERR"),15000);
   if(r.startsWith("ERR")) throw new Error("controller "+r);
+  otaSetPhase("programming the port module");
   setStmState("programming…");
   setStmMsg("Programming the port module — outputs are dark. Do not power off.");
   await otacChar.writeValueWithResponse(otaEnc("STM FLASH PORT"));
@@ -3046,6 +3059,7 @@ $("btnStmRb").onclick=async()=>{
 // of darkness and removes any doubt about what is actually on the hardware.
 async function runFullUpdate(){
   if(!otaManifest||!otacChar||!otadChar) return;
+  otaSetPhase("");                      // fresh run — no stale phase to report
   const stmInfo = ((stmCaps()&1) && otaManifest.stm_port) ? otaManifest.stm_port : null;
   const both = !!stmInfo;
   if(!await askConfirm(
@@ -3060,6 +3074,7 @@ async function runFullUpdate(){
   if(stmInfo){
     otaBusy=true; otaAbort=false; renderOta();
     try{
+      otaSetPhase("downloading the port module image");
       setStmState("downloading…");
       const sv=await fetchVerified(stmInfo,"stm_port.bin");
       await stmStageAndFlash(sv.buf, sv.crc);
@@ -3077,6 +3092,7 @@ async function runFullUpdate(){
     otaBusy=false; renderOta();
   }
 
+  otaSetPhase("downloading the controller image");
   setOtaState("downloading…");
   let v;
   try{ v=await fetchVerified(otaManifest,"firmware.bin"); }
@@ -3108,6 +3124,7 @@ async function runOta(file, opts){
   $("btnOtaCancel").classList.remove("hidden");
   setOtaState("starting…"); otaProgress(0);
   try{
+    otaSetPhase("opening the controller update session");
     await otacChar.writeValueWithResponse(otaEnc(`BEGIN ${size} ${crc.toString(16)}`));
     let r=await waitOta(m=>m==="READY"||m.startsWith("ERR"),8000);
     if(r.startsWith("ERR")) throw new Error("controller "+r);
@@ -3115,13 +3132,16 @@ async function runOta(file, opts){
     for(let off=0; off<size; off+=CH){
       if(otaAbort) throw new Error("cancelled");
       await otadChar.writeValueWithResponse(u.subarray(off,Math.min(off+CH,size)));
-      if((off & 0x1FFF)<CH) otaProgress(off/size);
+      if((off & 0x1FFF)<CH){
+        otaProgress(off/size);
+        otaSetPhase("uploading the controller image at "+Math.round(100*off/size)+"%");
+      }
     }
     otaProgress(1);
     await otacChar.writeValueWithResponse(otaEnc("END"));
     r=await waitOta(m=>m==="DONE"||m.startsWith("ERR"),20000);
     if(r.startsWith("ERR")) throw new Error("controller "+r);
-    setOtaState("done"); otaSelFile=null;
+    otaSetPhase(""); setOtaState("done"); otaSelFile=null;
     setOtaMsg("✓ Update sent — the controller is rebooting into the new firmware. "
       +"If the new build fails to start, it automatically reverts to the previous "
       +"version. Reconnect in a few seconds.");
@@ -3319,6 +3339,39 @@ if(!bleAvailable()){
 // renderOta falls back to "no hosted firmware" and the manual picker still works.
 loadOtaManifest();
 renderWiring();   // show the "run Step RGBW" hint before anything connects
+
+// The installed app is a cache-first PWA, so "am I even running the new build?"
+// is a real question with no obvious answer. Show it before connecting, and
+// give a way to force past a service worker that is serving an old shell.
+$("appVerTxt").textContent = "app " + APP_VER;
+$("appRefresh").onclick = async (e) => {
+  e.preventDefault();
+  $("appVerTxt").textContent = "refreshing…";
+  try{
+    if(navigator.serviceWorker){
+      const rs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(rs.map(r=>r.unregister()));
+    }
+    if(window.caches){
+      const ks = await caches.keys();
+      await Promise.all(ks.map(k=>caches.delete(k)));
+    }
+  }catch(_){}
+  location.reload(true);
+};
+
+// If an update run dies, the single most useful fact is WHERE it died. Record
+// the phase as it advances and stash it across the reload/reconnect, so the
+// next launch can say "the link dropped while uploading at 38%" instead of
+// leaving it to be guessed at.
+try{
+  const last = localStorage.getItem("jmbOtaDrop");
+  if(last){
+    localStorage.removeItem("jmbOtaDrop");
+    setOtaMsg("Last update attempt ended unexpectedly — " + last
+      + ". Nothing was committed; the controller kept the firmware it had.");
+  }
+}catch(_){}
 </script>
 </body>
 </html>

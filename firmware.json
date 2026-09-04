@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "55d48be-20260904",
+  "build": "deb3a03-20260904",
   "size": 1189648,
   "crc32": "88a44fe1",
   "sha256": "0cee5586dc17d88b8cddb7e360e3af8be1fe7d77e7986b1152426b98129c6f15",
   "date": "2026-09-04",
-  "notes": "Fix a link-dropping filesystem mount on the BLE path, a multi-second UI freeze, and the tab state after a reconnect",
+  "notes": "App version visible before connecting, a way past a stale cached shell, and capture WHERE an update dies",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
