@@ -807,7 +807,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04q.stm-ram-stage";
+const APP_VER="2026-09-04r.port-fail-continue";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -3093,14 +3093,20 @@ async function runFullUpdate(ctrlOnly){
     }catch(e){
       try{ await otacChar.writeValueWithResponse(otaEnc("STM ABORT")); }catch(_){}
       setStmState("failed");
-      setStmMsg("Port update failed: "+((e&&e.message)||e)+". The port keeps the "
-        +"firmware it had and the controller was NOT touched, so nothing has "
-        +"changed. It can be retried over Bluetooth — no cable needed.");
+      setStmMsg("The port module could not be updated: "+((e&&e.message)||e)
+        +". It keeps the firmware it had — nothing was committed.");
       otaBusy=false; renderOta();
-      // Surface the escape hatch now that it is relevant: a controller whose
-      // firmware cannot survive the port step can still update itself.
       const only=$("otaOnlyRow"); if(only) only.classList.remove("hidden");
-      return;                       // stop before the controller
+      // A port step can fail BECAUSE the controller's own firmware is too old to
+      // carry it — which is the one case where continuing is the fix rather than
+      // a risk. The port was left untouched, so the controller update is safe to
+      // run; ask rather than assume, then carry straight on.
+      if(!await askConfirm("The port module could not be updated, and nothing on "
+        +"it was changed. This is often fixed by updating the controller first. "
+        +"Update the controller now and try the port module again afterwards?",
+        {title:"Continue with the controller?",ok:"Update controller"})){
+        return;
+      }
     }
     otaBusy=false; renderOta();
   }

@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "b863030-20260904",
+  "build": "94ec5b1-20260904",
   "size": 1189920,
-  "crc32": "086f1ea3",
-  "sha256": "e97fa32cf9ffc6f7cba948be3e0bccc76c4ceb865ea03dabdfa4103f56208d67",
+  "crc32": "ef136547",
+  "sha256": "065a8ae460433dadea8442b86559ae52bfefb6268dfc9d1f3431dd6c3f3ed936",
   "date": "2026-09-04",
-  "notes": "STM staging buffered in RAM: filesystem writes were failing the transfer from the BLE callback",
+  "notes": "When the port step fails, offer to carry on with the controller",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
