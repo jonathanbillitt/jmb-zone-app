@@ -684,7 +684,6 @@
     </div>
     <div class="card">
       <div class="ctlrow">
-        <button id="btnRefresh">Refresh</button>
         <button id="btnPin">Change PIN…</button>
         <button id="btnDisc" class="danger">Disconnect</button>
       </div>
@@ -814,7 +813,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04x.update-when-needed";
+const APP_VER="2026-09-04z.drop-refresh";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -3273,7 +3272,6 @@ async function runOta(file, opts){
   }
 }
 
-$("btnRefresh").onclick=()=>send("GET");
 $("btnDisc").onclick=()=>{ if(NBLE()){ NBLE().disconnect(); onDisconnected(); return; }
   const d0=dev; dev=null; if(d0&&d0.gatt.connected) d0.gatt.disconnect(); };
 $("btnPin").onclick=async()=>{
@@ -3468,19 +3466,29 @@ $("appVerTxt").textContent = APP_VER;
 // what actually replaces a cached shell.
 (async () => {
   try{
-    if(!navigator.serviceWorker) return;
-    const r = await navigator.serviceWorker.getRegistration();
-    if(!r) return;
-    await r.update();
-    if(r.waiting){
-      $("appUpdMsg").textContent = "A new version of the app is ready — "
-        + "press Look for app update to load it.";
+    const live = await publishedAppVersion();
+    if(live && live !== APP_VER){
+      $("appUpdMsg").textContent = "Version " + live + " is available — press "
+        + "Look for app update to install it.";
     }
-  }catch(_){}
+  }catch(_){}      // offline at launch is normal; say nothing
 })();
-$("appRefresh").onclick = async (e) => {
-  e.preventDefault();
-  $("appVerTxt").textContent = "updating…";
+// Ask the SERVER what version it publishes, rather than inferring anything from
+// the service worker's own idea of freshness. Returns null if it cannot be
+// reached — which is a different answer from "you are up to date".
+async function publishedAppVersion(){
+  // The CURRENT document, not a hardcoded "index.html" — the app is served as
+  // index.html live but under its own filename elsewhere, and a hardcoded name
+  // just 404s and reports "couldn't check" when everything is fine.
+  const r = await fetch(location.pathname, {cache:"no-store"});
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const m = (await r.text()).match(/APP_VER="([^"]*)"/);
+  return m ? m[1] : null;
+}
+
+// Apply an update: drop the worker and every cache, then reload. Destructive to
+// the session, so it only ever runs with consent.
+async function applyAppUpdate(){
   try{
     if(navigator.serviceWorker){
       const rs = await navigator.serviceWorker.getRegistrations();
@@ -3492,6 +3500,36 @@ $("appRefresh").onclick = async (e) => {
     }
   }catch(_){}
   location.reload(true);
+}
+
+// CHECK, then report. This used to clear everything and reload unconditionally,
+// which is a strange thing for a button called "Look for app update" to do —
+// and reloading drops the Bluetooth link, so it cost you the connection whether
+// or not there was anything to install.
+$("appRefresh").onclick = async (e) => {
+  e.preventDefault();
+  const btn=$("appRefresh");
+  btn.disabled=true;
+  $("appUpdMsg").textContent="Checking…";
+  try{
+    const live = await publishedAppVersion();
+    if(!live){
+      $("appUpdMsg").textContent="Couldn't read the published version.";
+    }else if(live === APP_VER){
+      $("appUpdMsg").textContent="You're on the latest version ("+APP_VER+").";
+    }else{
+      $("appUpdMsg").textContent="Version "+live+" is available.";
+      if(await askConfirm("Version "+live+" is available. Applying it reloads "
+        +"the app, which disconnects the controller — nothing on the controller "
+        +"is affected.",{title:"Update the app?",ok:"Update"})){
+        await applyAppUpdate();
+      }
+    }
+  }catch(err){
+    $("appUpdMsg").textContent = (navigator.onLine===false)
+      ? "This device is offline, so the published version can't be checked."
+      : "Couldn't check for an update ("+((err&&err.message)||err)+").";
+  }finally{ btn.disabled=false; }
 };
 
 // If an update run dies, the single most useful fact is WHERE it died. Record
