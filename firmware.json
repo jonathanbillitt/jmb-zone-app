@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "caec814+-20260904",
+  "build": "b9425f6-20260904",
   "size": 1189648,
-  "crc32": "aa2da480",
-  "sha256": "0d4ff7df38f80490b40490db56783b7344edf1d3f50e76233f51249b5bf10157",
+  "crc32": "21c3f646",
+  "sha256": "171612ddd58771621ec73dd759b1beafab3ffde9a46c4893d85b183e4c1d2f97",
   "date": "2026-09-04",
-  "notes": "Uncommitted bench build (based on: Deploy tooling: stage hosted firmware, sw-cache pre-flight, and a verifier that can actual)",
+  "notes": "Docs: .3 pre-fab checklist, and manuals rebuilt for everything added today",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
