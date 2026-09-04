@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "87b40ce-20260904",
-  "size": 1190272,
-  "crc32": "54c24232",
-  "sha256": "442074b89681529e11de7ad1659f8c193f60da3f77d7e7d122c7a13db3612fc2",
+  "build": "511b21c-20260904",
+  "size": 1190304,
+  "crc32": "39adcb9c",
+  "sha256": "b38f63a9fe6a3f57ec93a5ee0fe642c7a4810e054d591911307faeafd93145e6",
   "date": "2026-09-04",
-  "notes": "Port PWM: precompute the dead-zone threshold \u2014 a per-period ISR division was starving the bus and firing the 1 Hz comms failsafe",
+  "notes": "Dimmer: square-law (perceptual) response, like a tungsten lamp",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
