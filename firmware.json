@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "94ec5b1-20260904",
-  "size": 1189920,
-  "crc32": "ef136547",
-  "sha256": "065a8ae460433dadea8442b86559ae52bfefb6268dfc9d1f3431dd6c3f3ed936",
+  "build": "77ef23e-20260904",
+  "size": 1189952,
+  "crc32": "c17c3fb3",
+  "sha256": "1dfdc2b2441eca84693beeb7520e41ff03e5d6abf98b1f6140ad1438639606f5",
   "date": "2026-09-04",
-  "notes": "When the port step fails, offer to carry on with the controller",
+  "notes": "Report controller uptime so a dropped link can be told apart from a controller reboot",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",

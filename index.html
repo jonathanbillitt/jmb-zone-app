@@ -807,7 +807,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04r.port-fail-continue";
+const APP_VER="2026-09-04s.uptime-reboot-detect";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2422,8 +2422,24 @@ function renderSetup(){
   $("netStatus").textContent = !netOn ? "off"
       : wifiUp ? `Wi-Fi ${kv.NIP||""} · ${kv.NRS||"?"}dBm · live: ${srcName}`
       : "connecting…";
+  // UPTIME. When a link drops, "did the controller restart or did the phone lose
+  // the link?" are two entirely different faults, and until now nothing in the
+  // app could tell them apart — so several rounds of debugging were spent
+  // guessing. A uptime that goes BACKWARDS is proof the controller rebooted.
+  if(kv.UP!=null){
+    const up=+kv.UP;
+    let prev=lastUp;
+    if(prev==null){ try{ const v=localStorage.getItem("jmbLastUp"); if(v!=null) prev=+v; }catch(_){} }
+    if(prev!=null && up < prev){
+      setOtaMsg("⚠ The controller RESTARTED — its uptime went from "+prev+"s to "
+        +up+"s. The link did not simply drop; the controller itself rebooted.");
+    }
+    lastUp=up;
+    try{ localStorage.setItem("jmbLastUp", String(up)); }catch(_){}
+  }
   $("fwLine").textContent="Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+
-    " ports · "+(kv.HRS??0)+" h powered · app "+APP_VER;
+    " ports · "+(kv.HRS??0)+" h powered"+
+    (kv.UP!=null ? " · up "+(+kv.UP)+"s" : "");
   {
     const n=kv.VAR??kv.PORTS;
     $("varLine").textContent = n
@@ -2784,6 +2800,7 @@ let otaSelFile=null, otaBusy=false, otaAbort=false, otaWaiter=null, otaProbation
 // HOSTED FIRMWARE — the image is published next to this app, so updating is one
 // button instead of hunting for a .bin. Served from our own origin, so no CORS
 // and the service worker keeps a copy for a retry with no signal.
+let lastUp=null;                       // controller uptime, for reboot detection
 let otaManifest=null, otaManifestTried=0, otaManifestErr="";
 let otaPhase="";                       // what the update is doing right now
 function otaSetPhase(p){ otaPhase=p; }
@@ -3064,7 +3081,9 @@ async function runStmRollback(){
 // of darkness and removes any doubt about what is actually on the hardware.
 async function runFullUpdate(ctrlOnly){
   if(!otaManifest||!otacChar||!otadChar) return;
-  otaSetPhase("");                      // fresh run — no stale phase to report
+  // Not cleared to "" — the link has been dropping AT the confirm prompt, and an
+  // empty phase means the disconnect handler stashes nothing.
+  otaSetPhase("waiting for you to confirm the update");
   // Controller-only exists for a specific trap: a controller running firmware
   // whose STM FLASH blocks the BLE callback drops the link before the fixed
   // firmware can be installed. The combined run would die at the port step
