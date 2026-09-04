@@ -338,7 +338,11 @@ the wire. Each tool answers a specific question:</p>
 <h3>Setup — controller and housekeeping</h3>
 <p>Controller <strong>ID</strong> and <strong>Bluetooth name</strong> (what the pairing list shows), <strong>apply
 mode</strong> (how a change made to "All" fans out across the ports), <strong>CRMX wireless</strong>
-(link / unlink / antenna select — the status reads <strong>green when linked</strong>),
+(link / unlink / antenna select). The status distinguishes three things, because
+a CRMX pairing survives the transmitter being switched off: <strong>linked — no RF</strong>
+(amber) means paired but nothing is on air — transmitter off or out of range;
+<strong>linked — no data</strong> means the transmitter is present but isn't sending DMX; and
+<strong>linked · N Hz</strong> is a live stream,
 <strong>Firmware update over Bluetooth</strong> (§2a), <strong>Flash to find</strong> (identifies this
 controller for 5 s so you can pick it out of a rack: units with a front panel
 strobe their screen and leave the rig untouched; the screenless <strong>JMB one</strong>
@@ -368,6 +372,14 @@ and blue — so the check only speaks up for unambiguous cases: an output drawin
 nothing, an output drawing markedly more than its siblings, or the two together,
 which means two colours are sharing a terminal (see §7). The figures stay on
 screen after you stop the test.</p>
+<p>The comparison is <strong>relative</strong>, channel against channel, so it works on a 10 cm
+off-cut as readily as a 10 m run, and the load does not have to be tape. Two
+consequences worth knowing: a reading of only a few milliamps is reported as
+<em>no measurable current</em> rather than "nothing connected" — the controller cannot
+tell a disconnected output from a very small load — and a port is only ever
+<strong>inhibited</strong> when there is enough current for the comparison to be beyond
+doubt. On a small bench load a crossed pair is reported but the port stays
+live.</p>
 <p><strong>Effects on tuneable-white ports.</strong> On a CW/WW personality the effect list only
 offers the effects that read on a white strip (Candle, Fire, Lightning, TV Sim,
 Strobe, Pulse, Fluoro, Paparazzi, Explosion); the colour-only effects are hidden

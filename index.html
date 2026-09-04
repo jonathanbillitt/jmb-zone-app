@@ -535,8 +535,10 @@
         </select>
       </div>
       <div class="mini">Link pairs with a CRMX transmitter that's in linking
-      mode; Unlink forgets it. Status is data-truth: "linked &#8212; no data"
-      means paired but the transmitter isn't sending.</div>
+      mode; Unlink forgets it. Status is data-truth: <b>linked &#8212; no RF</b>
+      means paired but nothing is on air (transmitter off or out of range);
+      <b>linked &#8212; no data</b> means the transmitter is there but isn't
+      sending DMX.</div>
     </div>
     <!-- Network DMX (sACN/Art-Net over Wi-Fi) PARKED 2026-08-20 — hidden; the
          controller no longer starts WiFi. Elements kept so existing JS is inert
@@ -794,7 +796,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04h.manifest-retry";
+const APP_VER="2026-09-04j.rdm-identify-latch";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2220,17 +2222,23 @@ function onRdm(str){
              sn:+f.SN||0, model:hexDec(f.MD), label:hexDec(f.LB),
              mfr:hexDec(f.MF)};
     if(!rdmDevs[d.uid]) rdmOrder.push(d.uid);
+    else d.ident=rdmDevs[d.uid].ident;   // a re-discovery must not drop the flag
     rdmDevs[d.uid]=d;
   }else if(tag==="SN"){
     const u=f.U; (rdmSens[u]=rdmSens[u]||{})[+f.I]={v:+f.V,l:+f.L,h:+f.H};
   }else if(tag==="OK"||tag==="NK"){
     rdmPhaseTxt=(tag==="OK"?"✓ ":"✗ ")+(parts[2]||"").toLowerCase()+
       (tag==="NK"?" failed":"");
-    if(tag==="OK"&&rdmPend&&rdmDevs[rdmPend.uid]){
+    if(rdmPend&&rdmDevs[rdmPend.uid]){
       const d=rdmDevs[rdmPend.uid];
-      if(rdmPend.op==="ADDR") d.addr=rdmPend.val;
-      if(rdmPend.op==="PERS") d.pe=rdmPend.val;
-      if(rdmPend.op==="LABEL") d.label=rdmPend.txt;
+      if(tag==="OK"){
+        if(rdmPend.op==="ADDR")  d.addr=rdmPend.val;
+        if(rdmPend.op==="PERS")  d.pe=rdmPend.val;
+        if(rdmPend.op==="LABEL") d.label=rdmPend.txt;
+        if(rdmPend.op==="IDENT") d.ident=!!rdmPend.val;
+      }else if(rdmPend.op==="IDENT"){
+        d.ident=!rdmPend.val;      // refused — show what the fixture is doing
+      }
     }
     rdmPend=null;
   }else if(tag==="ERR"){
@@ -2268,7 +2276,7 @@ function renderRdm(){
         · ${d.fp}ch · pers ${d.pe}/${d.pt}${d.sn?` · ${d.sn} sensors`:""}</div>
       ${open?`<div class="devedit rows">
         <div class="row"><label>Identify</label>
-          <label class="toggle"><input type="checkbox" data-act="ident">
+          <label class="toggle"><input type="checkbox" data-act="ident"${d.ident?" checked":""}>
             <span></span></label></div>
         <div class="row"><label>Address</label>
           <input type="number" min="1" max="512" value="${d.addr}" data-f="addr">
@@ -2294,7 +2302,14 @@ function renderRdm(){
     if(el.dataset.act==="open"&&el.classList.contains("dh"))
       el.onclick=()=>{ rdmOpenUid=rdmOpenUid===uid?null:uid; renderRdm(); };
     else if(el.dataset.act==="ident")
-      el.onchange=()=>send(`RDM.${uid}.IDENT=${el.checked?1:0}`);
+      el.onchange=()=>{
+        // Optimistic: reflect it immediately so the switch does not spring back
+        // while the round-trip completes. A NAK below puts it back.
+        const on=el.checked;
+        if(rdmDevs[uid]) rdmDevs[uid].ident=on;
+        rdmPend={uid,op:"IDENT",val:on?1:0};
+        send(`RDM.${uid}.IDENT=${on?1:0}`);
+      };
     else el.onclick=()=>{
       const g=f=>card.querySelector(`[data-f="${f}"]`);
       if(el.dataset.act==="addr"){ rdmPend={uid,op:"ADDR",val:+g("addr").value||1};
@@ -2327,11 +2342,19 @@ function renderSetup(){
   if(document.activeElement!==$("fxBpm")) $("fxBpm").value=kv.BPM??"128";
   if(document.activeElement!==$("fxSpread")){ $("fxSpread").value=kv.SPR??"0";
     $("fxSpreadV").textContent=(kv.SPR??"0")+"%"; }
-  // CRMX: CX 0=not linked 1=linking 2=linked/no data 3=linked+data
+  // CRMX: CX 0=not linked 1=linking 2=linked/no data 3=linked+data.
+  // CX collapses "linked" without consulting rf_ok, but a CRMX pairing SURVIVES
+  // the transmitter being switched off — so state 2 covers two very different
+  // situations. Split them on CXF (the module's own RF line, which the app
+  // already receives): no carrier at all is a different problem from a
+  // transmitter that is powered but idle, and sending someone to check their
+  // desk output when the transmitter is off wastes their time.
   if(kv.CX!=null){
     const cx=+kv.CX, st=$("crmxStatus");
+    const rfOk = kv.CXF==="1";
     st.textContent=["not linked","linking…",
-      "linked — no data","linked · "+(kv.FPS??"?")+"Hz"][cx]||"—";
+      (rfOk ? "linked — no data" : "linked — no RF"),
+      "linked · "+(kv.FPS??"?")+"Hz"][cx]||"—";
     // Raw TiMo status lines — shows whether the module is talking to the
     // controller AT ALL, not just the firmware's interpretation. The status
     // inputs have no pull-ups, so an absent or badly-soldered module reads
@@ -2347,7 +2370,9 @@ function renderSetup(){
       }
     }
     // Linked (2 = paired, 3 = paired + data) reads green; linking amber; off dim.
-    st.style.color = cx>=2 ? "var(--ok)" : cx===1 ? "var(--warn)" : "var(--dim)";
+    st.style.color = cx===3 ? "var(--ok)"
+                   : cx===2 ? (rfOk ? "var(--ok)" : "var(--warn)")
+                   : cx===1 ? "var(--warn)" : "var(--dim)";
     st.style.fontWeight = cx>=2 ? "600" : "400";
     if(document.activeElement!==$("crmxAnt")) $("crmxAnt").value=kv.CA??"1";
   }
@@ -2414,7 +2439,7 @@ $("chArm").addEventListener("change",e=>{
 // a CCT fixture genuinely has an unused output, so this never asserts a fault.
 const WC_VERDICT=[
   "✓ consistent",
-  "no load — nothing connected, or the 24V rail is off",
+  "no measurable current — nothing connected, a very small load, or the rail is off",
   "⚠ check wiring — one output has no load while another draws about "
     +"double. Two colours may be sharing one terminal.",
   "⚠ one output has no load — open circuit, or that colour is fed from "
@@ -2445,7 +2470,8 @@ function renderWiring(){
   }
   const body = rows.length ? rows.join("\n\n")
     : "Wiring check: run Step RGBW for one full cycle (4 seconds) and each "
-      +"output's current is measured and compared here.";
+      +"output's current is measured and compared here. The comparison is "
+      +"relative, so it works on a short off-cut as well as a full run.";
   el.textContent = faults.length ? faults.join("\n\n")+"\n\n"+body : body;
   el.style.color = faults.length ? "var(--bad)" : "";
   const row=$("wireFaultRow");
