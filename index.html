@@ -474,6 +474,8 @@
       rainbow sweep, <b>Step RGBW</b> = full-drive R→G→B→White snap steps.
       Runs on <em>all</em> ports and overrides every source —
       <b>including live DMX</b> — until switched Off.</div>
+      <div class="mini" id="wireChk" style="margin-top:10px;white-space:pre-line;
+           border-top:1px solid var(--line);padding-top:10px"></div>
     </div>
     <div class="card">
       <div class="ctlrow">
@@ -784,7 +786,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04d.crmx-source-label";
+const APP_VER="2026-09-04e.wiring-check";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2349,6 +2351,7 @@ function renderSetup(){
     st.textContent = kv.CHL==="1" ? "ARMED — waiting for baton" : "off";
     st.style.color = kv.CHL==="1" ? "var(--warn)" : "var(--dim)";
   }
+  renderWiring();
   // Test-sequence state — highlight the running sequence's button
   if(kv.TSEQ!=null){
     const t=+kv.TSEQ;
@@ -2394,6 +2397,34 @@ $("chArm").addEventListener("change",e=>{
   st.textContent = on ? "ARMED — waiting for baton" : "off";
   st.style.color = on ? "var(--warn)" : "var(--dim)";
 });
+// WIRING CHECK — measured during Step RGBW, which drives one channel at a time.
+// The port's current sense is a total, so each step's reading IS that channel's
+// current; comparing the three finds mistakes the protection cannot see (two
+// colours on one terminal draws a perfectly normal port total). Advisory only —
+// a CCT fixture genuinely has an unused output, so this never asserts a fault.
+const WC_VERDICT=[
+  "✓ consistent",
+  "no load — nothing connected, or the 24V rail is off",
+  "⚠ check wiring — one output has no load while another draws about "
+    +"double. Two colours may be sharing one terminal.",
+  "⚠ one output has no load — open circuit, or that colour is fed from "
+    +"another terminal",
+  "⚠ one output draws markedly more than the others"];
+function renderWiring(){
+  const el=$("wireChk"); if(!el) return;
+  const A=x=>(x/1000).toFixed(2)+"A";
+  const rows=[];
+  for(let p=1;p<=8;p++){
+    const v=kv["WC"+p]; if(!v) continue;
+    const n=v.split(",").map(Number);
+    if(n.length<5||n.some(isNaN)) continue;
+    rows.push(`Port ${p}:  R ${A(n[0])} · G ${A(n[1])} · B ${A(n[2])} · W ${A(n[3])}`
+      +`\n   ${WC_VERDICT[n[4]]||""}`);
+  }
+  el.textContent = rows.length ? rows.join("\n\n")
+    : "Wiring check: run Step RGBW for one full cycle (4 seconds) and each "
+      +"output's current is measured and compared here.";
+}
 $("btnTestStop").onclick=()=>send("TESTSEQ=0");   // banner's own way out
 $("tsFade").onclick=()=>send("TESTSEQ=1");
 $("tsStep").onclick=()=>send("TESTSEQ=2");
@@ -3119,6 +3150,7 @@ if(!bleAvailable()){
 // is available before you connect to anything. Failure is silent and harmless:
 // renderOta falls back to "no hosted firmware" and the manual picker still works.
 loadOtaManifest();
+renderWiring();   // show the "run Step RGBW" hint before anything connects
 </script>
 </body>
 </html>

@@ -1,9 +1,9 @@
 {
   "version": "2.0.0",
   "build": "caec814+-20260904",
-  "size": 1188208,
-  "crc32": "be4ace67",
-  "sha256": "b0a3b34f4f5685455d4bdd0322b51227193049b14c09c44f83533ef4302ca98d",
+  "size": 1188928,
+  "crc32": "2f3c76bc",
+  "sha256": "ee3f32d04cb070eb4cb6247b7eb768e3b29de755eb75a93a319e31acdd2080c4",
   "date": "2026-09-04",
   "notes": "Uncommitted bench build (based on: Deploy tooling: stage hosted firmware, sw-cache pre-flight, and a verifier that can actual)",
   "file": "firmware.bin",
