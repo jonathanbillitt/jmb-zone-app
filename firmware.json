@@ -1,10 +1,16 @@
 {
   "version": "2.0.0",
-  "build": "6254b30+-20260904",
-  "size": 1184224,
-  "crc32": "acb0bbb4",
-  "sha256": "a16989ccb8bad4d2f0b20797b8c8c5a32a1e0df28590d1c57fe6d0564e3b14ce",
+  "build": "caec814+-20260904",
+  "size": 1188128,
+  "crc32": "587f4b9a",
+  "sha256": "0644c28452b6aff05e6aad0b2f4766f25f2da5ba1f91491d9e746438d93b8269",
   "date": "2026-09-04",
-  "notes": "Uncommitted bench build (based on: store assets: re-shoot screenshots at a phone viewport (540 CSS px @2x = 1080x1860) - the )",
-  "file": "firmware.bin"
+  "notes": "Uncommitted bench build (based on: Deploy tooling: stage hosted firmware, sw-cache pre-flight, and a verifier that can actual)",
+  "file": "firmware.bin",
+  "stm_port": {
+    "file": "stm_port.bin",
+    "size": 16984,
+    "crc32": "fec4353d",
+    "sha256": "3f90e92027aced5cf723db8d8b08fecf6e2e87ccdfa7065e6245201d90040fae"
+  }
 }

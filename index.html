@@ -524,8 +524,8 @@
           <option value="0">Int antenna</option>
         </select>
       </div>
-      <div class="mini">Link pairs with a transmitter that's in linking mode
-      (e.g. Aurora); Unlink forgets it. Status is data-truth: "linked &#8212; no data"
+      <div class="mini">Link pairs with a CRMX transmitter that's in linking
+      mode; Unlink forgets it. Status is data-truth: "linked &#8212; no data"
       means paired but the transmitter isn't sending.</div>
     </div>
     <!-- Network DMX (sACN/Art-Net over Wi-Fi) PARKED 2026-08-20 — hidden; the
@@ -633,6 +633,20 @@
       </div>
       <div class="ctlrow" id="otaRbRow" style="margin-top:8px">
         <button id="btnOtaRollback" class="danger" disabled>Roll back to previous</button>
+      </div>
+      <div id="stmWrap" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+        <div class="row" style="justify-content:space-between">
+          <label style="font-weight:600">Port module firmware</label>
+          <span class="mini" id="stmState" style="margin:0">—</span>
+        </div>
+        <div class="ctlrow">
+          <button id="btnStmGo" disabled>Update port module</button>
+          <button id="btnStmRb" class="danger" disabled>Roll back</button>
+        </div>
+        <div class="mini" id="stmMsg">The port module runs its own processor —
+        the one that drives the LEDs and enforces the current, temperature and
+        short-circuit protection. Outputs go dark for a few seconds while it is
+        reprogrammed.</div>
       </div>
       <div id="otaBarWrap" class="hidden" style="margin-top:10px;height:10px;background:var(--card2);border-radius:6px;overflow:hidden">
         <div id="otaBar" style="height:100%;width:0;background:linear-gradient(90deg,#6a2cf5,#5fd7ff);transition:width .15s"></div>
@@ -770,7 +784,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04b.hosted-firmware";
+const APP_VER="2026-09-04c.stm-ble-update";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2673,6 +2687,22 @@ function renderOta(){
                         : " — connect to compare with the controller"));
     }
   }
+  // Port-module section. Hidden entirely on units whose SWD topology cannot be
+  // addressed (multi-port share SWDIO/SWCLK with no target select) — offering a
+  // button that can only ever fail is worse than not offering it.
+  const caps=stmCaps(), stmSupported=(caps&1)!==0;
+  const stmInfo=otaManifest && otaManifest.stm_port;
+  const sw=$("stmWrap");
+  if(sw){
+    sw.classList.toggle("hidden", ok && !stmSupported);
+    $("btnStmGo").disabled = !ok || !stmSupported || !stmInfo || otaBusy;
+    $("btnStmRb").disabled = !ok || !stmSupported || !(caps&4) || otaBusy;
+    if(!otaBusy){
+      setStmState(!ok ? "connect first"
+                : !stmInfo ? "none published"
+                : (caps&2) ? "image stored" : "ready");
+    }
+  }
   const rbOk = ok && kv.RBOK==="1";
   const rbBtn = $("btnOtaRollback");
   if(rbBtn){
@@ -2741,6 +2771,96 @@ $("btnOtaRollback").onclick=async()=>{
   catch(e){ setOtaState("rollback failed");
             setOtaMsg("Could not reach the controller: "+(e.message||e)); }
 };
+// ---------- port-module (STM32) firmware over BLE ----------
+// STM is a capability bitmask from the controller: 1 = this unit's SWD topology
+// can be programmed at all, 2 = an image is staged, 4 = a previous image is kept.
+function stmCaps(){ return +(kv.STM||0); }
+function setStmState(t){ $("stmState").textContent=t; }
+function setStmMsg(t){ $("stmMsg").textContent=t; }
+
+async function runStmUpdate(){
+  const info = otaManifest && otaManifest.stm_port;
+  if(!info || !otacChar || !otadChar) return;
+  if(!await askConfirm("Every output goes dark for a few seconds while the port "
+    +"module is reprogrammed. Do not power the unit off during the update.",
+    {title:"Update port module?",ok:"Update"})) return;
+
+  setStmState("downloading…");
+  let buf;
+  try{
+    const r=await fetch(info.file||"stm_port.bin");
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    buf=await r.arrayBuffer();
+  }catch(e){ setStmState("download failed");
+             setStmMsg("Could not download the port firmware: "+((e&&e.message)||e)
+               +" — nothing was sent."); return; }
+  if(buf.byteLength!==info.size){
+    setStmState("download failed");
+    setStmMsg("Downloaded "+buf.byteLength+" bytes, manifest says "+info.size
+      +" — refusing to install a truncated image."); return;
+  }
+  const got=crc32(buf).toString(16).padStart(8,"0");
+  if(got!==info.crc32){
+    setStmState("download failed");
+    setStmMsg("Checksum mismatch ("+got+" vs "+info.crc32+") — refusing."); return;
+  }
+
+  otaBusy=true; otaAbort=false; renderOta();
+  try{
+    setStmState("sending…");
+    const size=buf.byteLength;
+    await otacChar.writeValueWithResponse(otaEnc(
+      `STM BEGIN PORT ${size} ${crc32(buf).toString(16)}`));
+    let r=await waitOta(m=>m==="READY"||m.startsWith("ERR"),8000);
+    if(r.startsWith("ERR")) throw new Error("controller "+r);
+    const CH=240, u=new Uint8Array(buf);
+    for(let off=0; off<size; off+=CH){
+      if(otaAbort) throw new Error("cancelled");
+      await otadChar.writeValueWithResponse(u.subarray(off,Math.min(off+CH,size)));
+      if((off & 0x7FF)<CH) setStmState(Math.round(100*off/size)+"%");
+    }
+    await otacChar.writeValueWithResponse(otaEnc("STM END"));
+    r=await waitOta(m=>m==="STORED"||m.startsWith("ERR"),15000);
+    if(r.startsWith("ERR")) throw new Error("controller "+r);
+
+    // Only now does anything touch the port processor.
+    setStmState("programming…");
+    setStmMsg("Programming the port module — outputs are dark. Do not power off.");
+    await otacChar.writeValueWithResponse(otaEnc("STM FLASH PORT"));
+    r=await waitOta(m=>m==="STMOK"||m.startsWith("ERR"),60000);
+    if(r.startsWith("ERR")) throw new Error("controller "+r);
+    setStmState("✓ updated");
+    setStmMsg("Port module updated and restarted. Outputs return on the next "
+      +"frame from whatever source is driving them.");
+  }catch(e){
+    try{ await otacChar.writeValueWithResponse(otaEnc("STM ABORT")); }catch(_){}
+    setStmState("failed");
+    setStmMsg("Port update "+(e&&e.message==="cancelled"?"cancelled":"failed: "
+      +((e&&e.message)||e))+". The port keeps the firmware it already had — "
+      +"the controller can retry over Bluetooth, no cable needed.");
+  }finally{ otaBusy=false; renderOta(); }
+}
+
+$("btnStmGo").onclick=runStmUpdate;
+$("btnStmRb").onclick=async()=>{
+  if(!otacChar) return;
+  if(!await askConfirm("The port module returns to the firmware it was running "
+    +"before the last update. Outputs go dark for a few seconds.",
+    {title:"Roll back port module?",ok:"Roll back",danger:true})) return;
+  otaBusy=true; renderOta();
+  try{
+    setStmState("programming…");
+    await otacChar.writeValueWithResponse(otaEnc("STM ROLLBACK PORT"));
+    const r=await waitOta(m=>m==="STMOK"||m.startsWith("ERR"),60000);
+    if(r.startsWith("ERR")) throw new Error("controller "+r);
+    setStmState("✓ rolled back");
+    setStmMsg("Port module restored to its previous firmware.");
+  }catch(e){
+    setStmState("failed");
+    setStmMsg("Rollback failed: "+((e&&e.message)||e)+" — the port keeps what it had.");
+  }finally{ otaBusy=false; renderOta(); }
+};
+
 $("btnOtaHosted").onclick=async()=>{
   if(!otaManifest) return;
   setOtaState("downloading…");
