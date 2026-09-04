@@ -796,7 +796,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04k.combined-update";
+const APP_VER="2026-09-04l.tab-state-crc-yield";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -811,12 +811,24 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function hello(html){ $("hello").classList.remove("hidden"); $("hello").innerHTML=html; }
 
 // ---------- tabs ----------
+// Nav highlight and visible tab must be set together. showApp() used to unhide
+// tab-control directly without touching either the other tabs or the highlight,
+// so a reconnect dropped you on Control while the nav still showed Setup —
+// exactly when you are mid-update and watching Setup.
+function activeTabName(){
+  const b=document.querySelector("#nav button.active");
+  return b ? b.dataset.tab : "control";
+}
+function selectTab(name){
+  document.querySelectorAll("#nav button").forEach(b=>
+    b.classList.toggle("active", b.dataset.tab===name));
+  document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
+  const el=$("tab-"+name);
+  if(el) el.classList.remove("hidden");
+}
 document.querySelectorAll("#nav button").forEach(btn=>{
   btn.onclick=()=>{
-    document.querySelectorAll("#nav button").forEach(b=>b.classList.remove("active"));
-    btn.classList.add("active");
-    document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
-    $("tab-"+btn.dataset.tab).classList.remove("hidden");
+    selectTab(btn.dataset.tab);
     if(btn.dataset.tab==="colour"){
       Object.keys(colEngaged).forEach(k=>delete colEngaged[k]);
       seedColour();                     // arrive showing the port's real state
@@ -831,7 +843,7 @@ function showApp(){
   $("hello").classList.add("hidden");
   $("chips").classList.remove("hidden");
   $("nav").classList.remove("hidden");
-  $("tab-control").classList.remove("hidden");
+  selectTab(activeTabName());   // come back where you were, not always Control
 }
 function hideApp(){
   $("chips").classList.add("hidden");
@@ -2722,6 +2734,33 @@ $("impFile").addEventListener("change",async ev=>{
 });
 
 // ---------- BLE OTA (firmware update over Bluetooth) ----------
+// Same CRC, yielding every 128 KB so the page stays responsive on a phone.
+// A synchronous pass over a 1.2 MB image is ~9.5M inner iterations and froze
+// the UI for seconds — twice, because the caller and runOta each computed it.
+let CRC_TBL=null;
+function crcTable(){
+  if(CRC_TBL) return CRC_TBL;
+  CRC_TBL=new Uint32Array(256);
+  for(let n=0;n<256;n++){
+    let c=n;
+    for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);
+    CRC_TBL[n]=c>>>0;
+  }
+  return CRC_TBL;
+}
+async function crc32Async(buf, onProgress){
+  const u=new Uint8Array(buf), t=crcTable();
+  let c=0xFFFFFFFF;
+  const CHUNK=262144;
+  for(let i=0;i<u.length;i++){
+    c=(t[(c^u[i])&0xFF]^(c>>>8))>>>0;      // table-driven: one lookup per byte,
+    if((i & (CHUNK-1))===CHUNK-1){          // not eight shifts
+      if(onProgress) onProgress(i/u.length);
+      await new Promise(r=>setTimeout(r,0));
+    }
+  }
+  return (c^0xFFFFFFFF)>>>0;
+}
 function crc32(buf){
   let c=0xFFFFFFFF; const u=new Uint8Array(buf);
   for(let i=0;i<u.length;i++){ c^=u[i];
@@ -2904,18 +2943,20 @@ async function fetchVerified(info, fallbackName){
   const buf=await r.arrayBuffer();
   if(buf.byteLength!==info.size)
     throw new Error("downloaded "+buf.byteLength+" bytes, manifest says "+info.size);
-  const got=crc32(buf).toString(16).padStart(8,"0");
+  const n=await crc32Async(buf);
+  const got=n.toString(16).padStart(8,"0");
   if(got!==info.crc32) throw new Error("checksum mismatch ("+got+" vs "+info.crc32+")");
-  return buf;
+  return {buf, crc:n};
 }
 
 // Stage an STM image over BLE and program it. No confirm, no otaBusy — the
 // caller owns both, so this composes into the combined update.
-async function stmStageAndFlash(buf){
+async function stmStageAndFlash(buf, crc){
   setStmState("sending…");
   const size=buf.byteLength;
+  if(crc===undefined) crc=await crc32Async(buf);
   await otacChar.writeValueWithResponse(otaEnc(
-    `STM BEGIN PORT ${size} ${crc32(buf).toString(16)}`));
+    `STM BEGIN PORT ${size} ${crc.toString(16)}`));
   let r=await waitOta(m=>m==="READY"||m.startsWith("ERR"),8000);
   if(r.startsWith("ERR")) throw new Error("controller "+r);
   const CH=240, u=new Uint8Array(buf);
@@ -2955,7 +2996,8 @@ async function runStmUpdate(){
     setStmMsg("Downloaded "+buf.byteLength+" bytes, manifest says "+info.size
       +" — refusing to install a truncated image."); return;
   }
-  const got=crc32(buf).toString(16).padStart(8,"0");
+  const crcv=await crc32Async(buf);
+  const got=crcv.toString(16).padStart(8,"0");
   if(got!==info.crc32){
     setStmState("download failed");
     setStmMsg("Checksum mismatch ("+got+" vs "+info.crc32+") — refusing."); return;
@@ -2963,7 +3005,7 @@ async function runStmUpdate(){
 
   otaBusy=true; otaAbort=false; renderOta();
   try{
-    await stmStageAndFlash(buf);
+    await stmStageAndFlash(buf, crcv);
     setStmState("✓ updated");
     setStmMsg("Port module updated and restarted. Outputs return on the next "
       +"frame from whatever source is driving them.");
@@ -3019,8 +3061,8 @@ async function runFullUpdate(){
     otaBusy=true; otaAbort=false; renderOta();
     try{
       setStmState("downloading…");
-      const sbuf=await fetchVerified(stmInfo,"stm_port.bin");
-      await stmStageAndFlash(sbuf);
+      const sv=await fetchVerified(stmInfo,"stm_port.bin");
+      await stmStageAndFlash(sv.buf, sv.crc);
       setStmState("✓ updated");
       setStmMsg("Port module updated. Continuing with the controller…");
     }catch(e){
@@ -3036,16 +3078,16 @@ async function runFullUpdate(){
   }
 
   setOtaState("downloading…");
-  let buf;
-  try{ buf=await fetchVerified(otaManifest,"firmware.bin"); }
+  let v;
+  try{ v=await fetchVerified(otaManifest,"firmware.bin"); }
   catch(e){
     setOtaState("download failed");
     setOtaMsg("Could not download the controller firmware: "+((e&&e.message)||e)
       +(both?" — the port module was updated, the controller was not.":" — nothing was sent."));
     return;
   }
-  await runOta(new File([buf], otaManifest.version+" build "+otaManifest.build),
-               {skipConfirm:true});
+  await runOta(new File([v.buf], otaManifest.version+" build "+otaManifest.build),
+               {skipConfirm:true, crc:v.crc});
 }
 
 $("btnOtaHosted").onclick=async()=>{
@@ -3059,7 +3101,7 @@ async function runOta(file, opts){
   if(!file||!otacChar||!otadChar){ setOtaMsg("Connect to an update-capable controller first."); return; }
   const buf=await file.arrayBuffer(), size=buf.byteLength;
   if(new Uint8Array(buf)[0]!==0xE9){ setOtaMsg("That isn't an ESP32 firmware .bin (bad magic byte)."); return; }
-  const crc=crc32(buf);
+  const crc=(opts.crc!==undefined) ? opts.crc : await crc32Async(buf);
   if(!opts.skipConfirm &&
      !await askConfirm(`${file.name} (${(size/1024).toFixed(0)} KB). The controller reboots into the new firmware when done.`,{title:"Flash firmware?",ok:"Flash"})) return;
   otaBusy=true; otaAbort=false; renderOta();

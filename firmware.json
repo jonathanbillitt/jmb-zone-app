@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "2e9278d-20260904",
+  "build": "55d48be-20260904",
   "size": 1189648,
-  "crc32": "49fe2de2",
-  "sha256": "2c9206ca91c756d681c817f307b1358c945dcea1b48f32b1cef637ac2501400b",
+  "crc32": "2f1fd852",
+  "sha256": "f1da301a50fbecb3d5872baac9ae17280b30f10d899db22ce4553cbf2820f7bc",
   "date": "2026-09-04",
-  "notes": "One button updates the lot: port module first, then the controller",
+  "notes": "Fix a link-dropping filesystem mount on the BLE path, a multi-second UI freeze, and the tab state after a reconnect",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
