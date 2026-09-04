@@ -6,7 +6,7 @@
 // MUST be "jmb-" + the app's APP_VER with dots as dashes. deploy_pages.py
 // enforces it: a deploy that bumps APP_VER but not this key publishes new HTML
 // that no client ever sees, because the old shell stays cached and un-evicted.
-const CACHE="jmb-2026-09-04s-uptime-reboot-detect";
+const CACHE="jmb-2026-09-04t-dismiss-dead-prompt";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./firmware.json",
                 "./icon.svg", "./icon-maskable.svg", "./icon-512.png",
                 "./icon-512-maskable.png", "./privacy.html", "./jmb-splash.png",

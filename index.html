@@ -807,7 +807,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04s.uptime-reboot-detect";
+const APP_VER="2026-09-04t.dismiss-dead-prompt";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -939,6 +939,7 @@ async function connect(){
 }
 async function onDisconnected(){
   otaNoteDrop();                            // capture WHERE an update died
+  dismissConfirm();                         // never leave a dead prompt on screen
   if(busy){ cmdChar=null; return; }         // a connect/reconnect owns the link
   busy=true;
   authed=false; cmdChar=null;
@@ -1014,6 +1015,10 @@ function askPin(){
 function hideOverlay(){ $("overlay").classList.add("hidden"); }
 // In-app dialogs replacing window.confirm/alert — no browser chrome, no
 // "app.jmblighting.co.uk says" header, styled like the rest of the app.
+// Held so a dropped link can dismiss an open prompt. A confirm that outlives
+// its connection just sits there doing nothing when pressed, which reads as the
+// app being broken rather than as the link having gone.
+let cfCancel=null;
 function askConfirm(msg,opt){
   const o=opt||{};
   return new Promise(res=>{
@@ -1024,10 +1029,12 @@ function askConfirm(msg,opt){
     n.classList.remove("hidden");
     $("cfOv").classList.remove("hidden");
     const done=v=>{ $("cfOv").classList.add("hidden");
-                    y.onclick=n.onclick=null; res(v); };
+                    y.onclick=n.onclick=null; cfCancel=null; res(v); };
+    cfCancel=()=>done(false);
     y.onclick=()=>done(true); n.onclick=()=>done(false);
   });
 }
+function dismissConfirm(){ if(cfCancel) cfCancel(); }
 function askText(msg,opt){
   const o=opt||{};
   return new Promise(res=>{

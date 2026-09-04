@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "77ef23e-20260904",
+  "build": "e144966-20260904",
   "size": 1189952,
-  "crc32": "c17c3fb3",
-  "sha256": "1dfdc2b2441eca84693beeb7520e41ff03e5d6abf98b1f6140ad1438639606f5",
+  "crc32": "d6d706b5",
+  "sha256": "8a8c4bc28745230644d2b63a6ae9355b4ff08392a1ff24f1991b53dd162fd6ad",
   "date": "2026-09-04",
-  "notes": "Report controller uptime so a dropped link can be told apart from a controller reboot",
+  "notes": "A dropped link now dismisses any open prompt instead of leaving a dead one on screen",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
