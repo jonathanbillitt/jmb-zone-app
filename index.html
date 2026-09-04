@@ -315,7 +315,9 @@
   <h1 id="title">JMB Lighting</h1>
   <button id="btnConnect" class="primary">Connect</button>
 </header>
-<div class="mini" id="appVerBar" style="text-align:right;margin:-6px 2px 8px 0">
+<!-- No negative top margin: the header is position:sticky with z-index 5, so a
+     negative margin slid this underneath it and clipped the text. -->
+<div class="mini" id="appVerBar" style="text-align:right;margin:10px 16px 2px">
   <span id="appVerTxt"></span>
   <a href="#" id="appRefresh" style="margin-left:8px">refresh app</a>
 </div>
@@ -800,7 +802,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04m.drop-diagnostics";
+const APP_VER="2026-09-04n.verbar-visible";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
