@@ -639,7 +639,7 @@
       <div class="ctlrow">
         <button id="btnOtaPick">Choose .bin…</button>
         <input type="file" id="otaFile" accept=".bin,application/octet-stream" class="hidden">
-        <button id="btnOtaGo" disabled>Update over Bluetooth</button>
+        <button id="btnOtaGo" disabled>Install this file</button>
       </div>
       <div class="ctlrow" id="otaRbRow" style="margin-top:8px">
         <button id="btnOtaRollback" class="danger" disabled>Roll back to previous</button>
@@ -794,7 +794,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04f.wiring-fault";
+const APP_VER="2026-09-04g.ident-labels";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1983,7 +1983,7 @@ function renderProductMark(){
 // Index 4 = CRMX. The controller reports it separately from wired even though
 // both arrive on the same input, because the jack's insertion switch — not
 // firmware — picks between them; see the SRC note in ble_control.cpp.
-const SRC_NAMES=["—","Wired DMX","sACN","Art-Net","CRMX"];
+const SRC_NAMES=["—","DMX","sACN","Art-Net","CRMX"];
 let fpsHist=[], fpsLast=0;
 function fmtAge(ms){ if(ms==null||isNaN(ms)) return "—";
   return ms<1500?ms+"ms":ms<90000?(ms/1000).toFixed(1)+"s":Math.round(ms/60000)+"m"; }
@@ -2365,6 +2365,7 @@ function renderSetup(){
     const t=+kv.TSEQ;
     $("tsFade").className = t===1 ? "primary" : "";
     $("tsStep").className = t===2 ? "primary" : "";
+    $("tsOff").className  = t===0 ? "primary" : "";   // lit = nothing running
   }
   const srcName=["off","DMX","sACN","Art-Net","CRMX"][+(kv.SRC||0)]||"—";
   const netOn=(kv.NET==="1"), wifiUp=(kv.NW==="1");
@@ -2787,7 +2788,7 @@ function renderOta(){
     setOtaMsg("New firmware confirmed and running normally.");
     return;
   }
-  setOtaState(ok?(otaSelFile?"ready":"pick a .bin"):"connect first");
+  setOtaState(!ok ? "connect first" : otaManifest ? "ready" : "no firmware published");
 }
 function otaStatHandler(e){
   const msg=new TextDecoder().decode(e.target.value).trim();
