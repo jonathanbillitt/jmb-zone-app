@@ -16,8 +16,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0e1116">
+<!-- Full-screen home-screen app (no browser chrome). Android reads the manifest
+     display:standalone; iOS Safari reads these apple-* tags. Retain ALL of this
+     for the App Store build — see docs/APP_SPEC_IOS.md. -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JMB Lighting">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-512.png">
@@ -29,10 +36,16 @@
     --warn:#d29922; --bad:#f85149; --r:#ff5d5d; --g:#4ade80; --b:#60a5fa;
   }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html { overscroll-behavior:none; }   /* no pull-to-refresh reload */
   body { margin:0; background:var(--bg); color:var(--text);
          font:15px/1.45 system-ui,Segoe UI,Roboto,sans-serif;
-         padding-bottom:64px; }
-  header { display:flex; align-items:center; gap:12px; padding:12px 16px;
+         overscroll-behavior:none;         /* both, for iOS + Android */
+         /* paint under the notch, but keep content out of it */
+         padding:env(safe-area-inset-top) env(safe-area-inset-right)
+                 calc(64px + env(safe-area-inset-bottom)) env(safe-area-inset-left); }
+  header { display:flex; align-items:center; gap:12px;
+           padding:calc(12px + env(safe-area-inset-top)) 16px 12px;
+           margin:calc(-1 * env(safe-area-inset-top)) 0 0;   /* fill the notch bg */
            background:var(--card); border-bottom:1px solid var(--line);
            position:sticky; top:0; z-index:5; }
   header .lockup { display:flex; align-items:stretch; gap:0; flex-shrink:0; }
@@ -149,6 +162,7 @@
   th { color:var(--dim); font-weight:500; font-size:12px; }
   td.num { font-variant-numeric:tabular-nums; }
   nav { position:fixed; bottom:0; left:0; right:0; display:flex; z-index:6;
+        padding-bottom:env(safe-area-inset-bottom);   /* clear the home indicator */
         background:var(--card); border-top:1px solid var(--line); }
   nav button { flex:1; border:none; border-radius:0; background:none;
                color:var(--dim); font-size:12px; padding:9px 0 10px; }
@@ -816,7 +830,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-05a.pdm-floor-blue-bars";
+const APP_VER="2026-09-05b.fullscreen-no-pullrefresh";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
