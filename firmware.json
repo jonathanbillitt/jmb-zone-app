@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "b9425f6-20260904",
+  "build": "2e9278d-20260904",
   "size": 1189648,
-  "crc32": "21c3f646",
-  "sha256": "171612ddd58771621ec73dd759b1beafab3ffde9a46c4893d85b183e4c1d2f97",
+  "crc32": "49fe2de2",
+  "sha256": "2c9206ca91c756d681c817f307b1358c945dcea1b48f32b1cef637ac2501400b",
   "date": "2026-09-04",
-  "notes": "Docs: .3 pre-fab checklist, and manuals rebuilt for everything added today",
+  "notes": "One button updates the lot: port module first, then the controller",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",

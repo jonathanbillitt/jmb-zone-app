@@ -796,7 +796,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04j.rdm-identify-latch";
+const APP_VER="2026-09-04k.combined-update";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2788,9 +2788,16 @@ function renderOta(){
     }else{
       const running=kv.FWB||"";
       const same=running && running===otaManifest.build;
-      hb.disabled=!ok||otaBusy||same;
-      hb.textContent=same ? "Latest already installed"
-                          : "Install "+otaManifest.version+" over Bluetooth";
+      // "Already installed" refers to the CONTROLLER build. The port module is
+      // re-flashed regardless, so the button stays live either way — it just
+      // says what the run will actually do.
+      const withStm = (stmCaps()&1) && otaManifest.stm_port;
+      hb.disabled=!ok||otaBusy;
+      hb.textContent = withStm
+        ? (same ? "Reinstall " + otaManifest.version + " + port module"
+                : "Update controller + port module")
+        : (same ? "Reinstall " + otaManifest.version
+                : "Install "+otaManifest.version+" over Bluetooth");
       hm.textContent="Available: "+otaManifest.version+" · build "+otaManifest.build
         +" · "+Math.round(otaManifest.size/1024)+" KB · "+otaManifest.date
         +(running ? " — controller is running build "+running
@@ -2889,6 +2896,44 @@ function stmCaps(){ return +(kv.STM||0); }
 function setStmState(t){ $("stmState").textContent=t; }
 function setStmMsg(t){ $("stmMsg").textContent=t; }
 
+// Download an image and prove it before anything is opened on the controller.
+// Shared by the port-module and combined flows so the two cannot drift apart.
+async function fetchVerified(info, fallbackName){
+  const r=await fetch(info.file||fallbackName);
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const buf=await r.arrayBuffer();
+  if(buf.byteLength!==info.size)
+    throw new Error("downloaded "+buf.byteLength+" bytes, manifest says "+info.size);
+  const got=crc32(buf).toString(16).padStart(8,"0");
+  if(got!==info.crc32) throw new Error("checksum mismatch ("+got+" vs "+info.crc32+")");
+  return buf;
+}
+
+// Stage an STM image over BLE and program it. No confirm, no otaBusy — the
+// caller owns both, so this composes into the combined update.
+async function stmStageAndFlash(buf){
+  setStmState("sending…");
+  const size=buf.byteLength;
+  await otacChar.writeValueWithResponse(otaEnc(
+    `STM BEGIN PORT ${size} ${crc32(buf).toString(16)}`));
+  let r=await waitOta(m=>m==="READY"||m.startsWith("ERR"),8000);
+  if(r.startsWith("ERR")) throw new Error("controller "+r);
+  const CH=240, u=new Uint8Array(buf);
+  for(let off=0; off<size; off+=CH){
+    if(otaAbort) throw new Error("cancelled");
+    await otadChar.writeValueWithResponse(u.subarray(off,Math.min(off+CH,size)));
+    if((off & 0x7FF)<CH) setStmState(Math.round(100*off/size)+"%");
+  }
+  await otacChar.writeValueWithResponse(otaEnc("STM END"));
+  r=await waitOta(m=>m==="STORED"||m.startsWith("ERR"),15000);
+  if(r.startsWith("ERR")) throw new Error("controller "+r);
+  setStmState("programming…");
+  setStmMsg("Programming the port module — outputs are dark. Do not power off.");
+  await otacChar.writeValueWithResponse(otaEnc("STM FLASH PORT"));
+  r=await waitOta(m=>m==="STMOK"||m.startsWith("ERR"),60000);
+  if(r.startsWith("ERR")) throw new Error("controller "+r);
+}
+
 async function runStmUpdate(){
   const info = otaManifest && otaManifest.stm_port;
   if(!info || !otacChar || !otadChar) return;
@@ -2918,28 +2963,7 @@ async function runStmUpdate(){
 
   otaBusy=true; otaAbort=false; renderOta();
   try{
-    setStmState("sending…");
-    const size=buf.byteLength;
-    await otacChar.writeValueWithResponse(otaEnc(
-      `STM BEGIN PORT ${size} ${crc32(buf).toString(16)}`));
-    let r=await waitOta(m=>m==="READY"||m.startsWith("ERR"),8000);
-    if(r.startsWith("ERR")) throw new Error("controller "+r);
-    const CH=240, u=new Uint8Array(buf);
-    for(let off=0; off<size; off+=CH){
-      if(otaAbort) throw new Error("cancelled");
-      await otadChar.writeValueWithResponse(u.subarray(off,Math.min(off+CH,size)));
-      if((off & 0x7FF)<CH) setStmState(Math.round(100*off/size)+"%");
-    }
-    await otacChar.writeValueWithResponse(otaEnc("STM END"));
-    r=await waitOta(m=>m==="STORED"||m.startsWith("ERR"),15000);
-    if(r.startsWith("ERR")) throw new Error("controller "+r);
-
-    // Only now does anything touch the port processor.
-    setStmState("programming…");
-    setStmMsg("Programming the port module — outputs are dark. Do not power off.");
-    await otacChar.writeValueWithResponse(otaEnc("STM FLASH PORT"));
-    r=await waitOta(m=>m==="STMOK"||m.startsWith("ERR"),60000);
-    if(r.startsWith("ERR")) throw new Error("controller "+r);
+    await stmStageAndFlash(buf);
     setStmState("✓ updated");
     setStmMsg("Port module updated and restarted. Outputs return on the next "
       +"frame from whatever source is driving them.");
@@ -2972,47 +2996,72 @@ $("btnStmRb").onclick=async()=>{
   }finally{ otaBusy=false; renderOta(); }
 };
 
-$("btnOtaHosted").onclick=async()=>{
-  if(!otaManifest){ setOtaState("checking…"); await loadOtaManifest(); return; }
+// ONE BUTTON FOR THE LOT. Port module FIRST: the controller update ends in a
+// reboot that drops the Bluetooth link, so anything sequenced after it would
+// need a reconnect — and doing the port first means a port failure stops the
+// run before the controller has been touched at all.
+// No version comparison: re-flashing an identical port image is a few seconds
+// of darkness and removes any doubt about what is actually on the hardware.
+async function runFullUpdate(){
+  if(!otaManifest||!otacChar||!otadChar) return;
+  const stmInfo = ((stmCaps()&1) && otaManifest.stm_port) ? otaManifest.stm_port : null;
+  const both = !!stmInfo;
+  if(!await askConfirm(
+      (both ? "The port module is reprogrammed first — every output goes dark for "
+            + "a few seconds — and then the controller restarts into its new "
+            + "firmware. "
+            : "The controller restarts into the new firmware when it finishes. ")
+      + "Keep the app open and the phone unlocked, and do not power the unit off.",
+      {title: both ? "Update controller and port module?" : "Update controller?",
+       ok:"Update"})) return;
+
+  if(stmInfo){
+    otaBusy=true; otaAbort=false; renderOta();
+    try{
+      setStmState("downloading…");
+      const sbuf=await fetchVerified(stmInfo,"stm_port.bin");
+      await stmStageAndFlash(sbuf);
+      setStmState("✓ updated");
+      setStmMsg("Port module updated. Continuing with the controller…");
+    }catch(e){
+      try{ await otacChar.writeValueWithResponse(otaEnc("STM ABORT")); }catch(_){}
+      setStmState("failed");
+      setStmMsg("Port update failed: "+((e&&e.message)||e)+". The port keeps the "
+        +"firmware it had and the controller was NOT touched, so nothing has "
+        +"changed. It can be retried over Bluetooth — no cable needed.");
+      otaBusy=false; renderOta();
+      return;                       // stop before the controller
+    }
+    otaBusy=false; renderOta();
+  }
+
   setOtaState("downloading…");
   let buf;
-  try{
-    const r=await fetch(otaManifest.file||"firmware.bin");
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    buf=await r.arrayBuffer();
-  }catch(e){
+  try{ buf=await fetchVerified(otaManifest,"firmware.bin"); }
+  catch(e){
     setOtaState("download failed");
-    setOtaMsg("Could not download the firmware: "+((e&&e.message)||e)
-      +" — nothing was sent to the controller.");
+    setOtaMsg("Could not download the controller firmware: "+((e&&e.message)||e)
+      +(both?" — the port module was updated, the controller was not.":" — nothing was sent."));
     return;
   }
-  // Check the download BEFORE opening an OTA session. A truncated or corrupted
-  // download would otherwise be caught only by the controller's CRC after
-  // several minutes of uploading — and a size-correct but wrong image would
-  // reach the inactive slot before anything noticed.
-  if(buf.byteLength!==otaManifest.size){
-    setOtaState("download failed");
-    setOtaMsg("Downloaded "+buf.byteLength+" bytes but the manifest says "
-      +otaManifest.size+" — refusing to install a truncated image.");
-    return;
-  }
-  const got=crc32(buf).toString(16).padStart(8,"0");
-  if(got!==otaManifest.crc32){
-    setOtaState("download failed");
-    setOtaMsg("Checksum mismatch (got "+got+", expected "+otaManifest.crc32
-      +") — refusing to install.");
-    return;
-  }
-  await runOta(new File([buf], otaManifest.version+" build "+otaManifest.build));
+  await runOta(new File([buf], otaManifest.version+" build "+otaManifest.build),
+               {skipConfirm:true});
+}
+
+$("btnOtaHosted").onclick=async()=>{
+  if(!otaManifest){ setOtaState("checking…"); await loadOtaManifest(); return; }
+  return runFullUpdate();
 };
 $("btnOtaCancel").onclick=()=>{ otaAbort=true; };
 $("btnOtaGo").onclick=()=>runOta(otaSelFile);
-async function runOta(file){
+async function runOta(file, opts){
+  opts=opts||{};
   if(!file||!otacChar||!otadChar){ setOtaMsg("Connect to an update-capable controller first."); return; }
   const buf=await file.arrayBuffer(), size=buf.byteLength;
   if(new Uint8Array(buf)[0]!==0xE9){ setOtaMsg("That isn't an ESP32 firmware .bin (bad magic byte)."); return; }
   const crc=crc32(buf);
-  if(!await askConfirm(`${file.name} (${(size/1024).toFixed(0)} KB). The controller reboots into the new firmware when done.`,{title:"Flash firmware?",ok:"Flash"})) return;
+  if(!opts.skipConfirm &&
+     !await askConfirm(`${file.name} (${(size/1024).toFixed(0)} KB). The controller reboots into the new firmware when done.`,{title:"Flash firmware?",ok:"Flash"})) return;
   otaBusy=true; otaAbort=false; renderOta();
   $("btnOtaCancel").classList.remove("hidden");
   setOtaState("starting…"); otaProgress(0);

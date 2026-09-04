@@ -117,7 +117,16 @@ names the winner: <strong>DMX</strong> or <strong>CRMX</strong>.</p>
 <p>The controller updates its own firmware straight over Bluetooth from the app —
 no USB, no cable, no Wi-Fi.</p>
 <ul>
-<li><strong>One button</strong> (Setup → <em>Firmware update</em> → <strong>Install … over Bluetooth</strong>).
+<li><strong>One button</strong> updates everything (Setup → <em>Firmware update</em>). On a unit whose
+  port module can be programmed this reads <strong>Update controller + port module</strong>
+  and does both in a single run: the <strong>port module first</strong> — every output goes
+  dark for a few seconds — and then the controller, which restarts into its new
+  firmware at the end. That order is deliberate: the controller update finishes
+  by rebooting and dropping the Bluetooth link, so anything after it would need
+  a reconnect, and doing the port first means a port failure stops the run
+  before the controller has been touched at all. The port module is re-flashed
+  whether or not its firmware changed, so there is never any doubt about what is
+  on the hardware.
   The firmware is published alongside the app, so there is no file to find and
   no way to send a build meant for a different product. The card names the
   version and build about to be installed, and the build the controller is
