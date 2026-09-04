@@ -692,9 +692,8 @@
         <button id="btnResetAll" class="danger">Reset all ports</button>
         <button id="btnUndo">Undo reset</button>
       </div>
-      <div class="mini">Flash strobes this controller's screen “HERE” for
-      3s (outputs untouched) — tap it after connecting to check you're on
-      the right unit.</div>
+      <div class="mini" id="identMsg">Flash identifies this controller for 5
+      seconds — tap it after connecting to check you're on the right unit.</div>
     </div>
     <div class="card">
       <div class="ctlrow">
@@ -825,7 +824,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04v.link-in-header";
+const APP_VER="2026-09-04w.ident-text-tidy";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2435,6 +2434,7 @@ function renderSetup(){
     st.style.color = kv.CHL==="1" ? "var(--warn)" : "var(--dim)";
   }
   renderLink();
+  renderIdentMsg();
   renderWiring();
   // Test-sequence state — highlight the running sequence's button
   if(kv.TSEQ!=null){
@@ -2516,6 +2516,19 @@ const WC_VERDICT=[
 // advertisements — so BRS comes from the controller's own radio.
 // Thresholds are the usual BLE rules of thumb: better than -60 is excellent,
 // -70 good, -80 workable, below that expect dropouts.
+// Flash-to-find behaves differently by variant, so describe the unit in front of
+// you rather than the general case: a panel unit strobes its screen and leaves
+// the rig alone, while the screenless ONE has nothing else to answer with.
+function renderIdentMsg(){
+  const el=$("identMsg"); if(!el) return;
+  const oneOff = (+(kv.PORTS||kv.VAR||0)) === 1;
+  el.textContent = "Flash identifies this controller for 5 seconds — tap it "
+    + "after connecting to check you're on the right unit. "
+    + (oneOff
+        ? "This unit has no screen, so it blinks its outputs."
+        : "It strobes the screen; the outputs are untouched.");
+}
+
 function renderLink(){
   const wrap=$("sigWrap"), bars=$("sigBars");
   if(!wrap||!bars) return;
@@ -3141,6 +3154,10 @@ async function runStmRollback(){
 // of darkness and removes any doubt about what is actually on the hardware.
 async function runFullUpdate(ctrlOnly){
   if(!otaManifest||!otacChar||!otadChar) return;
+  // Clear the recovery link from any previous failure: it was only ever hidden
+  // again when the manifest went missing, so a success left it on screen
+  // offering a worse route than the button beside it.
+  { const only=$("otaOnlyRow"); if(only) only.classList.add("hidden"); }
   // Not cleared to "" — the link has been dropping AT the confirm prompt, and an
   // empty phase means the disconnect handler stashes nothing.
   otaSetPhase("waiting for you to confirm the update");
