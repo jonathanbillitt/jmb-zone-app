@@ -794,7 +794,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04g.ident-labels";
+const APP_VER="2026-09-04h.manifest-retry";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -868,6 +868,7 @@ async function gattSetup(){
       // OTA chars are optional — present only on OTA-capable firmware.
       otacChar=otadChar=otasChar=null;
       try{
+        retryOtaManifest(true);   // connected: try again if startup had no data
         otacChar=await svc.getCharacteristic(OTAC);
         otadChar=await svc.getCharacteristic(OTAD);
         otasChar=await svc.getCharacteristic(OTAS);
@@ -2706,17 +2707,31 @@ let otaSelFile=null, otaBusy=false, otaAbort=false, otaWaiter=null, otaProbation
 // HOSTED FIRMWARE — the image is published next to this app, so updating is one
 // button instead of hunting for a .bin. Served from our own origin, so no CORS
 // and the service worker keeps a copy for a retry with no signal.
-let otaManifest=null;
+let otaManifest=null, otaManifestTried=0, otaManifestErr="";
 async function loadOtaManifest(){
+  otaManifestTried=Date.now();
   try{
-    const r=await fetch("firmware.json");
+    const r=await fetch("firmware.json",{cache:"no-cache"});
     if(!r.ok) throw new Error("HTTP "+r.status);
     const m=await r.json();
     if(!m||!m.size||!m.crc32) throw new Error("incomplete manifest");
-    otaManifest=m;
-  }catch(_){ otaManifest=null; }   // offline or nothing published — manual still works
+    otaManifest=m; otaManifestErr="";
+  }catch(e){
+    // Almost always "the phone has no data right now", not "nothing published".
+    // Saying the latter sent people looking for a problem that isn't there.
+    otaManifest=null; otaManifestErr=(e&&e.message)||String(e);
+  }
   renderOta();
 }
+// Retry whenever there is a reason to think it might work now: the connection
+// came back, the network came back, or the user pressed Retry. Rate-limited so
+// a repeatedly-failing fetch cannot storm.
+function retryOtaManifest(force){
+  if(otaManifest) return;
+  if(!force && Date.now()-otaManifestTried < 15000) return;
+  loadOtaManifest();
+}
+addEventListener("online",()=>retryOtaManifest(true));
 function setOtaState(t){ $("otaState").textContent=t; }
 function setOtaMsg(t){ $("otaMsg").textContent=t; }
 function otaProgress(f){ $("otaBarWrap").classList.remove("hidden");
@@ -2735,9 +2750,14 @@ function renderOta(){
   const hb=$("btnOtaHosted"), hm=$("otaHosted");
   if(hb&&hm){
     if(!otaManifest){
-      hb.disabled=true;
-      hb.textContent="Install latest firmware";
-      hm.textContent="No hosted firmware available right now — you can still "
+      hb.disabled=false;                       // the button becomes Retry
+      hb.textContent="Retry";
+      hm.textContent=(navigator.onLine===false
+        ? "This device is offline, so the latest firmware can't be fetched. "
+        : "Couldn't fetch the latest firmware"
+          +(otaManifestErr?" ("+otaManifestErr+"). ":". "))
+        +"Reconnect to Wi-Fi or mobile data and press Retry. Bluetooth still "
+        +"works without internet — only the download needs it. You can also "
         +"install a file below.";
     }else{
       const running=kv.FWB||"";
@@ -2927,7 +2947,7 @@ $("btnStmRb").onclick=async()=>{
 };
 
 $("btnOtaHosted").onclick=async()=>{
-  if(!otaManifest) return;
+  if(!otaManifest){ setOtaState("checking…"); await loadOtaManifest(); return; }
   setOtaState("downloading…");
   let buf;
   try{

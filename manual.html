@@ -117,18 +117,35 @@ names the winner: <strong>DMX</strong> or <strong>CRMX</strong>.</p>
 <p>The controller updates its own firmware straight over Bluetooth from the app —
 no USB, no cable, no Wi-Fi.</p>
 <ul>
-<li><strong>In the app</strong> (Setup → <em>Firmware update</em>): pick a <code>firmware.bin</code>, confirm,
-  and the app streams it to the controller over the Bluetooth link. A progress
-  bar tracks the transfer; outputs hold their last look throughout.</li>
-<li><strong>The image is checked before it runs</strong> (CRC verified end-to-end) and only
-  then made the next boot.</li>
-<li><strong>Automatic rollback.</strong> After an update the controller boots the new image on
-  probation: if it doesn't come up cleanly and confirm itself, the controller
-  falls back to the previous working firmware on its own. The app shows a
-  <em>confirming…</em> indicator during probation and <em>firmware confirmed</em> once the
-  new build has proven itself, so a bad flash can never brick the unit.</li>
+<li><strong>One button</strong> (Setup → <em>Firmware update</em> → <strong>Install … over Bluetooth</strong>).
+  The firmware is published alongside the app, so there is no file to find and
+  no way to send a build meant for a different product. The card names the
+  version and build about to be installed, and the build the controller is
+  running, so you can see whether an update would change anything.</li>
+<li><strong>Checked twice before it runs.</strong> The app verifies the download's size and
+  checksum <em>before</em> opening a transfer, and the controller re-checks the
+  checksum across the Bluetooth link before the image is made bootable. A bad
+  download fails in a second rather than after a long upload.</li>
+<li><strong>Automatic rollback.</strong> The new image boots on probation: if it doesn't come
+  up cleanly and confirm itself, the controller returns to the previous working
+  firmware on its own. The app shows <em>confirming…</em> during probation and
+  <em>firmware confirmed</em> once the build has proven itself.</li>
+<li><strong>Manual rollback.</strong> <em>Roll back to previous</em> returns to the last firmware
+  deliberately — for a build that runs perfectly well but behaves wrongly,
+  which the automatic check cannot detect. The button stays greyed until there
+  is a previous version stored, which happens after your first update.</li>
+<li><strong>Port module firmware.</strong> The port processor — the one driving the LEDs and
+  enforcing current, temperature and short-circuit protection — updates the
+  same way, from <em>Port module firmware</em> on the same card. Outputs go dark for a
+  few seconds while it is reprogrammed, and its previous version is kept for
+  rollback. If an attempt fails the port simply keeps the firmware it had, and
+  it can be retried over Bluetooth. Do not power the unit off during a port
+  update.</li>
 </ul>
 <blockquote>
+<p>Keep the app open and the phone unlocked until an update finishes. Outputs
+hold their last look during a controller update; they go dark during a port
+module update.</p>
 <p>Wi-Fi / network DMX (sACN, Art-Net) and Wi-Fi OTA are not part of the
 shipping firmware — the control path is deliberately kept off the network for
 responsiveness. Wired DMX, CRMX and BLE cover input and updates.</p>
@@ -276,7 +293,10 @@ the wire. Each tool answers a specific question:</p>
 <ul>
 <li>
 <p><strong>Signal card</strong> — <em>Is a signal arriving, and is it healthy?</em> Shows whether a
-  signal is present and from where (<strong>wired DMX / sACN / Art-Net</strong>), its <strong>frame
+  signal is present and from where (<strong>DMX / CRMX / sACN / Art-Net</strong>). It reads
+  <strong>CRMX</strong> only when the radio is verifiably carrying the data; otherwise it
+  says simply <strong>DMX</strong>, because wired and wireless arrive on the same input and
+  the source is picked by the XLR socket itself, not by the controller, its <strong>frame
   rate</strong> with a rolling 90-second graph, <strong>slot count</strong>, <strong>start code</strong>, <strong>time
   since the last packet</strong>, alternate-start-code packet count, and <strong>error
   counts</strong>. Your first check that the desk is actually reaching the rig at a good
@@ -319,12 +339,35 @@ the wire. Each tool answers a specific question:</p>
 <p>Controller <strong>ID</strong> and <strong>Bluetooth name</strong> (what the pairing list shows), <strong>apply
 mode</strong> (how a change made to "All" fans out across the ports), <strong>CRMX wireless</strong>
 (link / unlink / antenna select — the status reads <strong>green when linked</strong>),
-<strong>Firmware update over Bluetooth</strong> (§2a), <strong>Flash to find</strong> (strobes this
-controller's screen for 3 s so you can pick it out of a rack — outputs
-untouched), <strong>Reset all ports</strong> with an <strong>Undo</strong>, <strong>show-file export / import</strong>
+<strong>Firmware update over Bluetooth</strong> (§2a), <strong>Flash to find</strong> (identifies this
+controller for 5 s so you can pick it out of a rack: units with a front panel
+strobe their screen and leave the rig untouched; the screenless <strong>JMB one</strong>
+blinks its own outputs instead, being the only thing it can show you with), <strong>Reset all ports</strong> with an <strong>Undo</strong>, <strong>show-file export / import</strong>
 (one <strong>.jmb</strong> file carrying the whole rig — addresses, heads, labels, looks and
 scenes — reloadable on any phone or controller), <strong>change PIN</strong>, and
 <strong>Disconnect</strong>.</p>
+<p><strong>Test sequences</strong> (Setup, top of the tab) drive every port directly, overriding
+every source — <strong>live DMX included</strong> — until switched <strong>Off</strong>. A banner appears
+on the Control tab while a test runs, with its own <em>Stop test</em> button, and the
+<strong>Off</strong> button lights when nothing is running so you can tell at a glance.</p>
+<ul>
+<li><strong>Step RGBW</strong> — full drive red → green → blue → white, one second each, gamma
+  bypassed. Every channel at maximum and identical on all ports, so a dead
+  channel or a weak output stage stands out immediately.</li>
+<li><strong>Fade</strong> — a smooth rainbow sweep, for judging dimming smoothness and colour
+  blending.</li>
+</ul>
+<p><strong>The wiring check</strong> runs automatically during Step RGBW. Because that test
+lights one colour at a time, and each port measures its own current, the reading
+during each step <em>is</em> that channel's current. After one full four-second cycle
+the app lists them per port:</p>
+<p><code>Port 1:  R 1.90A · G 1.60A · B 1.50A · W 4.90A
+   ✓ consistent</code></p>
+<p>Colours legitimately differ — red's forward voltage is about a volt below green
+and blue — so the check only speaks up for unambiguous cases: an output drawing
+nothing, an output drawing markedly more than its siblings, or the two together,
+which means two colours are sharing a terminal (see §7). The figures stay on
+screen after you stop the test.</p>
 <p><strong>Effects on tuneable-white ports.</strong> On a CW/WW personality the effect list only
 offers the effects that read on a white strip (Candle, Fire, Lightning, TV Sim,
 Strobe, Pulse, Fluoro, Paparazzi, Explosion); the colour-only effects are hidden
@@ -339,6 +382,20 @@ learning the app or showing it off before the hardware is in front of you.</p>
 µs trip, over-temperature, ground-leak imbalance, comms-loss failsafe.
 Latched ports show a flashing fault banner on their screen, the fault word
 appears in the menu and the app, and Clear Faults / Port Reset re-arms.</p>
+<p><strong>Wiring fault.</strong> Separate from the electrical faults above, and raised by the
+controller rather than the port. Running <strong>Step RGBW</strong> measures each output's
+current one colour at a time; if one output draws roughly double while another
+draws nothing, two colours are almost certainly sharing a terminal. The port is
+<strong>inhibited</strong> and both the panel and the app name the pair — <em>P1 WIRE R+B</em> means
+the blue load is on the red terminal.</p>
+<p>This matters because it is the one wiring mistake the port's own protection
+cannot see: the current still leaves and returns through the same loop, so
+over-current and ground-leak detection are both satisfied while one output
+quietly carries two channels' worth. <strong>Clear Faults</strong> on the panel, or <em>Clear
+wiring fault &amp; re-enable</em> in the app, restores the port; if the wiring is still
+crossed it latches again the next time you run the test. An output with simply
+<em>nothing</em> connected is reported but never inhibits a port — a tuneable-white
+fixture legitimately has an unused output.</p>
 <p><strong>Thermal foldback</strong> (Setup → Thermal Fold, on by default): before a port hits
 its over-temp trip, it eases the output down over the last 10 °C (to a 30 %
 floor) so a hot fixture <em>rides through</em> instead of hard-latching mid-show. The
