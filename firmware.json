@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "511b21c-20260904",
-  "size": 1190304,
-  "crc32": "39adcb9c",
-  "sha256": "b38f63a9fe6a3f57ec93a5ee0fe642c7a4810e054d591911307faeafd93145e6",
+  "build": "deb0ceb-20260904",
+  "size": 1190336,
+  "crc32": "bd7dc75d",
+  "sha256": "0286d308162b7767cddadbe8731652f9691c6cc6c4a48516a22a92e14e22b9c9",
   "date": "2026-09-04",
-  "notes": "Dimmer: square-law (perceptual) response, like a tungsten lamp",
+  "notes": "Dimmer: square law WITH a smooth-light floor \u2014 the pure law walked into the port's sparse-pulse zone",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
