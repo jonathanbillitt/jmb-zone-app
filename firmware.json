@@ -1,16 +1,16 @@
 {
   "version": "2.0.0",
-  "build": "deb0ceb-20260904",
-  "size": 1190336,
-  "crc32": "bd7dc75d",
-  "sha256": "0286d308162b7767cddadbe8731652f9691c6cc6c4a48516a22a92e14e22b9c9",
+  "build": "ec0c2b5-20260904",
+  "size": 1190304,
+  "crc32": "ae3cfbcd",
+  "sha256": "f777d4c225c4788dd4fd380bd5d0fc368af313baf0de3869422cf6d2113b8af4",
   "date": "2026-09-04",
-  "notes": "Dimmer: square law WITH a smooth-light floor \u2014 the pure law walked into the port's sparse-pulse zone",
+  "notes": "Restore July's low end on .2 hardware: port floor to 1 tick (plain dither), dimmer linear \u2014 floor and square law kept selectable for .3",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
     "size": 17084,
-    "crc32": "5f3f28d3",
-    "sha256": "9e0da72cc91a8f978f1393e51a6598ab01c93401d60287da2149ac632b11413e"
+    "crc32": "21c85840",
+    "sha256": "14a39e92408e2a9688c6e9857170b7d290debabd09313b0c88217126266974c9"
   }
 }
