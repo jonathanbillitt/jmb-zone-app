@@ -620,10 +620,16 @@
         <span class="mini" id="otaState" style="margin:0">—</span>
       </div>
       <div class="ctlrow">
+        <button id="btnOtaHosted" class="primary" disabled>Install latest firmware</button>
+        <button id="btnOtaCancel" class="danger hidden">Cancel</button>
+      </div>
+      <div class="mini" id="otaHosted">Checking for the latest firmware…</div>
+      <div class="mini" style="margin-top:12px;color:var(--dim)">Or install a
+      firmware file of your own:</div>
+      <div class="ctlrow">
         <button id="btnOtaPick">Choose .bin…</button>
         <input type="file" id="otaFile" accept=".bin,application/octet-stream" class="hidden">
-        <button id="btnOtaGo" class="primary" disabled>Update over Bluetooth</button>
-        <button id="btnOtaCancel" class="danger hidden">Cancel</button>
+        <button id="btnOtaGo" disabled>Update over Bluetooth</button>
       </div>
       <div class="ctlrow" id="otaRbRow" style="margin-top:8px">
         <button id="btnOtaRollback" class="danger" disabled>Roll back to previous</button>
@@ -631,9 +637,10 @@
       <div id="otaBarWrap" class="hidden" style="margin-top:10px;height:10px;background:var(--card2);border-radius:6px;overflow:hidden">
         <div id="otaBar" style="height:100%;width:0;background:linear-gradient(90deg,#6a2cf5,#5fd7ff);transition:width .15s"></div>
       </div>
-      <div class="mini" id="otaMsg">Update the controller over Bluetooth — pick your
-      build's <code>firmware.bin</code>. Keep the app open and the phone unlocked
-      until it finishes; the controller reboots into the new firmware itself.</div>
+      <div class="mini" id="otaMsg">Firmware arrives over Bluetooth — no cable, no
+      files to find. Keep the app open and the phone unlocked until it finishes.
+      The controller reboots into the new build itself, and if that build fails to
+      start it returns to the previous one on its own.</div>
     </div>
     <div class="card">
       <div class="ctlrow across">
@@ -763,7 +770,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04a.testbanner-rollback";
+const APP_VER="2026-09-04b.hosted-firmware";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2617,6 +2624,20 @@ function crc32(buf){
 }
 const otaEnc=s=>new TextEncoder().encode(s);
 let otaSelFile=null, otaBusy=false, otaAbort=false, otaWaiter=null, otaProbationSeen=false;
+// HOSTED FIRMWARE — the image is published next to this app, so updating is one
+// button instead of hunting for a .bin. Served from our own origin, so no CORS
+// and the service worker keeps a copy for a retry with no signal.
+let otaManifest=null;
+async function loadOtaManifest(){
+  try{
+    const r=await fetch("firmware.json");
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const m=await r.json();
+    if(!m||!m.size||!m.crc32) throw new Error("incomplete manifest");
+    otaManifest=m;
+  }catch(_){ otaManifest=null; }   // offline or nothing published — manual still works
+  renderOta();
+}
 function setOtaState(t){ $("otaState").textContent=t; }
 function setOtaMsg(t){ $("otaMsg").textContent=t; }
 function otaProgress(f){ $("otaBarWrap").classList.remove("hidden");
@@ -2629,6 +2650,29 @@ function renderOta(){
   // RBOK=0 means the other slot is erased (board never OTA'd) — nothing to go
   // back to, so don't offer it. Older firmware omits RBOK entirely: treat a
   // missing key as "no", never as "yes".
+  // Hosted-firmware line. FWB is the controller's build id; older firmware does
+  // not send it, so "same build" is only ever claimed when we can actually
+  // compare two ids — never inferred from silence.
+  const hb=$("btnOtaHosted"), hm=$("otaHosted");
+  if(hb&&hm){
+    if(!otaManifest){
+      hb.disabled=true;
+      hb.textContent="Install latest firmware";
+      hm.textContent="No hosted firmware available right now — you can still "
+        +"install a file below.";
+    }else{
+      const running=kv.FWB||"";
+      const same=running && running===otaManifest.build;
+      hb.disabled=!ok||otaBusy||same;
+      hb.textContent=same ? "Latest already installed"
+                          : "Install "+otaManifest.version+" over Bluetooth";
+      hm.textContent="Available: "+otaManifest.version+" · build "+otaManifest.build
+        +" · "+Math.round(otaManifest.size/1024)+" KB · "+otaManifest.date
+        +(running ? " — controller is running build "+running
+                  : (ok ? " — controller reports no build id (older firmware)"
+                        : " — connect to compare with the controller"));
+    }
+  }
   const rbOk = ok && kv.RBOK==="1";
   const rbBtn = $("btnOtaRollback");
   if(rbBtn){
@@ -2696,6 +2740,39 @@ $("btnOtaRollback").onclick=async()=>{
   try{ await otacChar.writeValueWithResponse(otaEnc("ROLLBACK")); }
   catch(e){ setOtaState("rollback failed");
             setOtaMsg("Could not reach the controller: "+(e.message||e)); }
+};
+$("btnOtaHosted").onclick=async()=>{
+  if(!otaManifest) return;
+  setOtaState("downloading…");
+  let buf;
+  try{
+    const r=await fetch(otaManifest.file||"firmware.bin");
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    buf=await r.arrayBuffer();
+  }catch(e){
+    setOtaState("download failed");
+    setOtaMsg("Could not download the firmware: "+((e&&e.message)||e)
+      +" — nothing was sent to the controller.");
+    return;
+  }
+  // Check the download BEFORE opening an OTA session. A truncated or corrupted
+  // download would otherwise be caught only by the controller's CRC after
+  // several minutes of uploading — and a size-correct but wrong image would
+  // reach the inactive slot before anything noticed.
+  if(buf.byteLength!==otaManifest.size){
+    setOtaState("download failed");
+    setOtaMsg("Downloaded "+buf.byteLength+" bytes but the manifest says "
+      +otaManifest.size+" — refusing to install a truncated image.");
+    return;
+  }
+  const got=crc32(buf).toString(16).padStart(8,"0");
+  if(got!==otaManifest.crc32){
+    setOtaState("download failed");
+    setOtaMsg("Checksum mismatch (got "+got+", expected "+otaManifest.crc32
+      +") — refusing to install.");
+    return;
+  }
+  await runOta(new File([buf], otaManifest.version+" build "+otaManifest.build));
 };
 $("btnOtaCancel").onclick=()=>{ otaAbort=true; };
 $("btnOtaGo").onclick=()=>runOta(otaSelFile);
@@ -2914,6 +2991,11 @@ if(!bleAvailable()){
     "open this page in the Bluefy browser — or install the App Store build.</div>");
   $("btnConnect").disabled=true;
 }
+
+// Look up the hosted firmware once at startup, so the update card can say what
+// is available before you connect to anything. Failure is silent and harmless:
+// renderOta falls back to "no hosted firmware" and the manual picker still works.
+loadOtaManifest();
 </script>
 </body>
 </html>

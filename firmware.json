@@ -1,0 +1,10 @@
+{
+  "version": "2.0.0",
+  "build": "6254b30+-20260904",
+  "size": 1184224,
+  "crc32": "acb0bbb4",
+  "sha256": "a16989ccb8bad4d2f0b20797b8c8c5a32a1e0df28590d1c57fe6d0564e3b14ce",
+  "date": "2026-09-04",
+  "notes": "Uncommitted bench build (based on: store assets: re-shoot screenshots at a phone viewport (540 CSS px @2x = 1080x1860) - the )",
+  "file": "firmware.bin"
+}
