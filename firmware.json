@@ -1,16 +1,16 @@
 {
   "version": "2.0.0",
-  "build": "e9a2e08-20260904",
+  "build": "87b40ce-20260904",
   "size": 1190272,
-  "crc32": "e36f804c",
-  "sha256": "ea5d7b101f7d1b96112aae82335d2001c09ac15f43a7292af715bc3e7920adf5",
+  "crc32": "54c24232",
+  "sha256": "442074b89681529e11de7ad1659f8c193f60da3f77d7e7d122c7a13db3612fc2",
   "date": "2026-09-04",
-  "notes": "Port PWM: minimum pulse 20 -> 40 ticks (2.5 us) as a test of light-per-pulse; dead zone defined as a rate",
+  "notes": "Port PWM: precompute the dead-zone threshold \u2014 a per-period ISR division was starving the bus and firing the 1 Hz comms failsafe",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
-    "size": 17072,
-    "crc32": "0d4e60f3",
-    "sha256": "23c522e0b261ba93457d65577516a2a51915c57c2442f296c0427595fe51234f"
+    "size": 17084,
+    "crc32": "5f3f28d3",
+    "sha256": "9e0da72cc91a8f978f1393e51a6598ab01c93401d60287da2149ac632b11413e"
   }
 }
