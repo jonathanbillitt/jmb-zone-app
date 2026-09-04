@@ -784,7 +784,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04c.stm-ble-update";
+const APP_VER="2026-09-04d.crmx-source-label";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1177,7 +1177,7 @@ function renderControl(){
   if(w){
     w.classList.toggle("hidden", !dmxLive || testOn);
     if(dmxLive){
-      const src=["a network source","DMX","sACN","Art-Net"][+(kv.SRC||1)]||"DMX";
+      const src=["a network source","DMX","sACN","Art-Net","CRMX"][+(kv.SRC||1)]||"DMX";
       $("dmxWarnSrc").textContent=src+(kv.FPS?` (${kv.FPS} fps)`:"");
     }
   }
@@ -1970,7 +1970,10 @@ function renderProductMark(){
 }
 
 // ---------- Diag tab ----------
-const SRC_NAMES=["—","Wired DMX","sACN","Art-Net"];
+// Index 4 = CRMX. The controller reports it separately from wired even though
+// both arrive on the same input, because the jack's insertion switch — not
+// firmware — picks between them; see the SRC note in ble_control.cpp.
+const SRC_NAMES=["—","Wired DMX","sACN","Art-Net","CRMX"];
 let fpsHist=[], fpsLast=0;
 function fmtAge(ms){ if(ms==null||isNaN(ms)) return "—";
   return ms<1500?ms+"ms":ms<90000?(ms/1000).toFixed(1)+"s":Math.round(ms/60000)+"m"; }
@@ -2352,7 +2355,7 @@ function renderSetup(){
     $("tsFade").className = t===1 ? "primary" : "";
     $("tsStep").className = t===2 ? "primary" : "";
   }
-  const srcName=["off","DMX","sACN","Art-Net"][+(kv.SRC||0)]||"—";
+  const srcName=["off","DMX","sACN","Art-Net","CRMX"][+(kv.SRC||0)]||"—";
   const netOn=(kv.NET==="1"), wifiUp=(kv.NW==="1");
   $("netStatus").textContent = !netOn ? "off"
       : wifiUp ? `Wi-Fi ${kv.NIP||""} · ${kv.NRS||"?"}dBm · live: ${srcName}`
