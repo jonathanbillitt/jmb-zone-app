@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "65fa19d-20260904",
-  "size": 1189696,
-  "crc32": "d59f7b58",
-  "sha256": "65a46200cb284fb69f8e3d2f2f59cb6ecd1cfb4dbc4aabc84f7c2e0a74dda9ea",
+  "build": "b863030-20260904",
+  "size": 1189920,
+  "crc32": "086f1ea3",
+  "sha256": "e97fa32cf9ffc6f7cba948be3e0bccc76c4ceb865ea03dabdfa4103f56208d67",
   "date": "2026-09-04",
-  "notes": "One \"Update Firmware\" button; app version moves to the bottom of Setup and checks itself on open",
+  "notes": "STM staging buffered in RAM: filesystem writes were failing the transfer from the BLE callback",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",

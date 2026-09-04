@@ -654,7 +654,11 @@
         <button id="btnOtaRollback" class="danger" disabled>Roll back</button>
       </div>
       <div id="stmWrap" class="hidden">
-        <span class="mini" id="stmState"></span><span class="mini" id="stmMsg"></span>
+        <!-- stmState is kept so the existing progress calls have somewhere to
+             write, but it is internal detail and never rendered — shown next to
+             stmMsg it read as "failedPort update failed". -->
+        <span id="stmState" class="hidden"></span>
+        <div class="mini" id="stmMsg"></div>
       </div>
       <div id="otaBarWrap" class="hidden" style="margin-top:10px;height:10px;background:var(--card2);border-radius:6px;overflow:hidden">
         <div id="otaBar" style="height:100%;width:0;background:linear-gradient(90deg,#6a2cf5,#5fd7ff);transition:width .15s"></div>
@@ -803,7 +807,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04p.one-button";
+const APP_VER="2026-09-04q.stm-ram-stage";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
