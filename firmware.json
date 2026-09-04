@@ -1,16 +1,16 @@
 {
   "version": "2.0.0",
-  "build": "e4ad3c4-20260904",
+  "build": "0435adc-20260904",
   "size": 1190272,
-  "crc32": "1a8ddaf0",
-  "sha256": "27d57509dadb57e464e2db9a1e9f6af864fbc82a3a63772e00f8ce6a257a4da3",
+  "crc32": "47751624",
+  "sha256": "ca0d6335a48cd365a7f91d6acb4e392a675ad0e6bbbe35c6d9ee558cef6405ef",
   "date": "2026-09-04",
-  "notes": "Bluetooth link strength at the top of Setup",
+  "notes": "Port PWM: minimum-pulse floor as a single unified sigma-delta; signal bars blue",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
-    "size": 16984,
-    "crc32": "fec4353d",
-    "sha256": "3f90e92027aced5cf723db8d8b08fecf6e2e87ccdfa7065e6245201d90040fae"
+    "size": 17024,
+    "crc32": "c6c5cbed",
+    "sha256": "a34ff58bdeb625fce18df12e693abbd4e1435c04603c27b674dae83dcc98dcac"
   }
 }

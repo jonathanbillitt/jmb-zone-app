@@ -190,10 +190,13 @@
   .sigbars i { width:3px; background:var(--line); border-radius:1px; display:block; }
   .sigbars i:nth-child(1){ height:4px; }  .sigbars i:nth-child(2){ height:7px; }
   .sigbars i:nth-child(3){ height:10px; } .sigbars i:nth-child(4){ height:14px; }
-  .sigbars.q1 i:nth-child(-n+1), .sigbars.q2 i:nth-child(-n+2),
-  .sigbars.q3 i:nth-child(-n+3), .sigbars.q4 i:nth-child(-n+4) { background:var(--ok); }
+  /* Good link reads BLUE — it is a Bluetooth meter, and green is the colour of
+     "linked" on the CRMX card; two green things next to each other would invite
+     confusion. Amber and red keep their warning meanings. */
+  .sigbars.q3 i:nth-child(-n+3), .sigbars.q4 i:nth-child(-n+4) { background:var(--acc); }
   .sigbars.q1 i:nth-child(-n+1) { background:var(--bad); }
   .sigbars.q2 i:nth-child(-n+2) { background:var(--warn); }
+  .sig.on svg { stroke:var(--acc); }
   /* Test sequences outrank EVERY source — live DMX included — so this banner
      takes precedence over .dmxwarn (showing both would be contradictory) and
      carries its own stop button: the outputs are overridden from the Control
@@ -813,7 +816,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04z.drop-refresh";
+const APP_VER="2026-09-05a.pdm-floor-blue-bars";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
