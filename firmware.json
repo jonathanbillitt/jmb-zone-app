@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "1c9f89a-20260904",
-  "size": 1189968,
-  "crc32": "b68c6d0a",
-  "sha256": "9e2aef87121402e69313c3a9012145142aafb2ec3686c12c652ba9d104379f97",
+  "build": "e4ad3c4-20260904",
+  "size": 1190272,
+  "crc32": "1a8ddaf0",
+  "sha256": "27d57509dadb57e464e2db9a1e9f6af864fbc82a3a63772e00f8ce6a257a4da3",
   "date": "2026-09-04",
-  "notes": "Take LittleFS off the state-build path \u2014 the exact route that rebooted a unit before",
+  "notes": "Bluetooth link strength at the top of Setup",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",

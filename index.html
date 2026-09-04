@@ -180,6 +180,16 @@
   .dmxwarn strong { display:block; color:var(--warn); font-size:15px; margin-bottom:3px; }
   .dmxwarn em { color:var(--text); font-style:normal; font-weight:600; }
   .dmxwarn #dmxWarnSrc { font-weight:700; }
+  /* Bluetooth link strength — four bars, rising heights. */
+  .sigbars { display:inline-flex; align-items:flex-end; gap:2px; height:14px;
+             vertical-align:-2px; }
+  .sigbars i { width:3px; background:var(--line); border-radius:1px; display:block; }
+  .sigbars i:nth-child(1){ height:4px; }  .sigbars i:nth-child(2){ height:7px; }
+  .sigbars i:nth-child(3){ height:10px; } .sigbars i:nth-child(4){ height:14px; }
+  .sigbars.q1 i:nth-child(-n+1), .sigbars.q2 i:nth-child(-n+2),
+  .sigbars.q3 i:nth-child(-n+3), .sigbars.q4 i:nth-child(-n+4) { background:var(--ok); }
+  .sigbars.q1 i:nth-child(-n+1) { background:var(--bad); }
+  .sigbars.q2 i:nth-child(-n+2) { background:var(--warn); }
   /* Test sequences outrank EVERY source — live DMX included — so this banner
      takes precedence over .dmxwarn (showing both would be contradictory) and
      carries its own stop button: the outputs are overridden from the Control
@@ -464,6 +474,16 @@
   </div>
 
   <div id="tab-setup" class="tab hidden">
+    <div class="card" id="linkCard">
+      <div class="row" style="justify-content:space-between">
+        <label style="font-weight:600">Bluetooth link</label>
+        <span class="mini" style="margin:0">
+          <span class="sigbars" id="sigBars"><i></i><i></i><i></i><i></i></span>
+          <span id="sigTxt" style="margin-left:6px"></span>
+        </span>
+      </div>
+      <div class="mini" id="sigMsg"></div>
+    </div>
     <div class="card">
       <label style="font-weight:600">Test sequences</label>
       <div class="ctlrow" style="margin-top:6px">
@@ -807,7 +827,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04t.dismiss-dead-prompt";
+const APP_VER="2026-09-04u.link-strength";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2416,6 +2436,7 @@ function renderSetup(){
     st.textContent = kv.CHL==="1" ? "ARMED — waiting for baton" : "off";
     st.style.color = kv.CHL==="1" ? "var(--warn)" : "var(--dim)";
   }
+  renderLink();
   renderWiring();
   // Test-sequence state — highlight the running sequence's button
   if(kv.TSEQ!=null){
@@ -2492,6 +2513,38 @@ const WC_VERDICT=[
   "⚠ one output has no load — open circuit, or that colour is fed from "
     +"another terminal",
   "⚠ one output draws markedly more than the others"];
+// BLE link strength. The controller measures this: Web Bluetooth cannot read
+// RSSI once connected — the browser only exposes it while scanning
+// advertisements — so BRS comes from the controller's own radio.
+// Thresholds are the usual BLE rules of thumb: better than -60 is excellent,
+// -70 good, -80 workable, below that expect dropouts.
+function renderLink(){
+  const bars=$("sigBars"), txt=$("sigTxt"), msg=$("sigMsg");
+  if(!bars) return;
+  const connected = bleConnected() || demoOn;
+  const raw = kv.BRS!=null ? +kv.BRS : null;
+  let q=0, word="";
+  if(!connected){ txt.textContent="not connected"; msg.textContent=""; 
+                  bars.className="sigbars"; return; }
+  if(raw==null || raw===0){
+    txt.textContent="measuring…";
+    msg.textContent="Waiting for the controller's first reading.";
+    bars.className="sigbars"; return;
+  }
+  if(raw > -60){ q=4; word="excellent"; }
+  else if(raw > -70){ q=3; word="good"; }
+  else if(raw > -80){ q=2; word="fair"; }
+  else { q=1; word="weak"; }
+  bars.className="sigbars q"+q;
+  txt.textContent=raw+" dBm · "+word;
+  msg.textContent = q>=3
+    ? "Strong enough for firmware updates."
+    : q===2
+      ? "Usable, but move closer before starting a firmware update — a long "
+        +"transfer is where a marginal link shows up."
+      : "Weak. Expect dropouts; move closer to the controller.";
+}
+
 const WC_COLOUR={R:"red",G:"green",B:"blue"};
 function renderWiring(){
   const el=$("wireChk"); if(!el) return;
