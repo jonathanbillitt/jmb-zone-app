@@ -1,16 +1,16 @@
 {
   "version": "2.0.0",
-  "build": "6bb9bf0-20260904",
+  "build": "e9a2e08-20260904",
   "size": 1190272,
-  "crc32": "25694669",
-  "sha256": "903f0faff0948788fa0f1193c48777f663048dc4db72af17089b52f69aa440e5",
+  "crc32": "e36f804c",
+  "sha256": "ea5d7b101f7d1b96112aae82335d2001c09ac15f43a7292af715bc3e7920adf5",
   "date": "2026-09-04",
-  "notes": "Port PWM: run the dither step in TIM3's update interrupt so it can never skip a period",
+  "notes": "Port PWM: minimum pulse 20 -> 40 ticks (2.5 us) as a test of light-per-pulse; dead zone defined as a rate",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
-    "size": 17056,
-    "crc32": "3ee7199a",
-    "sha256": "b8a86cb03cbd2b608328335b0a3e51db3bf1ec6f532ed24531182ef43d0128cf"
+    "size": 17072,
+    "crc32": "0d4e60f3",
+    "sha256": "23c522e0b261ba93457d65577516a2a51915c57c2442f296c0427595fe51234f"
   }
 }
