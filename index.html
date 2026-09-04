@@ -180,6 +180,18 @@
   .dmxwarn strong { display:block; color:var(--warn); font-size:15px; margin-bottom:3px; }
   .dmxwarn em { color:var(--text); font-style:normal; font-weight:600; }
   .dmxwarn #dmxWarnSrc { font-weight:700; }
+  /* Test sequences outrank EVERY source — live DMX included — so this banner
+     takes precedence over .dmxwarn (showing both would be contradictory) and
+     carries its own stop button: the outputs are overridden from the Control
+     tab, so the way out belongs here, not two tabs away in Setup. Blue, not
+     the DMX amber, so a glance tells you which override you are looking at. */
+  .testwarn { background:#122536; border:1px solid var(--acc); color:var(--acc);
+              border-radius:12px; padding:12px 14px; margin-bottom:12px;
+              font-size:13.5px; line-height:1.45;
+              display:flex; align-items:center; gap:12px; }
+  .testwarn strong { display:block; color:var(--acc); font-size:15px; margin-bottom:3px; }
+  .testwarn em { color:var(--text); font-style:normal; font-weight:600; }
+  .testwarn #testWarnName { font-weight:700; }
   /* Diag tab — analyser styling */
   .statgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
   .stat { background:var(--card2); border:1px solid var(--line); border-radius:10px;
@@ -332,6 +344,12 @@
   </div>
 
   <div id="tab-control" class="tab hidden">
+    <div id="testWarn" class="testwarn hidden">
+      <span style="flex:1"><strong>Test sequence running</strong>
+      <span id="testWarnName"></span> is driving every port and <em>overrides
+      every source</em> — live DMX included — until it is switched off.</span>
+      <button id="btnTestStop">Stop test</button>
+    </div>
     <div id="dmxWarn" class="dmxwarn hidden">
       <strong>Live DMX in control</strong>
       <span id="dmxWarnSrc"></span> is driving the outputs — manual colour, dimmer
@@ -445,6 +463,18 @@
   </div>
 
   <div id="tab-setup" class="tab hidden">
+    <div class="card">
+      <label style="font-weight:600">Test sequences</label>
+      <div class="ctlrow" style="margin-top:6px">
+        <button id="tsFade">Fade</button>
+        <button id="tsStep">Step RGBW</button>
+        <button id="tsOff">Off</button>
+      </div>
+      <div class="mini">The panel's Test menu, remotely: <b>Fade</b> = smooth
+      rainbow sweep, <b>Step RGBW</b> = full-drive R→G→B→White snap steps.
+      Runs on <em>all</em> ports and overrides every source —
+      <b>including live DMX</b> — until switched Off.</div>
+    </div>
     <div class="card">
       <div class="ctlrow">
         <button id="btnExport">Export settings</button>
@@ -565,18 +595,6 @@
     </div>
 
     <div class="card">
-      <label style="font-weight:600">Test sequences</label>
-      <div class="ctlrow" style="margin-top:6px">
-        <button id="tsFade">Fade</button>
-        <button id="tsStep">Step RGBW</button>
-        <button id="tsOff">Off</button>
-      </div>
-      <div class="mini">The panel's Test menu, remotely: <b>Fade</b> = smooth
-      rainbow sweep, <b>Step RGBW</b> = full-drive R→G→B→White snap steps.
-      Runs on <em>all</em> ports and overrides every source —
-      <b>including live DMX</b> — until switched Off.</div>
-    </div>
-    <div class="card">
       <div class="row" style="justify-content:space-between">
         <label style="font-weight:600">Effects</label>
       </div>
@@ -606,6 +624,9 @@
         <input type="file" id="otaFile" accept=".bin,application/octet-stream" class="hidden">
         <button id="btnOtaGo" class="primary" disabled>Update over Bluetooth</button>
         <button id="btnOtaCancel" class="danger hidden">Cancel</button>
+      </div>
+      <div class="ctlrow" id="otaRbRow" style="margin-top:8px">
+        <button id="btnOtaRollback" class="danger" disabled>Roll back to previous</button>
       </div>
       <div id="otaBarWrap" class="hidden" style="margin-top:10px;height:10px;background:var(--card2);border-radius:6px;overflow:hidden">
         <div id="otaBar" style="height:100%;width:0;background:linear-gradient(90deg,#6a2cf5,#5fd7ff);transition:width .15s"></div>
@@ -742,7 +763,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-03a.crmx-diag";
+const APP_VER="2026-09-04a.testbanner-rollback";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1122,15 +1143,24 @@ function renderControl(){
   // Live DMX / sACN / Art-Net outranks everything on this tab — warn loudly so
   // "my faders do nothing" is self-explaining rather than a support call.
   const dmxLive = kv.DMX==="1";
+  // A running test sequence outranks live DMX as well as manual, so it owns the
+  // banner slot outright — showing "live DMX in control" underneath a test that
+  // is overriding that very DMX would be actively misleading.
+  const testOn = (+(kv.TSEQ||0)) !== 0;
+  const tw=$("testWarn");
+  if(tw){
+    tw.classList.toggle("hidden", !testOn);
+    if(testOn) $("testWarnName").textContent = (+kv.TSEQ===1) ? "Fade" : "Step RGBW";
+  }
   const w=$("dmxWarn");
   if(w){
-    w.classList.toggle("hidden", !dmxLive);
+    w.classList.toggle("hidden", !dmxLive || testOn);
     if(dmxLive){
       const src=["a network source","DMX","sACN","Art-Net"][+(kv.SRC||1)]||"DMX";
       $("dmxWarnSrc").textContent=src+(kv.FPS?` (${kv.FPS} fps)`:"");
     }
   }
-  const lk=dmxLive && !demoOn;
+  const lk=(dmxLive||testOn) && !demoOn;
   const bp=$("btnPrep"); if(bp){ bp.disabled=lk; bp.style.opacity=lk?".45":""; }
   const root=$("ports");
   ports.forEach((m,idx)=>{
@@ -1140,7 +1170,7 @@ function renderControl(){
     // Output controls lock while live DMX outranks manual (the banner says
     // why); patch fields stay editable - addressing with the desk up is
     // normal. DEMO mode never locks: it exists to let people play.
-    card.classList.toggle("dmxlock", dmxLive && !demoOn);
+    card.classList.toggle("dmxlock", (dmxLive||testOn) && !demoOn);
     const on=m.O===1, flt=(m.F||0)!==0;
     const bOn=$("on"+p);
     bOn.textContent=on?"online":"offline";
@@ -2340,6 +2370,7 @@ $("chArm").addEventListener("change",e=>{
   st.textContent = on ? "ARMED — waiting for baton" : "off";
   st.style.color = on ? "var(--warn)" : "var(--dim)";
 });
+$("btnTestStop").onclick=()=>send("TESTSEQ=0");   // banner's own way out
 $("tsFade").onclick=()=>send("TESTSEQ=1");
 $("tsStep").onclick=()=>send("TESTSEQ=2");
 $("tsOff").onclick =()=>send("TESTSEQ=0");
@@ -2595,6 +2626,15 @@ function renderOta(){
   const ok=!!otacChar;                     // connected to OTA-capable firmware
   $("btnOtaPick").disabled=!ok||otaBusy;
   $("btnOtaGo").disabled=!ok||!otaSelFile||otaBusy;
+  // RBOK=0 means the other slot is erased (board never OTA'd) — nothing to go
+  // back to, so don't offer it. Older firmware omits RBOK entirely: treat a
+  // missing key as "no", never as "yes".
+  const rbOk = ok && kv.RBOK==="1";
+  const rbBtn = $("btnOtaRollback");
+  if(rbBtn){
+    rbBtn.disabled = !rbOk || otaBusy;
+    rbBtn.title = rbOk ? "" : "No previous firmware on this controller yet";
+  }
   if(otaBusy) return;                      // an upload in progress owns the status line
   if(ok && kv.RB==="1"){                   // freshly-flashed image on probation
     otaProbationSeen=true;
@@ -2618,6 +2658,16 @@ function otaStatHandler(e){
   else if(msg==="READY") setOtaState("uploading…");
   else if(msg==="DONE"){ otaProgress(1); setOtaState("done — rebooting"); }
   else if(msg==="ABORTED") setOtaState("cancelled");
+  else if(msg==="REVERTING"){
+    otaProbationSeen=false;              // the reverted image is not on probation
+    setOtaState("rolling back — rebooting");
+    setOtaMsg("Restarting on the previous firmware. Reconnect in a few seconds.");
+  }
+  else if(msg==="ERR noprev"){
+    setOtaState("nothing to roll back to");
+    setOtaMsg("This controller has no previous firmware stored — the second app "
+      +"slot is still empty. It fills the first time you update over Bluetooth.");
+  }
   else if(msg.startsWith("ERR")) setOtaState("error");
   if(otaWaiter) otaWaiter(msg);
 }
@@ -2633,6 +2683,20 @@ $("otaFile").addEventListener("change",ev=>{
   setOtaMsg(`Selected ${f.name} — ${(f.size/1024).toFixed(0)} KB. Tap "Update over Bluetooth".`);
   renderOta();
 });
+// Manual rollback. The probation revert only catches an image that CRASHES;
+// a build that boots fine but is WRONG in the light needs a deliberate way
+// back. RBOK tells us the other slot actually holds an app — on a board that
+// has only ever been USB-flashed once, it is erased and there is nothing to
+// go back to, so the button stays disabled rather than bricking the unit.
+$("btnOtaRollback").onclick=async()=>{
+  if(!await askConfirm("The controller restarts on the firmware it was running "
+    +"before the last update. Your settings are not affected.",
+    {title:"Roll back firmware?",ok:"Roll back",danger:true})) return;
+  setOtaState("rolling back…");
+  try{ await otacChar.writeValueWithResponse(otaEnc("ROLLBACK")); }
+  catch(e){ setOtaState("rollback failed");
+            setOtaMsg("Could not reach the controller: "+(e.message||e)); }
+};
 $("btnOtaCancel").onclick=()=>{ otaAbort=true; };
 $("btnOtaGo").onclick=()=>runOta(otaSelFile);
 async function runOta(file){
