@@ -642,6 +642,9 @@
         <button id="btnOtaCancel" class="danger hidden">Cancel</button>
       </div>
       <div class="mini" id="otaHosted">Checking for the latest firmware…</div>
+      <div class="mini" id="otaOnlyRow" style="margin-top:4px">
+        <a href="#" id="btnOtaCtrlOnly">update the controller only</a>
+      </div>
       <div class="mini" style="margin-top:12px;color:var(--dim)">Or install a
       firmware file of your own:</div>
       <div class="ctlrow">
@@ -802,7 +805,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04n.verbar-visible";
+const APP_VER="2026-09-04o.controller-only";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2844,6 +2847,8 @@ function renderOta(){
       // re-flashed regardless, so the button stays live either way — it just
       // says what the run will actually do.
       const withStm = (stmCaps()&1) && otaManifest.stm_port;
+      const onlyRow=$("otaOnlyRow");
+      if(onlyRow) onlyRow.classList.toggle("hidden", !withStm || !ok || otaBusy);
       hb.disabled=!ok||otaBusy;
       hb.textContent = withStm
         ? (same ? "Reinstall " + otaManifest.version + " + port module"
@@ -3059,10 +3064,15 @@ $("btnStmRb").onclick=async()=>{
 // run before the controller has been touched at all.
 // No version comparison: re-flashing an identical port image is a few seconds
 // of darkness and removes any doubt about what is actually on the hardware.
-async function runFullUpdate(){
+async function runFullUpdate(ctrlOnly){
   if(!otaManifest||!otacChar||!otadChar) return;
   otaSetPhase("");                      // fresh run — no stale phase to report
-  const stmInfo = ((stmCaps()&1) && otaManifest.stm_port) ? otaManifest.stm_port : null;
+  // Controller-only exists for a specific trap: a controller running firmware
+  // whose STM FLASH blocks the BLE callback drops the link before the fixed
+  // firmware can be installed. The combined run would die at the port step
+  // every time, so the fix could never arrive through the path it fixes.
+  const stmInfo = (!ctrlOnly && (stmCaps()&1) && otaManifest.stm_port)
+                ? otaManifest.stm_port : null;
   const both = !!stmInfo;
   if(!await askConfirm(
       (both ? "The port module is reprogrammed first — every output goes dark for "
@@ -3110,7 +3120,12 @@ async function runFullUpdate(){
 
 $("btnOtaHosted").onclick=async()=>{
   if(!otaManifest){ setOtaState("checking…"); await loadOtaManifest(); return; }
-  return runFullUpdate();
+  return runFullUpdate(false);
+};
+$("btnOtaCtrlOnly").onclick=async(e)=>{
+  e.preventDefault();
+  if(!otaManifest){ setOtaState("checking…"); await loadOtaManifest(); return; }
+  return runFullUpdate(true);
 };
 $("btnOtaCancel").onclick=()=>{ otaAbort=true; };
 $("btnOtaGo").onclick=()=>runOta(otaSelFile);

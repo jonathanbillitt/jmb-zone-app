@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "deb3a03-20260904",
-  "size": 1189648,
-  "crc32": "20506318",
-  "sha256": "f3b2210efb758c7f709185dbe0d584001a76233aef313de97c1c825337190670",
+  "build": "fc8ac2d-20260904",
+  "size": 1189696,
+  "crc32": "90be62c7",
+  "sha256": "445abf1cbb564c1c10c17729899ba16626cb5ee0ded0cd0be57ac97b6304be95",
   "date": "2026-09-04",
-  "notes": "App version visible before connecting, a way past a stale cached shell, and capture WHERE an update dies",
+  "notes": "STM programming ran inside the BLE write callback and dropped the link; add a controller-only path so the fix can be delivered",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
