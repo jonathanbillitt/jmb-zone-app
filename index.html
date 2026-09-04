@@ -181,6 +181,10 @@
   .dmxwarn em { color:var(--text); font-style:normal; font-weight:600; }
   .dmxwarn #dmxWarnSrc { font-weight:700; }
   /* Bluetooth link strength — four bars, rising heights. */
+  .sig { display:inline-flex; align-items:center; gap:5px; flex-shrink:0; }
+  .sig svg { width:13px; height:13px; fill:none; stroke:var(--dim);
+             stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round; }
+  .sig.on svg { stroke:var(--text); }
   .sigbars { display:inline-flex; align-items:flex-end; gap:2px; height:14px;
              vertical-align:-2px; }
   .sigbars i { width:3px; background:var(--line); border-radius:1px; display:block; }
@@ -323,6 +327,10 @@
     <span id="prodMark"></span>
   </span>
   <h1 id="title">JMB Lighting</h1>
+  <span id="sigWrap" class="sig hidden" title="">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 7.5 17.5 16.5 12 22V2l5.5 5.5L6.5 16.5"/></svg>
+    <span class="sigbars" id="sigBars"><i></i><i></i><i></i><i></i></span>
+  </span>
   <button id="btnConnect" class="primary">Connect</button>
 </header>
 
@@ -474,16 +482,6 @@
   </div>
 
   <div id="tab-setup" class="tab hidden">
-    <div class="card" id="linkCard">
-      <div class="row" style="justify-content:space-between">
-        <label style="font-weight:600">Bluetooth link</label>
-        <span class="mini" style="margin:0">
-          <span class="sigbars" id="sigBars"><i></i><i></i><i></i><i></i></span>
-          <span id="sigTxt" style="margin-left:6px"></span>
-        </span>
-      </div>
-      <div class="mini" id="sigMsg"></div>
-    </div>
     <div class="card">
       <label style="font-weight:600">Test sequences</label>
       <div class="ctlrow" style="margin-top:6px">
@@ -827,7 +825,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04u.link-strength";
+const APP_VER="2026-09-04v.link-in-header";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2519,30 +2517,32 @@ const WC_VERDICT=[
 // Thresholds are the usual BLE rules of thumb: better than -60 is excellent,
 // -70 good, -80 workable, below that expect dropouts.
 function renderLink(){
-  const bars=$("sigBars"), txt=$("sigTxt"), msg=$("sigMsg");
-  if(!bars) return;
+  const wrap=$("sigWrap"), bars=$("sigBars");
+  if(!wrap||!bars) return;
   const connected = bleConnected() || demoOn;
+  if(!connected){ wrap.classList.add("hidden"); return; }
+  wrap.classList.remove("hidden");
   const raw = kv.BRS!=null ? +kv.BRS : null;
-  let q=0, word="";
-  if(!connected){ txt.textContent="not connected"; msg.textContent=""; 
-                  bars.className="sigbars"; return; }
-  if(raw==null || raw===0){
-    txt.textContent="measuring…";
-    msg.textContent="Waiting for the controller's first reading.";
-    bars.className="sigbars"; return;
+  if(raw==null || raw===0){                 // connected, no reading yet
+    wrap.classList.remove("on");
+    bars.className="sigbars";
+    wrap.title="Bluetooth connected — measuring signal strength…";
+    return;
   }
+  let q, word;
   if(raw > -60){ q=4; word="excellent"; }
   else if(raw > -70){ q=3; word="good"; }
   else if(raw > -80){ q=2; word="fair"; }
   else { q=1; word="weak"; }
+  wrap.classList.add("on");
   bars.className="sigbars q"+q;
-  txt.textContent=raw+" dBm · "+word;
-  msg.textContent = q>=3
-    ? "Strong enough for firmware updates."
+  // The detail lives on the tooltip so the header stays a glance, not a readout.
+  wrap.title="Bluetooth "+raw+" dBm · "+word+" — "+(q>=3
+    ? "strong enough for firmware updates."
     : q===2
-      ? "Usable, but move closer before starting a firmware update — a long "
+      ? "usable, but move closer before starting a firmware update; a long "
         +"transfer is where a marginal link shows up."
-      : "Weak. Expect dropouts; move closer to the controller.";
+      : "expect dropouts; move closer to the controller.");
 }
 
 const WC_COLOUR={R:"red",G:"green",B:"blue"};
