@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "fc8ac2d-20260904",
+  "build": "65fa19d-20260904",
   "size": 1189696,
-  "crc32": "90be62c7",
-  "sha256": "445abf1cbb564c1c10c17729899ba16626cb5ee0ded0cd0be57ac97b6304be95",
+  "crc32": "d59f7b58",
+  "sha256": "65a46200cb284fb69f8e3d2f2f59cb6ecd1cfb4dbc4aabc84f7c2e0a74dda9ea",
   "date": "2026-09-04",
-  "notes": "STM programming ran inside the BLE write callback and dropped the link; add a controller-only path so the fix can be delivered",
+  "notes": "One \"Update Firmware\" button; app version moves to the bottom of Setup and checks itself on open",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",

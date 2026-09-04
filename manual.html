@@ -117,16 +117,11 @@ names the winner: <strong>DMX</strong> or <strong>CRMX</strong>.</p>
 <p>The controller updates its own firmware straight over Bluetooth from the app —
 no USB, no cable, no Wi-Fi.</p>
 <ul>
-<li><strong>One button</strong> updates everything (Setup → <em>Firmware update</em>). On a unit whose
-  port module can be programmed this reads <strong>Update controller + port module</strong>
-  and does both in a single run: the <strong>port module first</strong> — every output goes
-  dark for a few seconds — and then the controller, which restarts into its new
-  firmware at the end. That order is deliberate: the controller update finishes
-  by rebooting and dropping the Bluetooth link, so anything after it would need
-  a reconnect, and doing the port first means a port failure stops the run
-  before the controller has been touched at all. The port module is re-flashed
-  whether or not its firmware changed, so there is never any doubt about what is
-  on the hardware.
+<li><strong>One button: Update Firmware</strong> (Setup → <em>Firmware update</em>). It updates
+  everything the unit runs, in one go. Outputs go dark for a few seconds part
+  way through, and the controller restarts into its new firmware at the end.
+  Nothing needs choosing and nothing needs finding — the firmware is published
+  alongside the app.
   The firmware is published alongside the app, so there is no file to find and
   no way to send a build meant for a different product. The card names the
   version and build about to be installed, and the build the controller is
@@ -139,17 +134,13 @@ no USB, no cable, no Wi-Fi.</p>
   up cleanly and confirm itself, the controller returns to the previous working
   firmware on its own. The app shows <em>confirming…</em> during probation and
   <em>firmware confirmed</em> once the build has proven itself.</li>
-<li><strong>Manual rollback.</strong> <em>Roll back to previous</em> returns to the last firmware
+<li><strong>Manual rollback.</strong> <em>Roll back</em> returns everything to the previous firmware
   deliberately — for a build that runs perfectly well but behaves wrongly,
   which the automatic check cannot detect. The button stays greyed until there
   is a previous version stored, which happens after your first update.</li>
-<li><strong>Port module firmware.</strong> The port processor — the one driving the LEDs and
-  enforcing current, temperature and short-circuit protection — updates the
-  same way, from <em>Port module firmware</em> on the same card. Outputs go dark for a
-  few seconds while it is reprogrammed, and its previous version is kept for
-  rollback. If an attempt fails the port simply keeps the firmware it had, and
-  it can be retried over Bluetooth. Do not power the unit off during a port
-  update.</li>
+<li><strong>Do not power the unit off during an update.</strong> If one fails part way, the
+  unit keeps the firmware it already had — nothing is committed until it has
+  been checked — and it can simply be retried over Bluetooth.</li>
 </ul>
 <blockquote>
 <p>Keep the app open and the phone unlocked until an update finishes. Outputs

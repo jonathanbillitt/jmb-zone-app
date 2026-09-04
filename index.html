@@ -315,12 +315,7 @@
   <h1 id="title">JMB Lighting</h1>
   <button id="btnConnect" class="primary">Connect</button>
 </header>
-<!-- No negative top margin: the header is position:sticky with z-index 5, so a
-     negative margin slid this underneath it and clipped the text. -->
-<div class="mini" id="appVerBar" style="text-align:right;margin:10px 16px 2px">
-  <span id="appVerTxt"></span>
-  <a href="#" id="appRefresh" style="margin-left:8px">refresh app</a>
-</div>
+
 
 <div id="chips" class="hidden">
   <span class="chip" id="chipDmx">DMX <b>—</b></span>
@@ -638,12 +633,15 @@
         <span class="mini" id="otaState" style="margin:0">—</span>
       </div>
       <div class="ctlrow">
-        <button id="btnOtaHosted" class="primary" disabled>Install latest firmware</button>
+        <button id="btnOtaHosted" class="primary" disabled>Update Firmware</button>
         <button id="btnOtaCancel" class="danger hidden">Cancel</button>
       </div>
       <div class="mini" id="otaHosted">Checking for the latest firmware…</div>
-      <div class="mini" id="otaOnlyRow" style="margin-top:4px">
-        <a href="#" id="btnOtaCtrlOnly">update the controller only</a>
+      <!-- Only ever revealed if the all-in-one run fails at the port module, as
+           the way back from a controller whose firmware cannot survive that
+           step. Not part of the normal surface. -->
+      <div class="mini hidden" id="otaOnlyRow" style="margin-top:4px">
+        <a href="#" id="btnOtaCtrlOnly">retry the controller on its own</a>
       </div>
       <div class="mini" style="margin-top:12px;color:var(--dim)">Or install a
       firmware file of your own:</div>
@@ -653,21 +651,10 @@
         <button id="btnOtaGo" disabled>Install this file</button>
       </div>
       <div class="ctlrow" id="otaRbRow" style="margin-top:8px">
-        <button id="btnOtaRollback" class="danger" disabled>Roll back to previous</button>
+        <button id="btnOtaRollback" class="danger" disabled>Roll back</button>
       </div>
-      <div id="stmWrap" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
-        <div class="row" style="justify-content:space-between">
-          <label style="font-weight:600">Port module firmware</label>
-          <span class="mini" id="stmState" style="margin:0">—</span>
-        </div>
-        <div class="ctlrow">
-          <button id="btnStmGo" disabled>Update port module</button>
-          <button id="btnStmRb" class="danger" disabled>Roll back</button>
-        </div>
-        <div class="mini" id="stmMsg">The port module runs its own processor —
-        the one that drives the LEDs and enforces the current, temperature and
-        short-circuit protection. Outputs go dark for a few seconds while it is
-        reprogrammed.</div>
+      <div id="stmWrap" class="hidden">
+        <span class="mini" id="stmState"></span><span class="mini" id="stmMsg"></span>
       </div>
       <div id="otaBarWrap" class="hidden" style="margin-top:10px;height:10px;background:var(--card2);border-radius:6px;overflow:hidden">
         <div id="otaBar" style="height:100%;width:0;background:linear-gradient(90deg,#6a2cf5,#5fd7ff);transition:width .15s"></div>
@@ -728,6 +715,17 @@
       </div>
       <div class="mini">The full user manual and DMX channel chart. Bundled with
         the app — they open even with no internet, once the app has loaded once.</div>
+    </div>
+    <div class="card" id="appCard">
+      <div class="row" style="justify-content:space-between">
+        <label style="font-weight:600">App</label>
+        <span class="mini" id="appVerTxt" style="margin:0"></span>
+      </div>
+      <div class="ctlrow">
+        <button id="appRefresh">Look for app update</button>
+      </div>
+      <div class="mini" id="appUpdMsg">The app checks for its own update every
+        time it opens. This forces a fresh check and reloads.</div>
     </div>
   </div>
 </main>
@@ -805,7 +803,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-04o.controller-only";
+const APP_VER="2026-09-04p.one-button";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2833,6 +2831,7 @@ function renderOta(){
     if(!otaManifest){
       hb.disabled=false;                       // the button becomes Retry
       hb.textContent="Retry";
+      const onlyRow0=$("otaOnlyRow"); if(onlyRow0) onlyRow0.classList.add("hidden");
       hm.textContent=(navigator.onLine===false
         ? "This device is offline, so the latest firmware can't be fetched. "
         : "Couldn't fetch the latest firmware"
@@ -2846,15 +2845,8 @@ function renderOta(){
       // "Already installed" refers to the CONTROLLER build. The port module is
       // re-flashed regardless, so the button stays live either way — it just
       // says what the run will actually do.
-      const withStm = (stmCaps()&1) && otaManifest.stm_port;
-      const onlyRow=$("otaOnlyRow");
-      if(onlyRow) onlyRow.classList.toggle("hidden", !withStm || !ok || otaBusy);
       hb.disabled=!ok||otaBusy;
-      hb.textContent = withStm
-        ? (same ? "Reinstall " + otaManifest.version + " + port module"
-                : "Update controller + port module")
-        : (same ? "Reinstall " + otaManifest.version
-                : "Install "+otaManifest.version+" over Bluetooth");
+      hb.textContent = "Update Firmware";
       hm.textContent="Available: "+otaManifest.version+" · build "+otaManifest.build
         +" · "+Math.round(otaManifest.size/1024)+" KB · "+otaManifest.date
         +(running ? " — controller is running build "+running
@@ -2865,20 +2857,12 @@ function renderOta(){
   // Port-module section. Hidden entirely on units whose SWD topology cannot be
   // addressed (multi-port share SWDIO/SWCLK with no target select) — offering a
   // button that can only ever fail is worse than not offering it.
-  const caps=stmCaps(), stmSupported=(caps&1)!==0;
-  const stmInfo=otaManifest && otaManifest.stm_port;
+  // The port module is an implementation detail — its status only appears while
+  // the single update run is actually working on it.
+  const caps=stmCaps();
   const sw=$("stmWrap");
-  if(sw){
-    sw.classList.toggle("hidden", ok && !stmSupported);
-    $("btnStmGo").disabled = !ok || !stmSupported || !stmInfo || otaBusy;
-    $("btnStmRb").disabled = !ok || !stmSupported || !(caps&4) || otaBusy;
-    if(!otaBusy){
-      setStmState(!ok ? "connect first"
-                : !stmInfo ? "none published"
-                : (caps&2) ? "image stored" : "ready");
-    }
-  }
-  const rbOk = ok && kv.RBOK==="1";
+  if(sw) sw.classList.toggle("hidden", !otaBusy);
+  const rbOk = ok && (kv.RBOK==="1" || (caps&4)!==0);
   const rbBtn = $("btnOtaRollback");
   if(rbBtn){
     rbBtn.disabled = !rbOk || otaBusy;
@@ -2938,9 +2922,21 @@ $("otaFile").addEventListener("change",ev=>{
 // has only ever been USB-flashed once, it is erased and there is nothing to
 // go back to, so the button stays disabled rather than bricking the unit.
 $("btnOtaRollback").onclick=async()=>{
-  if(!await askConfirm("The controller restarts on the firmware it was running "
-    +"before the last update. Your settings are not affected.",
+  const caps=stmCaps();
+  const alsoPort = (caps&1) && (caps&4);
+  if(!await askConfirm("Everything goes back to the firmware it was running "
+    +"before the last update"
+    +(alsoPort ? ", outputs included — they go dark for a few seconds. " : ". ")
+    +"Your settings are not affected.",
     {title:"Roll back firmware?",ok:"Roll back",danger:true})) return;
+  // Same order as the update: the port module first, because the controller
+  // rollback ends in a reboot that drops the link.
+  if(alsoPort){
+    otaBusy=true; renderOta();
+    try{ await runStmRollback(); }
+    catch(_){ otaBusy=false; renderOta(); return; }
+    otaBusy=false; renderOta();
+  }
   setOtaState("rolling back…");
   try{ await otacChar.writeValueWithResponse(otaEnc("ROLLBACK")); }
   catch(e){ setOtaState("rollback failed");
@@ -3038,13 +3034,10 @@ async function runStmUpdate(){
   }finally{ otaBusy=false; renderOta(); }
 }
 
-$("btnStmGo").onclick=runStmUpdate;
-$("btnStmRb").onclick=async()=>{
+// The standalone port-module buttons are gone — one button does the lot. The
+// rollback below is reached from the single Roll back control.
+async function runStmRollback(){
   if(!otacChar) return;
-  if(!await askConfirm("The port module returns to the firmware it was running "
-    +"before the last update. Outputs go dark for a few seconds.",
-    {title:"Roll back port module?",ok:"Roll back",danger:true})) return;
-  otaBusy=true; renderOta();
   try{
     setStmState("programming…");
     await otacChar.writeValueWithResponse(otaEnc("STM ROLLBACK PORT"));
@@ -3055,8 +3048,9 @@ $("btnStmRb").onclick=async()=>{
   }catch(e){
     setStmState("failed");
     setStmMsg("Rollback failed: "+((e&&e.message)||e)+" — the port keeps what it had.");
-  }finally{ otaBusy=false; renderOta(); }
-};
+    throw e;
+  }
+}
 
 // ONE BUTTON FOR THE LOT. Port module FIRST: the controller update ends in a
 // reboot that drops the Bluetooth link, so anything sequenced after it would
@@ -3099,6 +3093,9 @@ async function runFullUpdate(ctrlOnly){
         +"firmware it had and the controller was NOT touched, so nothing has "
         +"changed. It can be retried over Bluetooth — no cable needed.");
       otaBusy=false; renderOta();
+      // Surface the escape hatch now that it is relevant: a controller whose
+      // firmware cannot survive the port step can still update itself.
+      const only=$("otaOnlyRow"); if(only) only.classList.remove("hidden");
       return;                       // stop before the controller
     }
     otaBusy=false; renderOta();
@@ -3360,10 +3357,26 @@ renderWiring();   // show the "run Step RGBW" hint before anything connects
 // The installed app is a cache-first PWA, so "am I even running the new build?"
 // is a real question with no obvious answer. Show it before connecting, and
 // give a way to force past a service worker that is serving an old shell.
-$("appVerTxt").textContent = "app " + APP_VER;
+$("appVerTxt").textContent = APP_VER;
+// Check for an app update on EVERY open, not only when someone thinks to look.
+// The worker is network-first, so a normal launch already fetches fresh HTML —
+// this additionally asks the browser to re-check the worker itself, which is
+// what actually replaces a cached shell.
+(async () => {
+  try{
+    if(!navigator.serviceWorker) return;
+    const r = await navigator.serviceWorker.getRegistration();
+    if(!r) return;
+    await r.update();
+    if(r.waiting){
+      $("appUpdMsg").textContent = "A new version of the app is ready — "
+        + "press Look for app update to load it.";
+    }
+  }catch(_){}
+})();
 $("appRefresh").onclick = async (e) => {
   e.preventDefault();
-  $("appVerTxt").textContent = "refreshing…";
+  $("appVerTxt").textContent = "updating…";
   try{
     if(navigator.serviceWorker){
       const rs = await navigator.serviceWorker.getRegistrations();
