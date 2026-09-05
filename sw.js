@@ -6,9 +6,10 @@
 // MUST be "jmb-" + the app's APP_VER with dots as dashes. deploy_pages.py
 // enforces it: a deploy that bumps APP_VER but not this key publishes new HTML
 // that no client ever sees, because the old shell stays cached and un-evicted.
-const CACHE="jmb-2026-09-05b-fullscreen-no-pullrefresh";
+const CACHE="jmb-2026-09-05c-install-icons";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./firmware.json",
-                "./icon.svg", "./icon-maskable.svg", "./icon-512.png",
+                "./icon.svg", "./icon-maskable.svg", "./icon-192.png",
+                "./icon-192-maskable.png", "./icon-512.png",
                 "./icon-512-maskable.png", "./privacy.html", "./jmb-splash.png",
                 // Docs precached so the manual + DMX chart open with no signal.
                 "./manual.html", "./dmx-chart.html",
