@@ -506,15 +506,11 @@
         <button id="tsFade">Fade</button>
         <button id="tsOff">Off</button>
       </div>
-      <div class="mini"><b>Step RGBW</b> — full drive R → G → B → White, one
-      second each, gamma bypassed. Every channel at maximum and identical on all
-      ports, so a dead channel or a weak output stage stands out at a glance.
-      Because it lights one colour at a time, it is also the test that
-      <b>measures your wiring</b> — results below.<br><br>
-      <b>Fade</b> — smooth rainbow sweep, for judging dimming smoothness and
-      colour blending.<br><br>
-      Both run on <em>all</em> ports and override every source —
-      <b>including live DMX</b> — until switched Off.</div>
+      <div class="mini"><b>Step RGBW</b> — R → G → B → White at full, 1 s each,
+      gamma off. Flags a dead channel or weak output stage, and measures wiring
+      (below).<br><br>
+      <b>Fade</b> — rainbow sweep, for dimming smoothness and colour blending.<br><br>
+      Both drive all ports and override every source, including live DMX, until Off.</div>
       <div class="mini" id="wireChk" style="margin-top:10px;white-space:pre-line;
            border-top:1px solid var(--line);padding-top:10px"></div>
       <div class="ctlrow hidden" id="wireFaultRow" style="margin-top:8px">
@@ -830,7 +826,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-05c.install-icons";
+const APP_VER="2026-09-05d.concise-help";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2595,11 +2591,9 @@ function renderWiring(){
     if(wf){
       const [dbl,dead]=wf.split("+");
       faults.push(`⛔ PORT ${p} INHIBITED — wiring fault (${wf})\n`
-        +`   The ${WC_COLOUR[dead]||dead} load appears to be on the `
-        +`${WC_COLOUR[dbl]||dbl} terminal: ${WC_COLOUR[dbl]||dbl} drives about `
-        +`double while ${WC_COLOUR[dead]||dead} drives nothing.\n`
-        +`   That puts two channels' current through one output, which the port's `
-        +`own protection cannot see. Output is off until you clear it.`);
+        +`   ${WC_COLOUR[dead]||dead} reads nothing, ${WC_COLOUR[dbl]||dbl} reads double: `
+        +`the ${WC_COLOUR[dead]||dead} load is on the ${WC_COLOUR[dbl]||dbl} terminal. `
+        +`Output off until fixed.`);
     }
     const v=kv["WC"+p]; if(!v) continue;
     const n=v.split(",").map(Number);
@@ -2608,9 +2602,8 @@ function renderWiring(){
       +`\n   ${WC_VERDICT[n[4]]||""}`);
   }
   const body = rows.length ? rows.join("\n\n")
-    : "Wiring check: run Step RGBW for one full cycle (4 seconds) and each "
-      +"output's current is measured and compared here. The comparison is "
-      +"relative, so it works on a short off-cut as well as a full run.";
+    : "Run Step RGBW for one cycle (4 s). Each output's current is measured and "
+      +"compared here — relative, so a short off-cut works too.";
   el.textContent = faults.length ? faults.join("\n\n")+"\n\n"+body : body;
   el.style.color = faults.length ? "var(--bad)" : "";
   const row=$("wireFaultRow");
