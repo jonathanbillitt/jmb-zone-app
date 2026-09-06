@@ -1,10 +1,11 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>JMB Lighting — DMX Personality Chart</title><style>
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>JMB Lighting — DMX Personality Chart</title><style>
 @page { size: A4; margin: 18mm 16mm; }
 body { font: 10.5pt/1.55 'Segoe UI', system-ui, sans-serif; color: #1a2230; max-width: 175mm; margin: 0 auto; }
 h1 { font-size: 21pt; color: #14203a; border-bottom: 3px solid #6a2cf5; padding-bottom: 6px; margin: 0 0 2px; }
 h1 + p { color: #667; margin-top: 2px; }
 h2 { font-size: 13.5pt; color: #2a1d66; margin: 22px 0 8px; border-bottom: 1px solid #d8d4ee; padding-bottom: 3px; }
 h3 { font-size: 11pt; color: #333; margin: 14px 0 6px; }
+h1, h2, h3 { scroll-margin-top: 64px; }  /* clear the sticky search bar when jumped to */
 table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; font-size: 9.8pt; page-break-inside: avoid; }
 th { background: #eeeafb; color: #2a1d66; text-align: left; }
 th, td { border: 1px solid #cfc9e8; padding: 4px 8px; vertical-align: top; }
@@ -18,7 +19,18 @@ a { color: #4636b8; }
 blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #b7ade6; background: #f7f5fd; color: #444; }
 .page-break { page-break-before: always; }
 .footer { margin-top: 26px; font-size: 8.5pt; color: #99a; text-align: center; }
+/* On-screen section search (hidden in the PDF). */
+#jmbsearch { position: sticky; top: 0; z-index: 50; background: #fff; padding: 10px 0 8px; margin: 0 0 8px; border-bottom: 1px solid #d8d4ee; }
+#jmbsearch input { width: 100%; box-sizing: border-box; font: 11pt 'Segoe UI', system-ui, sans-serif; padding: 9px 14px; border: 1.5px solid #b7ade6; border-radius: 9px; outline: none; }
+#jmbsearch input:focus { border-color: #6a2cf5; }
+#jmbsearch .jr { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #d8d4ee; border-radius: 0 0 9px 9px; box-shadow: 0 10px 24px rgba(20,20,40,.14); max-height: 55vh; overflow: auto; }
+#jmbsearch .jrow { padding: 9px 14px; cursor: pointer; border-bottom: 1px solid #f0eef8; font-size: 10.5pt; color: #2a1d66; }
+#jmbsearch .jrow:last-child { border-bottom: 0; }
+#jmbsearch .jrow:hover, #jmbsearch .jrow.on { background: #f2eefc; }
+#jmbsearch .jrow small { color: #99a; font-size: 8.5pt; }
+@media print { #jmbsearch { display: none !important; } }
 </style></head><body>
+<div id="jmbsearch"><input type="search" placeholder="Search this manual — e.g. port bus" aria-label="Search this manual"><div class="jr"></div></div>
 <h1>JMB Lighting — DMX Personality Chart</h1>
 <p>JMB one / 4our / 8ight · Firmware 2.x · 2026-08-20</p>
 <h2>Personalities (per port)</h2>
@@ -252,4 +264,32 @@ E1.37-1 CURVE (dimmer curve) and MODULATION_FREQUENCY (PWM 1=Smooth 8 kHz,
 supported on the root. The root also
 exposes each port's temperature and output current as E1.20 sensors, and
 personality is settable at the root for sub-0-only consoles.</p>
+<script>
+(function(){
+  var box=document.getElementById('jmbsearch'), inp=box.querySelector('input'),
+      res=box.querySelector('.jr'),
+      heads=[].slice.call(document.querySelectorAll('h1,h2,h3'));
+  heads.forEach(function(h,i){ if(!h.id) h.id='sec'+i; });
+  function flash(el){ var o=el.style.backgroundColor; el.style.transition='background-color .25s';
+    el.style.backgroundColor='#fff3b0'; setTimeout(function(){el.style.backgroundColor=o||'';},1000); }
+  function go(el,block){ el.scrollIntoView({behavior:'smooth',block:block||'start'}); flash(el); res.innerHTML=''; }
+  function row(text,tag,fn){ var d=document.createElement('div'); d.className='jrow';
+    d.innerHTML=text+(tag?' <small>'+tag+'</small>':''); d.onclick=fn; res.appendChild(d); return d; }
+  function render(q){ res.innerHTML=''; if(!q) return;
+    var ql=q.toLowerCase();
+    var m=heads.filter(function(h){return h.textContent.toLowerCase().indexOf(ql)>-1;});
+    if(m.length){ m.slice(0,15).forEach(function(h){ row(h.textContent, h.tagName.toLowerCase(),
+        function(){go(h,'start');}); }); return; }
+    var all=[].slice.call(document.querySelectorAll('p,li,td,th'));
+    var hit=null; for(var i=0;i<all.length;i++){ if(all[i].textContent.toLowerCase().indexOf(ql)>-1){hit=all[i];break;} }
+    if(hit) row('Go to first match','in text',function(){go(hit,'center');});
+    else row('No match','',function(){});
+  }
+  inp.addEventListener('input',function(){render(inp.value.trim());});
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){ var f=res.querySelector('.jrow'); if(f) f.click(); e.preventDefault(); }
+    else if(e.key==='Escape'){ inp.value=''; res.innerHTML=''; inp.blur(); } });
+})();
+</script>
+
 </body></html>
