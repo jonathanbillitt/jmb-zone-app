@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "9267e49+-20260908",
+  "build": "1752ab9-20260908",
   "size": 1191808,
-  "crc32": "022876f8",
-  "sha256": "142fba751c3242439bad00ac6ae489fe4f6659b22c23738fb3571d4943f90d85",
+  "crc32": "cf82e3e5",
+  "sha256": "f3d96bf68fbc27a93484c6afcfd82620001e9ee93a27e7011d78e38e88a3b46c",
   "date": "2026-09-08",
-  "notes": "Uncommitted bench build (based on: Reworks \u00a74: re-correct for the 12/24 V rail-agnostic constraint \u2014 FET swap first, gate dri)",
+  "notes": "DMX test transmitter (Diag tab): desk-syntax keypad, latched levels, out the OUT socket while no DMX is received",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
