@@ -826,7 +826,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-05d.concise-help";
+const APP_VER="2026-09-08a.cct-order";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1285,6 +1285,14 @@ function renderControl(){
       if(rg) rg.classList.toggle("cw", cct);   // ice track for cool white
       if(rg) rg.classList.toggle("hidden", dim1);   // Dim = one Level slider
       if(rb) rb.classList.toggle("hidden", cct||dim1);
+      // Order the sliders Cool-then-Warm in CCT mode to match the CW/WW
+      // personality (DMX ch1=CW, ch2=WW). Bindings are unchanged — Cool is
+      // still the G output, Warm the R output — only the visual row order flips.
+      if(rr&&rg){
+        const gFirst = rg.nextElementSibling===rr;
+        if(cct && !gFirst) rr.parentNode.insertBefore(rg,rr);
+        if(!cct && gFirst) rr.parentNode.insertBefore(rr,rg);
+      }
       // Monochrome ports (CCT + Dim) only offer effects that read on them.
       const xs=$("x"+p);
       if(xs) for(const o of xs.options) o.hidden = (cct||dim1) && !CCT_FX.has(+o.value);
