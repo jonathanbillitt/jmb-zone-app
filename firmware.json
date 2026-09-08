@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "ec0c2b5-20260904",
-  "size": 1190304,
-  "crc32": "ae3cfbcd",
-  "sha256": "f777d4c225c4788dd4fd380bd5d0fc368af313baf0de3869422cf6d2113b8af4",
-  "date": "2026-09-04",
-  "notes": "Restore July's low end on .2 hardware: port floor to 1 tick (plain dither), dimmer linear \u2014 floor and square law kept selectable for .3",
+  "build": "9267e49+-20260908",
+  "size": 1191808,
+  "crc32": "022876f8",
+  "sha256": "142fba751c3242439bad00ac6ae489fe4f6659b22c23738fb3571d4943f90d85",
+  "date": "2026-09-08",
+  "notes": "Uncommitted bench build (based on: Reworks \u00a74: re-correct for the 12/24 V rail-agnostic constraint \u2014 FET swap first, gate dri)",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",

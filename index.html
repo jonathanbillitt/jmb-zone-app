@@ -165,6 +165,14 @@
   th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
   th { color:var(--dim); font-weight:500; font-size:12px; }
   td.num { font-variant-numeric:tabular-nums; }
+  .txpad { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:8px 0; }
+  .txpad button { padding:10px 0; font-size:15px; }
+  .txpad button.wide { grid-column:span 2; }
+  #txCmd { width:100%; box-sizing:border-box; font:16px Consolas,monospace; padding:8px 10px;
+           border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--text); }
+  #txWarn { background:#3a2a10; color:#ffc477; border:1px solid #7a5a20; border-radius:8px;
+            padding:8px 12px; margin:8px 0; }
+  .card.off { opacity:.45; pointer-events:none; }
   nav { position:fixed; bottom:0; left:0; right:0; display:flex; z-index:6;
         padding-bottom:env(safe-area-inset-bottom);   /* clear the home indicator */
         background:var(--card); border-top:1px solid var(--line); }
@@ -500,6 +508,30 @@
       <b>Port bus</b>
       <table id="diagBus"></table>
     </div>
+
+    <div class="card" id="txCard">
+      <div class="ctlrow">
+        <b style="flex:1">Transmit DMX</b>
+        <button id="txClear">Clear</button>
+        <button id="txToggle" class="primary">Start</button>
+      </div>
+      <div class="mini">Sends a test universe from the OUT socket while no DMX is
+        being received. Desk syntax: <code>1 THRU 5 @ 80</code> ·
+        <code>10 + 12 @ FULL</code>. Levels stay latched until Clear or power-off.</div>
+      <div id="txWarn" class="hidden">Transmitting test DMX — latched levels persist
+        across reconnects until Clear.</div>
+      <div id="txBusy" class="mini hidden">DMX is being received — transmit unavailable.</div>
+      <input id="txCmd" inputmode="numeric" autocomplete="off" placeholder="1 THRU 5 @ 80">
+      <div class="txpad">
+        <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="THRU">THRU</button>
+        <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button data-k="+">+</button>
+        <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button data-k="-">−</button>
+        <button data-k="0">0</button><button data-k="@">@</button><button data-k="FULL">FULL</button><button data-k="BS">⌫</button>
+        <button id="txEnter" class="primary wide" style="grid-column:span 4">ENTER</button>
+      </div>
+      <div class="err" id="txErr"></div>
+      <div class="mini" id="txList"></div>
+    </div>
   </div>
 
   <div id="tab-setup" class="tab hidden">
@@ -830,7 +862,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-08c.pin-strict";
+const APP_VER="2026-09-08d.dmx-tx";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1195,6 +1227,7 @@ function onState(str){
     ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
   }
   setChip("chipDmx","DMX", kv.DMX==="1"?"live":"none", kv.DMX==="1"?"ok":"bad");
+  renderTx();
   setChip("chipFps","fps", kv.FPS??"—");
   setChip("chipCid","ID",  kv.CID??"—");
   if(n){ const cn=hexDec(kv.CN);
@@ -2254,6 +2287,72 @@ function renderFlk(){
   $("flkList").innerHTML=flkEvts.map(e=>
     `<div class="evt"><span>${new Date(e.t).toLocaleTimeString()}</span>
      <span class="ch">ch ${e.ch}</span><span>${e.o} → ${e.n}</span></div>`).join("");
+}
+
+// ---------- DMX test transmitter (Diag) ----------
+// Firmware: DMXTX=ON|OFF|CLR|ch,lvl;ch,lvl…  state: TXA (active) TXN (count)
+// TXL=ch:lvl,…[,+N]. The controller refuses ON while DMX is live; we grey the
+// card on the same condition. Levels live in controller RAM (persist across
+// app reconnects, cleared by Clear or power-off).
+function txParse(cmd){
+  const t=cmd.toUpperCase().replace(/\s+/g," ").trim().split(" ").filter(Boolean);
+  const at=t.indexOf("@"); if(at<0) throw "need @ level";
+  const sel=t.slice(0,at), lv=t.slice(at+1);
+  if(!lv.length) throw "need a level (0–100 or FULL)";
+  const pct=lv[0]==="FULL"?100:Number(lv[0]);
+  if(!(pct>=0&&pct<=100)) throw "level 0–100 or FULL";
+  const lvl=Math.round(pct*255/100);
+  const num=x=>{const n=Number(x); if(!Number.isInteger(n)||n<1||n>512) throw "channel 1–512"; return n;};
+  const chans=new Set(); let sign=1,i=0;
+  if(!sel.length) throw "need a channel";
+  while(i<sel.length){
+    let a=num(sel[i++]), b=a;
+    if(sel[i]==="THRU"){ if(i+1>=sel.length) throw "THRU needs an end"; b=num(sel[i+1]); i+=2; }
+    if(b<a)[a,b]=[b,a];
+    for(let c=a;c<=b;c++){ if(sign>0) chans.add(c); else chans.delete(c); }
+    if(i<sel.length){ if(sel[i]==="+")sign=1; else if(sel[i]==="-"||sel[i]==="−")sign=-1; else throw "use + or − between ranges"; i++; }
+  }
+  if(!chans.size) throw "no channels";
+  return [...chans].sort((x,y)=>x-y).map(ch=>({ch,lvl}));
+}
+function txSendPairs(pairs){
+  for(let i=0;i<pairs.length;i+=32)
+    send("DMXTX="+pairs.slice(i,i+32).map(p=>p.ch+","+p.lvl).join(";"));
+}
+function renderTx(){
+  const card=$("txCard"); if(!card) return;
+  const live=kv.DMX==="1", on=kv.TXA==="1";
+  card.classList.toggle("off", live && !on);
+  $("txBusy").classList.toggle("hidden", !live);
+  $("txWarn").classList.toggle("hidden", !on);
+  const tb=$("txToggle"); tb.textContent=on?"Stop":"Start"; tb.classList.toggle("primary",!on); tb.classList.toggle("danger",on);
+  const n=+(kv.TXN||0), l=$("txList");
+  if(!n){ l.textContent="No channels latched."; return; }
+  const items=(kv.TXL||"").split(",").filter(Boolean).map(e=>{
+    if(e.startsWith("+")) return `<span>${e.slice(1)} more…</span>`;
+    const [ch,lv]=e.split(":"); return `<span><b>${ch}</b> @ ${Math.round(+lv*100/255)}%</span>`;
+  });
+  l.innerHTML=`${n} latched: `+items.join(" · ");
+}
+{
+  const inp=$("txCmd"), err=$("txErr");
+  const put=k=>{ const v=inp.value; if(k==="BS"){ inp.value=v.replace(/\s*\S+\s*$/,""); return; }
+    inp.value=(v+(v&&!/\s$/.test(v)?" ":"")+k+(/^\d$/.test(k)?"":" ")).replace(/^\s+/,""); inp.focus(); };
+  document.querySelectorAll("#txCard .txpad button[data-k]").forEach(b=>b.onclick=()=>put(b.dataset.k));
+  // digits typed back-to-back should join into one number: a digit key after a digit appends
+  document.querySelectorAll("#txCard .txpad button[data-k]").forEach(b=>{ if(/^\d$/.test(b.dataset.k)) b.onclick=()=>{ inp.value=(inp.value+b.dataset.k); inp.focus(); }; });
+  const go=()=>{
+    err.textContent="";
+    let pairs; try{ pairs=txParse(inp.value); }catch(e){ err.textContent=String(e); return; }
+    if(kv.DMX==="1"){ err.textContent="DMX is being received — transmit unavailable."; return; }
+    txSendPairs(pairs);
+    if(kv.TXA!=="1") send("DMXTX=ON");
+    inp.value=""; send("GET");
+  };
+  $("txEnter").onclick=go;
+  inp.addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
+  $("txToggle").onclick=()=>{ send(kv.TXA==="1"?"DMXTX=OFF":"DMXTX=ON"); send("GET"); };
+  $("txClear").onclick=()=>{ send("DMXTX=CLR"); send("GET"); };
 }
 
 // ---------- RDM universe controller ----------

@@ -349,6 +349,12 @@ the wire. Each tool answers a specific question:</p>
   count, CRC errors, fault state), for diagnosing a port that has stopped
   responding.</p>
 </li>
+<li><strong>Transmit DMX</strong> — sends a test universe from the OUT socket while no DMX is
+  being received (greyed while a desk is live). Desk syntax on the keypad:
+  <code>1 THRU 5 @ 80</code>, <code>10 + 12 @ FULL</code>, <code>1 THRU 10 - 5 @ 50</code>; levels are 0–100 or
+  FULL. Each channel set is listed with its level and stays latched — across
+  app reconnects too — until <strong>Clear</strong> or power-off. <strong>Start/Stop</strong> toggles the
+  output; the amber banner shows while transmitting.</li>
 </ul>
 <h3>Setup — controller and housekeeping</h3>
 <p>Controller <strong>ID</strong> and <strong>Bluetooth name</strong> (what the pairing list shows), <strong>apply
