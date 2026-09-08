@@ -1,5 +1,9 @@
 <!DOCTYPE html>
 <!-- =========================================================================
+  Copyright © 2026 Jonathan Billitt (JMB Lighting). All rights reserved.
+  Proprietary and confidential — not licensed for reuse, redistribution or
+  derivative works without written permission.
+  =========================================================================
   JMB Lighting — companion app (Web Bluetooth, single file)
 
   Chrome/Edge on Android + desktop (iOS: use the Bluefy browser).
@@ -826,7 +830,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-08b.pin-perdevice";
+const APP_VER="2026-09-08c.pin-strict";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -894,12 +898,15 @@ function stateHandler(ev){ onState(dec.decode(ev.target.value)); }
 // call below falls through to the original Web Bluetooth path — unchanged.
 const NBLE=()=>window.JmbNativeBle||null;
 const devName=()=>NBLE()?NBLE().name:((dev&&dev.name)||"");
-// PIN memory is PER-DEVICE (keyed by the controller's name) so several
-// controllers each remember their own PIN; reads fall back to the legacy
-// global key so existing single-controller users are unaffected.
-const pinKey =()=>{ const n=devName(); return n?("jmb_pin:"+n):"jmb_pin"; };
-const loadPin=()=>{ try{ return localStorage.getItem(pinKey())||localStorage.getItem("jmb_pin")||""; }catch(_){ return ""; } };
-const savePin=v=>{ try{ localStorage.setItem(pinKey(),v); localStorage.setItem("jmb_pin",v); }catch(_){} };
+// PIN memory is PER-DEVICE and ONLY for a PIN that was manually entered for
+// THAT controller. Keyed strictly by the controller's name — NO global
+// fallback: a controller you've never unlocked shows a blank PIN screen and
+// never auto-fills a PIN typed on a different unit. savePin is only ever
+// reached after a successful manual unlock (or an auto-retry of a PIN this
+// controller already stored), so nothing is remembered that wasn't typed here.
+const pinKey =()=>{ const n=devName(); return n?("jmb_pin:"+n):""; };
+const loadPin=()=>{ try{ const k=pinKey(); return k?(localStorage.getItem(k)||""):""; }catch(_){ return ""; } };
+const savePin=v=>{ try{ const k=pinKey(); if(k) localStorage.setItem(k,v); }catch(_){} };
 const bleAvailable=()=>!!(navigator.bluetooth||NBLE());
 const bleConnected=()=>NBLE()?!!NBLE().connected:!!cmdChar;
 async function gattSetup(){
