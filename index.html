@@ -826,7 +826,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-08a.cct-order";
+const APP_VER="2026-09-08b.pin-perdevice";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -894,6 +894,12 @@ function stateHandler(ev){ onState(dec.decode(ev.target.value)); }
 // call below falls through to the original Web Bluetooth path — unchanged.
 const NBLE=()=>window.JmbNativeBle||null;
 const devName=()=>NBLE()?NBLE().name:((dev&&dev.name)||"");
+// PIN memory is PER-DEVICE (keyed by the controller's name) so several
+// controllers each remember their own PIN; reads fall back to the legacy
+// global key so existing single-controller users are unaffected.
+const pinKey =()=>{ const n=devName(); return n?("jmb_pin:"+n):"jmb_pin"; };
+const loadPin=()=>{ try{ return localStorage.getItem(pinKey())||localStorage.getItem("jmb_pin")||""; }catch(_){ return ""; } };
+const savePin=v=>{ try{ localStorage.setItem(pinKey(),v); localStorage.setItem("jmb_pin",v); }catch(_){} };
 const bleAvailable=()=>!!(navigator.bluetooth||NBLE());
 const bleConnected=()=>NBLE()?!!NBLE().connected:!!cmdChar;
 async function gattSetup(){
@@ -973,7 +979,7 @@ async function onDisconnected(){
         await gattSetup();
         $("hello").classList.add("hidden");
         askPin();
-        const saved=localStorage.getItem("jmb_pin");
+        const saved=loadPin();
         if(saved){ $("pinInput").value=saved; tryPin(); }
         return;
       }catch(_){}
@@ -1029,7 +1035,7 @@ function askPin(){
   renderPinNotice();
   $("overlay").classList.remove("hidden");
   $("pinErr").textContent="";
-  $("pinInput").value=localStorage.getItem("jmb_pin")||"";
+  $("pinInput").value=loadPin();
   setTimeout(()=>$("pinInput").focus(),50);
 }
 function hideOverlay(){ $("overlay").classList.add("hidden"); }
@@ -1135,7 +1141,7 @@ function onState(str){
   if(!authed){
     authed=true;
     clearTimeout(authTimer);
-    if(pinPending){ localStorage.setItem("jmb_pin",pinPending); pinPending=""; }
+    if(pinPending){ savePin(pinPending); pinPending=""; }
     hideOverlay(); showApp();
   }
   const pstr={};
@@ -3296,7 +3302,7 @@ $("btnPin").onclick=async()=>{
   const v=await askText("4\u201316 characters, no spaces.",{title:"New PIN",ok:"Set PIN",maxlength:16});
   if(v&&v.trim().length>=4){
     send("NEWPIN="+v.trim());
-    localStorage.setItem("jmb_pin",v.trim());
+    savePin(v.trim());
     tellUser("Reconnections must use the new PIN.",{title:"PIN changed"});
   }
 };
