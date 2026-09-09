@@ -18,9 +18,9 @@
   <rect width="128" height="128" fill="url(#bg)"/>
   <!-- Logo scaled up to fill the tile — JMB kept within the mask's safe circle
        so the letters never clip when the launcher rounds the icon. -->
-  <!-- 2026-09-09: artwork pulled back to 82 % (user: "zoom out a bit") so the
-       launcher mask leaves clear ground around the bars. -->
-  <g transform="translate(64 64) scale(0.82) translate(-64 -64)">
+  <!-- 2026-09-09: artwork pulled back to 70 % (user: "zoom out a bit", then
+       "a little more") so the launcher mask leaves clear ground around the bars. -->
+  <g transform="translate(64 64) scale(0.70) translate(-64 -64)">
   <rect x="18" y="22" width="92" height="14" rx="4" fill="url(#p)"/>
   <rect x="18" y="92" width="92" height="14" rx="4" fill="url(#p)"/>
   <text x="64" y="80" font-family="system-ui,'Segoe UI',Roboto,sans-serif"
