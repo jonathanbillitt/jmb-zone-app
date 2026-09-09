@@ -862,7 +862,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-08d.dmx-tx";
+const APP_VER="2026-09-09a.demo-tx";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2321,7 +2321,8 @@ function txSendPairs(pairs){
 }
 function renderTx(){
   const card=$("txCard"); if(!card) return;
-  const live=kv.DMX==="1", on=kv.TXA==="1";
+  // Demo never blocks the transmitter: the example DMX feed is not a real line.
+  const live=kv.DMX==="1" && !demoOn, on=kv.TXA==="1";
   card.classList.toggle("off", live && !on);
   $("txBusy").classList.toggle("hidden", !live);
   $("txWarn").classList.toggle("hidden", !on);
@@ -2344,7 +2345,7 @@ function renderTx(){
   const go=()=>{
     err.textContent="";
     let pairs; try{ pairs=txParse(inp.value); }catch(e){ err.textContent=String(e); return; }
-    if(kv.DMX==="1"){ err.textContent="DMX is being received — transmit unavailable."; return; }
+    if(kv.DMX==="1" && !demoOn){ err.textContent="DMX is being received — transmit unavailable."; return; }
     txSendPairs(pairs);
     if(kv.TXA!=="1") send("DMXTX=ON");
     inp.value=""; send("GET");
@@ -3429,7 +3430,14 @@ let demoTimer=null, demoOn=false, demoFlkTimer=null;
 // analyser has example data — the whole Diag tab works without hardware.
 const demoP=[{a:1,pe:0,r:100,g:40,b:0,x:0,s:128},{a:4,pe:0,r:0,g:80,b:100,x:0,s:128},
              {a:7,pe:2,r:100,g:35,b:0,x:0,s:128},{a:10,pe:4,r:100,g:100,b:100,x:9,s:128}];
-const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1,bpm:128,btn:'44656D6F20526967'};
+const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1,bpm:128,btn:'44656D6F20526967',txa:0};
+const demoTx={};                       // ch -> level, the demo transmitter's latch
+function demoTxState(){
+  const chs=Object.keys(demoTx).map(Number).sort((a,b)=>a-b);
+  const shown=chs.slice(0,48).map(c=>`${c}:${demoTx[c]}`);
+  if(chs.length>48) shown.push("+"+(chs.length-48));
+  return `TXA=${demoF.txa};TXN=${chs.length};TXL=${shown.join(",")};`;
+}
 function demoState(){
   const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S${d.s??128},H${n},`+
     `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6500,OT80,L0;`;
@@ -3442,7 +3450,7 @@ function demoState(){
     `NET=${demoF.net};NW=${demoF.net};NUN=${demoF.nun};SRC=${demoF.net?1:0};`+
     "NIP=192.168.1.42;NRS=-52;TF=1;PB=0;CX=3;CA=1;"+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
-    `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+
+    `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+demoTxState()+
     "CN="+Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join("")+";"+
     demoP.map((d,i)=>P(i+1,d)).join(""));
 }
@@ -3521,6 +3529,12 @@ function demoCmd(s){
     },3500);
     return; }
   if(s.startsWith("FLK=0")){ demoF.flkon=0; clearInterval(demoFlkTimer); demoState(); return; }
+  if(s.startsWith("DMXTX=")){ const a=s.slice(6);
+    if(a==="ON") demoF.txa=1; else if(a==="OFF") demoF.txa=0;
+    else if(a==="CLR") Object.keys(demoTx).forEach(k=>delete demoTx[k]);
+    else a.split(";").forEach(p=>{ const [c,l]=p.split(",").map(Number);
+      if(c>=1&&c<=512) demoTx[c]=Math.max(0,Math.min(255,l|0)); });
+    demoState(); return; }
   if(s==="UNIVMM"){ demoUnivMM(); return; }
   if(s==="UNIV"){ demoUniv(); return; }
   if(s.startsWith("RDMSCAN")){ demoRdmScan(); return; }
