@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "1752ab9-20260908",
-  "size": 1191808,
-  "crc32": "cf82e3e5",
-  "sha256": "f3d96bf68fbc27a93484c6afcfd82620001e9ee93a27e7011d78e38e88a3b46c",
-  "date": "2026-09-08",
-  "notes": "DMX test transmitter (Diag tab): desk-syntax keypad, latched levels, out the OUT socket while no DMX is received",
+  "build": "00c5b93-20260909",
+  "size": 1191904,
+  "crc32": "09327042",
+  "sha256": "08c0d05bc7bc703ed6306c6275953685110569f54c232deb7c5429578a76633e",
+  "date": "2026-09-09",
+  "notes": "RDM listen-down: re-point the UART at the mux output (GPIO20) for the response window",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
