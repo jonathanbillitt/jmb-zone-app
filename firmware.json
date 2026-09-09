@@ -1,16 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "00c5b93-20260909",
-  "size": 1191904,
-  "crc32": "09327042",
-  "sha256": "08c0d05bc7bc703ed6306c6275953685110569f54c232deb7c5429578a76633e",
+  "build": "f472286-20260909",
+  "size": 1192448,
+  "crc32": "7c0e1156",
+  "sha256": "2d4b6bb7db3186bdb309fa457df12313db0a07e4f353a4f56afd8eca7ef54369",
   "date": "2026-09-09",
-  "notes": "RDM listen-down: re-point the UART at the mux output (GPIO20) for the response window",
-  "file": "firmware.bin",
-  "stm_port": {
-    "file": "stm_port.bin",
-    "size": 17084,
-    "crc32": "21c85840",
-    "sha256": "14a39e92408e2a9688c6e9857170b7d290debabd09313b0c88217126266974c9"
-  }
+  "notes": "Loop stall monitor: per-section timing of loop(), LPX/LPS/LPN in the BLE state, shown on the Diag tab",
+  "file": "firmware.bin"
 }
