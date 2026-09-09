@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "f472286-20260909",
-  "size": 1192448,
-  "crc32": "7c0e1156",
-  "sha256": "2d4b6bb7db3186bdb309fa457df12313db0a07e4f353a4f56afd8eca7ef54369",
+  "build": "b724279-20260909",
+  "size": 1192704,
+  "crc32": "8a847dea",
+  "sha256": "03d87e948aae2397c476d55ee8c840938bbf019a30429202370efb3a7f2fb3eb",
   "date": "2026-09-09",
-  "notes": "Loop stall monitor: per-section timing of loop(), LPX/LPS/LPN in the BLE state, shown on the Diag tab",
+  "notes": "App: factory PIN tried automatically; RDM scan lists the controller itself first",
   "file": "firmware.bin"
 }

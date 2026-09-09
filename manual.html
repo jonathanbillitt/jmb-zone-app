@@ -259,9 +259,12 @@ thru automatically when you stop (or after 3 minutes idle).</p>
 <p><strong>https://app.jmblighting.co.uk/</strong> — runs in <strong>Chrome or Edge</strong> on Android or a
 desktop (on <strong>iPhone</strong>, open it in the <strong>Bluefy</strong> browser, which supplies the
 Bluetooth that iOS Safari lacks). Choose <strong>Add to Home screen</strong> for a
-full-screen, offline-capable app. Tap <strong>Connect</strong>, pick your controller from the
-list, and enter the PIN (default <strong>0123</strong> — change it in Setup). If a controller
-has just been reflashed, toggle the phone's Bluetooth off and on once first.</p>
+full-screen, offline-capable app. Tap <strong>Connect</strong> and pick your controller from
+the list. The factory PIN (<strong>0123</strong>) is tried for you, so a new controller opens
+straight away. A controller with its own PIN (set in Setup → Change PIN) asks
+for it once per phone, then remembers it for that controller only — a PIN typed
+for one unit is never offered to another. If a controller has just been
+reflashed, toggle the phone's Bluetooth off and on once first.</p>
 <p>Everything the app sends goes <strong>straight to the controller over Bluetooth</strong> —
 no account, no cloud, no internet needed once it has loaded, and nothing about
 your rig leaves the phone. The app also <strong>updates itself</strong>: opened with any
@@ -497,7 +500,7 @@ only the flicker frequency changes.</p>
 <hr />
 <h2>9. Quick reference</h2>
 <ul>
-<li>Default PIN: <strong>0123</strong> · default addresses: sequential RGB</li>
+<li>Factory PIN: <strong>0123</strong> (entered for you; only a user-set PIN is remembered, per controller) · default addresses: sequential RGB</li>
 <li>DMX chart: see <code>docs/DMX_CHART.md</code></li>
 <li>Start address caps at 513 − footprint so the whole personality fits the
   universe (FX 10ch → max 503); it drops automatically if you switch a port

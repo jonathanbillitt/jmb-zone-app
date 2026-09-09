@@ -808,7 +808,8 @@
 <div id="overlay" class="hidden">
   <div class="box">
     <b>Enter PIN</b>
-    <div class="mini">The controller ignores everything until it hears the PIN.</div>
+    <div class="mini">The factory PIN 0123 is tried for you. A controller with its
+      own PIN asks once per phone, then remembers it for that controller only.</div>
     <input id="pinInput" inputmode="numeric" autocomplete="off" placeholder="••••">
     <button id="pinGo" class="primary" style="width:100%">Unlock</button>
     <button id="pinFlash" style="width:100%;margin-top:8px">Flash this controller</button>
@@ -863,7 +864,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-09e.loopstat";
+const APP_VER="2026-09-09f.pin-self";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -997,6 +998,7 @@ async function connect(){
     $("hello").classList.add("hidden");
     authed=false;
     askPin();
+    autoPin();        // factory PIN, or this controller's remembered PIN
   }finally{
     busy=false;
     $("btnConnect").disabled=false;
@@ -1019,8 +1021,7 @@ async function onDisconnected(){
         await gattSetup();
         $("hello").classList.add("hidden");
         askPin();
-        const saved=loadPin();
-        if(saved){ $("pinInput").value=saved; tryPin(); }
+        autoPin();
         return;
       }catch(_){}
     }
@@ -1143,6 +1144,21 @@ function tellUser(msg,opt){
   });
 }
 let pinPending="";
+// Automatic unlock on connect. The FACTORY PIN (0123) is tried on every
+// controller and is never stored — it is public. A USER-DEFINED PIN is only
+// auto-entered on a controller it was typed for (loadPin, per-device); the
+// per-device memory rules apply to user PINs alone.
+function autoPin(){
+  const saved=loadPin(), pin=saved||"0123";
+  $("pinInput").value=saved;
+  pinPending=saved;               // factory PIN never saved
+  send("PIN="+pin);
+  clearTimeout(authTimer);
+  authTimer=setTimeout(()=>{
+    if(!authed) $("pinErr").textContent=saved?"No answer — wrong PIN?"
+                                              :"This controller has its own PIN.";
+  },1500);
+}
 async function tryPin(){
   const pin=$("pinInput").value.trim();
   if(!pin) return;
@@ -2403,7 +2419,7 @@ function onRdm(str){
     if(!/^[0-9A-Fa-f]{1,16}$/.test(f.U||"")) return;   // wire data, not trusted
     const d={uid:f.U, addr:+f.A||0, fp:+f.FP||0, pe:+f.PE||0, pt:+f.PT||0,
              sn:+f.SN||0, model:hexDec(f.MD), label:hexDec(f.LB),
-             mfr:hexDec(f.MF)};
+             mfr:hexDec(f.MF), self:f.SELF==="1"};   // SELF = the controller itself
     if(!rdmDevs[d.uid]) rdmOrder.push(d.uid);
     else d.ident=rdmDevs[d.uid].ident;   // a re-discovery must not drop the flag
     rdmDevs[d.uid]=d;
@@ -2450,6 +2466,15 @@ function renderRdm(){
   host.innerHTML=rdmOrder.map(u=>{
     const d=rdmDevs[u], open=rdmOpenUid===u;
     const sens=rdmSens[u]||{};
+    // The controller lists itself first so a scan with nothing else on the
+    // line still shows something real. It cannot address itself over its own
+    // OUT socket, so the card is read-only: its settings live on the other tabs.
+    if(d.self) return `<div class="devcard self" data-uid="${esc(u)}">
+      <div class="dh"><b>${esc(d.label||d.model||"This controller")}</b>
+        <span class="badge">this controller</span></div>
+      <div class="uid">${d.model?esc(d.model)+" · ":""}${d.mfr?esc(d.mfr)+" · ":""}UID ${esc(u)}</div>
+      <div class="mini">Its own settings are on the Control and Setup tabs.</div>
+    </div>`;
     return `<div class="devcard" data-uid="${esc(u)}">
       <div class="dh" data-act="open">
         <b>${esc(d.label||d.model||"RDM device")}</b>
@@ -3512,6 +3537,8 @@ function demoRdmScan(){
          [1500,"JMBR;PH=SCAN;N=2;Q=2"],[2100,"JMBR;PH=SCAN;N=3;Q=0"],
          [2500,"JMBR;PH=INFO;N=3;I=0"]];
   q.forEach(([t,m])=>at(t,()=>onState(m)));
+  at(200,()=>onState("JMBR;DEV;I=255;U=4A4D0000BEEF;A=0;FP=0;PE=0;PT=0;SN=0;"+
+    `MD=${hexEnc("JMB 4our 4-port LED")};LB=${hexEnc("Demo Rig")};MF=${hexEnc("JMB Lighting")};SELF=1`));
   DEMO_DEVS.forEach((d,i)=>at(2900+i*500,()=>{ demoDevRow(d);
     onState(`JMBR;PH=INFO;N=3;I=${i+1}`); }));
   at(4600,()=>onState("JMBR;PH=READY;N=3"));
