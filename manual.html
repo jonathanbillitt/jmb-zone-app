@@ -1,6 +1,12 @@
 <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>JMB Lighting — User Manual</title><style>
 @page { size: A4; margin: 18mm 16mm; }
 body { font: 10.5pt/1.55 'Segoe UI', system-ui, sans-serif; color: #1a2230; max-width: 175mm; margin: 0 auto; }
+/* Screen only: side gutters so text never sits edge-to-edge on a phone
+   (print keeps the @page margins). Explicit light canvas so a dark-themed
+   viewer never paints its own ground behind the dark text. */
+:root { color-scheme: light; }
+html { background: #fff; }
+@media screen { body { padding: 0 18px 24px; box-sizing: border-box; } }
 h1 { font-size: 21pt; color: #14203a; border-bottom: 3px solid #6a2cf5; padding-bottom: 6px; margin: 0 0 2px; }
 h1 + p { color: #667; margin-top: 2px; }
 h2 { font-size: 13.5pt; color: #2a1d66; margin: 22px 0 8px; border-bottom: 1px solid #d8d4ee; padding-bottom: 3px; }
@@ -266,13 +272,18 @@ at a venue. There is nothing to install from a store and no updates to chase.</p
 number</strong>, its <strong>personality</strong> (RGB or tuneable white, 8- or 16-bit, the
 10-channel effect mode, or a <strong>single-channel dimmer</strong> — one DMX level over the
 port's set colour, ideal for single-colour and IR strips), an <strong>effect</strong> picker with a <strong>speed</strong> control, and the
-level controls: <strong>R / G / B sliders</strong> — which become <strong>Warm / Cool</strong> on a
-tuneable-white port (amber and ice-blue tracks, the unused Blue row hidden) —
-plus two large <strong>jog wheels</strong> for <strong>Dim</strong> and <strong>FX speed</strong> that are easy to ride
+level controls: <strong>R / G / B sliders</strong> — which become <strong>Cool / Warm</strong> on a
+tuneable-white port (ice-blue and amber tracks, the unused Blue row hidden) —
+plus two <strong>encoders</strong> for <strong>Dim</strong> and <strong>FX speed</strong> that are easy to ride
 by feel during a take. Tap the <strong>label</strong> slot in a card's header to name the
 port (up to 16 characters; the name also appears on that port's own screen when
 the panel is locked). <strong>Clear all</strong> returns every port to a clean base — full
 white, effects off, dimmer down — after a confirmation.</p>
+<p>An <strong>orange outline on a DMX address box</strong> means that port's channels overlap
+another port's: its start address plus footprint runs into a different start
+address on the same controller. It is a nudge, not a block — overlapping can be
+deliberate — and both sides of the overlap are marked. Two ports set to the
+<em>same</em> start address are treated as mirroring and are not marked.</p>
 <p>Touching any colour or level control <strong>takes manual control automatically</strong> and
 stops a running effect on that port, so a fader never feels dead. When a live
 <strong>DMX, sACN or Art-Net</strong> signal is driving the rig, a <strong>"Live DMX in control"</strong>
