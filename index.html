@@ -194,6 +194,16 @@
                    color:var(--text); border:1px solid var(--line); border-radius:9px; }
   #overlay .err { color:var(--bad); font-size:13px; min-height:18px; margin-top:8px; }
   .mini { color:var(--dim); font-size:12px; margin-top:8px; }
+  /* Info icon: static help notes in a card collapse behind it (user,
+     2026-09-10 — "not always on show"). Sits after the card title when the
+     card has one, else where the note was. .on = notes revealed. */
+  .ib { display:inline-flex; align-items:center; justify-content:center;
+        width:18px; height:18px; border-radius:50%; border:1px solid var(--line);
+        background:transparent; color:var(--dim); padding:0; margin:0 0 0 8px;
+        font:italic 700 11px/1 Georgia,"Times New Roman",serif; vertical-align:middle;
+        cursor:pointer; flex:none; }
+  .ib.on { color:var(--acc); border-color:var(--acc); }
+  .ib.solo { display:flex; margin:8px 0 0; }
   .ctlrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   /* keep a row of buttons on one line across the box, sharing the width evenly */
   .ctlrow.across { flex-wrap:nowrap; gap:8px; }
@@ -869,7 +879,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-10h.crashmark";
+const APP_VER="2026-09-10i.helpicons";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -3772,6 +3782,37 @@ $("appRefresh").onclick = async (e) => {
       : "Couldn't check for an update ("+((err&&err.message)||err)+").";
   }finally{ btn.disabled=false; }
 };
+
+// ---------- help notes behind an info icon ----------
+// Every static explanatory note (a div.mini with no id, inside a card on a
+// tab) is hidden and an ⓘ toggles all the notes in that card. Notes with an
+// id are live status and stay visible; span.mini are inline hints next to a
+// control and stay too. The icon goes after the card's title when it has
+// one, otherwise where the first note sat. (user, 2026-09-10)
+document.querySelectorAll(".tab .card").forEach(card=>{
+  const notes=[...card.querySelectorAll("div.mini:not([id])")]
+    .filter(n=>n.closest(".card")===card && !n.closest(".devcard"));
+  if(!notes.length) return;
+  notes.forEach(n=>{ n.classList.add("help","hidden"); });
+  const btn=document.createElement("button");
+  btn.type="button"; btn.className="ib"; btn.textContent="i";
+  btn.title="Show notes"; btn.setAttribute("aria-label","Show notes");
+  // A card "title" is a <b>, or a label styled bold (the section headers);
+  // an ordinary field label (Name, Hardware…) is not a title.
+  let head=card.querySelector(":scope > .ctlrow > b, :scope > .row > label, :scope > b, :scope > label");
+  if(head && head.tagName==="LABEL" && +getComputedStyle(head).fontWeight < 600) head=null;
+  // .row labels are a fixed 52px column, so the icon must be a flex SIBLING
+  // (inside the label it wraps onto its own line); a title <b> is free-width
+  // and takes it inline.
+  if(head && head.tagName==="LABEL" && head.parentElement.classList.contains("row")) head.after(btn);
+  else if(head) head.appendChild(btn);
+  else { btn.classList.add("solo"); notes[0].before(btn); }
+  btn.onclick=e=>{ e.preventDefault(); e.stopPropagation();
+    const open=notes[0].classList.contains("hidden");
+    notes.forEach(n=>n.classList.toggle("hidden",!open));
+    btn.classList.toggle("on",open);
+    btn.title=btn.getAttribute("aria-label")=open?"Hide notes":"Show notes"; };
+});
 
 // If an update run dies, the single most useful fact is WHERE it died. Record
 // the phase as it advances and stash it across the reload/reconnect, so the
