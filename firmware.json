@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "a995339-20260910",
-  "size": 1193536,
-  "crc32": "11dc4959",
-  "sha256": "689cd7df2765a5856f7a32b308795b0eadf0f258621ec968d942db6eb3580217",
+  "build": "3829519-20260910",
+  "size": 1193856,
+  "crc32": "8f09e94d",
+  "sha256": "b03a961e1037d053c003e29764c85cb77aa07f00f4b81a0856f5c5805c9bf282",
   "date": "2026-09-10",
-  "notes": "Strobe + Police keep an exact schedule on the effect clock; switches are only rounded to the next push",
+  "notes": "Strobe + Police: flash starts on the exact schedule, flash LENGTH a fixed push count \u2014 rounding lands in the dark gap",
   "file": "firmware.bin"
 }
