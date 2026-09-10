@@ -866,7 +866,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-10b.police";
+const APP_VER="2026-09-10c.pushgap";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2150,10 +2150,11 @@ function renderDiag(){
   // push every ~20 ms, so anything much above that shows as stutter.
   if(kv.LPX!==undefined){
     const sec=["mcp","ble","dmx","net","misc","out","bus","tail"][+kv.LPS]||"?";
-    const mx=+kv.LPX||0, n=+kv.LPN||0, avg=(+kv.LPA||0)/10;
+    const mx=+kv.LPX||0, n=+kv.LPN||0, avg=(+kv.LPA||0)/10, gap=+kv.LPG||0;
     const el=$("loopStat");
-    el.textContent=`Loop: average ${avg.toFixed(1)} ms · longest ${mx} ms (${sec}) · ${n} stall${n===1?"":"s"} over 50 ms in 5 s`;
-    el.style.color=(mx>=50||n||avg>=15)?"var(--warn)":"";
+    el.textContent=`Loop: average ${avg.toFixed(1)} ms · longest ${mx} ms (${sec}) · ${n} stall${n===1?"":"s"} over 50 ms`
+      +(kv.LPG!==undefined?` · longest push gap ${gap} ms`:"")+" (5 s window)";
+    el.style.color=(mx>=50||n||avg>=15||gap>=40)?"var(--warn)":"";
   }
   renderRdm();
 }
@@ -3492,7 +3493,7 @@ function demoState(){
     "NIP=192.168.1.42;NRS=-52;TF=1;PB=0;CX=3;CA=1;"+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
     `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+demoTxState()+
-    "LPX=9;LPS=5;LPN=0;LPA=31;"+
+    "LPX=9;LPS=5;LPN=0;LPA=31;LPG=22;"+
     "CN="+Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join("")+";"+
     demoP.map((d,i)=>P(i+1,d)).join(""));
 }

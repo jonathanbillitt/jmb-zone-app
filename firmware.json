@@ -1,10 +1,16 @@
 {
   "version": "2.0.0",
-  "build": "832b1b8-20260910",
-  "size": 1192816,
-  "crc32": "0ee1b953",
-  "sha256": "7172b1b5b22857396877e6dc753bf42c0bd1f0ae09092dca31e62231134f8b52",
+  "build": "4940868-20260910",
+  "size": 1193120,
+  "crc32": "a4e9cb15",
+  "sha256": "d6e3c53fd6a820d35888da4972bdf37be5952fd6ba4df3b511ded32627965673",
   "date": "2026-09-10",
-  "notes": "Police as a push-driven sequence (no flash doubled or dropped); loop monitor reports the mean pass",
-  "file": "firmware.bin"
+  "notes": "BLE state notify time-sliced (no 48 ms loop stall); effect fields read Off at boot; push-gap metric",
+  "file": "firmware.bin",
+  "stm_port": {
+    "file": "stm_port.bin",
+    "size": 17084,
+    "crc32": "21c85840",
+    "sha256": "14a39e92408e2a9688c6e9857170b7d290debabd09313b0c88217126266974c9"
+  }
 }
