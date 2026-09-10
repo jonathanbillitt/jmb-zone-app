@@ -869,7 +869,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-10g.manifest";
+const APP_VER="2026-09-10h.crashmark";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2652,10 +2652,21 @@ function renderSetup(){
   const RR={1:"power-on",3:"software restart",4:"CRASH (panic)",5:"interrupt watchdog",
             6:"task watchdog",7:"watchdog",8:"deep sleep",9:"brownout",10:"SDIO",
             11:"USB",12:"JTAG"};
+  // CRS = crash marker: valid,loopSection,bleHandler,uptimeMs at the moment
+  // the previous boot died (survives the reset in RTC memory).
+  let crs="";
+  if(kv.CRS){
+    const [v,ls,bc,up]=kv.CRS.split(",").map(Number);
+    if(v){
+      const LS=["mcp","ble","dmx","net","misc","out","bus","tail"];
+      const BC={0:"",1:"BLE command handler",2:"BLE OTA control",3:"BLE OTA data",4:"BLE connect/disconnect"};
+      crs=" · crashed in "+(BC[bc]||("loop section "+(LS[ls]||ls)))+" at "+(up/1000).toFixed(1)+"s";
+    }
+  }
   $("fwLine").textContent="Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+
     " ports · "+(kv.HRS??0)+" h powered"+
     (kv.UP!=null ? " · up "+(+kv.UP)+"s" : "")+
-    (kv.RR!=null ? " · last boot: "+(RR[+kv.RR]||("reason "+kv.RR)) : "");
+    (kv.RR!=null ? " · last boot: "+(RR[+kv.RR]||("reason "+kv.RR)) : "")+crs;
   {
     const n=kv.VAR??kv.PORTS;
     $("varLine").textContent = n

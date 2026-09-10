@@ -1,16 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "7a28487-20260910",
-  "size": 1193296,
-  "crc32": "54f18127",
-  "sha256": "60a380e742211993271dd9f8043ac23542d20e453e4cb3592fe2f0f10ee666c5",
+  "build": "b84b005-20260910",
+  "size": 1193744,
+  "crc32": "69a63281",
+  "sha256": "e51a6d7acbc76dec96e90676e4adda40af05f9272d032de64d95b4f0f9b1c468",
   "date": "2026-09-10",
-  "notes": "FIX: port-module update crashed the controller at \"sending the port module image\" \u2014 first LittleFS mount ran in the BLE callback",
-  "file": "firmware.bin",
-  "stm_port": {
-    "file": "stm_port.bin",
-    "size": 17084,
-    "crc32": "21c85840",
-    "sha256": "14a39e92408e2a9688c6e9857170b7d290debabd09313b0c88217126266974c9"
-  }
+  "notes": "Crash marker in RTC memory: which loop section / BLE handler was running when the controller died, shown after the reboot",
+  "file": "firmware.bin"
 }
