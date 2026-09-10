@@ -198,11 +198,11 @@
      2026-09-10 — "not always on show"). Sits after the card title when the
      card has one, else where the note was. .on = notes revealed. */
   .ib { display:inline-flex; align-items:center; justify-content:center;
-        width:18px; height:18px; border-radius:50%; border:1px solid var(--line);
-        background:transparent; color:var(--dim); padding:0; margin:0 0 0 8px;
-        font:italic 700 11px/1 Georgia,"Times New Roman",serif; vertical-align:middle;
-        cursor:pointer; flex:none; }
-  .ib.on { color:var(--acc); border-color:var(--acc); }
+        width:22px; height:22px; border-radius:50%; border:1px solid var(--line);
+        background:transparent; padding:0; margin:0 0 0 8px; font-size:13px;
+        line-height:1; vertical-align:middle; cursor:pointer; flex:none;
+        filter:grayscale(1) opacity(.7); }
+  .ib.on { border-color:var(--acc); filter:none; }
   .ib.solo { display:flex; margin:8px 0 0; }
   .ctlrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   /* keep a row of buttons on one line across the box, sharing the width evenly */
@@ -486,7 +486,7 @@
           <button class="modechip" data-um="act">Activity</button>
         </div>
         <div id="univGrid" class="ugrid"></div>
-        <div id="univInfo" class="mini">Each DMX channel, numbered, showing its
+        <div id="univInfo" class="mini" data-help>Each DMX channel, numbered, showing its
           live level — tap one for its patch, captured range and change count.</div>
       </div>
     </div>
@@ -497,7 +497,7 @@
         <span class="mini" id="flkStat" style="margin:0"></span>
         <button id="btnFlk">Arm</button>
       </div>
-      <div id="flkList" class="mini" style="margin-top:8px">Arm it, then every
+      <div id="flkList" class="mini" data-help style="margin-top:8px">Arm it, then every
         channel-value change on the wire is logged here — the 2am ghost-flicker
         catcher. Survives leaving this tab.</div>
     </div>
@@ -508,7 +508,7 @@
         <button id="btnRdmStop" class="hidden">Stop</button>
         <button id="btnRdmScan" class="primary">Scan</button>
       </div>
-      <div class="mini" id="rdmPhase">Discover and edit every RDM fixture on the
+      <div class="mini" id="rdmPhase" data-help>Discover and edit every RDM fixture on the
         thru line — address, personality, label, identify and sensors, like a
         RDM tester. Scanning takes over the output line while active.</div>
       <div id="rdmDevs"></div>
@@ -560,7 +560,7 @@
       (below).<br><br>
       <b>Fade</b> — rainbow sweep, for dimming smoothness and colour blending.<br><br>
       Both drive all ports and override every source, including live DMX, until Off.</div>
-      <div class="mini" id="wireChk" style="margin-top:10px;white-space:pre-line;
+      <div class="mini" id="wireChk" data-help style="margin-top:10px;white-space:pre-line;
            border-top:1px solid var(--line);padding-top:10px"></div>
       <div class="ctlrow hidden" id="wireFaultRow" style="margin-top:8px">
         <button id="btnWireClear" class="danger">Clear wiring fault &amp; re-enable</button>
@@ -697,7 +697,7 @@
         <span class="unit">BPM</span>
         <button id="fxBpmSet">Set</button>
       </div>
-      <div class="mini" id="fxTapHint">Tap 4+ times in time with the music, or
+      <div class="mini" id="fxTapHint" data-help>Tap 4+ times in time with the music, or
         type a BPM. 128 = the designed tempo. Beat effects (Party, Club, Pulse)
         follow it rig-wide, and the ports' Speed wheels move with it.</div>
       <div class="row"><label>Spread</label>
@@ -733,7 +733,7 @@
       <div id="otaBarWrap" class="hidden" style="margin-top:10px;height:10px;background:var(--card2);border-radius:6px;overflow:hidden">
         <div id="otaBar" style="height:100%;width:0;background:linear-gradient(90deg,#6a2cf5,#5fd7ff);transition:width .15s"></div>
       </div>
-      <div class="mini" id="otaMsg">Firmware arrives over Bluetooth — no cable, no
+      <div class="mini" id="otaMsg" data-help>Firmware arrives over Bluetooth — no cable, no
       files to find. Keep the app open and the phone unlocked until it finishes.
       The controller reboots into the new build itself, and if that build fails to
       start it returns to the previous one on its own.</div>
@@ -744,7 +744,7 @@
         <button id="btnResetAll" class="danger">Reset all ports</button>
         <button id="btnUndo">Undo reset</button>
       </div>
-      <div class="mini" id="identMsg">Flash identifies this controller for 5
+      <div class="mini" id="identMsg" data-help>Flash identifies this controller for 5
       seconds — tap it after connecting to check you're on the right unit.</div>
     </div>
     <div class="card">
@@ -796,7 +796,7 @@
       <div class="ctlrow">
         <button id="appRefresh">Look for app update</button>
       </div>
-      <div class="mini" id="appUpdMsg">The app checks for its own update every
+      <div class="mini" id="appUpdMsg" data-help>The app checks for its own update every
         time it opens. This forces a fresh check and reloads.</div>
     </div>
   </div>
@@ -879,7 +879,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-10i.helpicons";
+const APP_VER="2026-09-10j.hand";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2340,6 +2340,7 @@ function onFlick(str){                    // "JMBK;<ch>,<old>,<new>,<age>;…"
 }
 function renderFlk(){
   if(!flkEvts.length){ return; }
+  reveal("flkList");
   $("flkList").innerHTML=flkEvts.map(e=>
     `<div class="evt"><span>${new Date(e.t).toLocaleTimeString()}</span>
      <span class="ch">ch ${e.ch}</span><span>${e.o} → ${e.n}</span></div>`).join("");
@@ -2492,7 +2493,7 @@ function hexEnc(t){ let o=""; for(const c of t){ const v=c.codePointAt(0);
 function renderRdm(){
   $("btnRdmStop").classList.toggle("hidden",!rdmActive);
   $("btnRdmScan").textContent=rdmActive?"Rescan":"Scan";
-  if(rdmPhaseTxt) $("rdmPhase").textContent=rdmPhaseTxt;
+  if(rdmPhaseTxt){ $("rdmPhase").textContent=rdmPhaseTxt; reveal("rdmPhase"); }
   const host=$("rdmDevs");
   if(!rdmOrder.length){ host.innerHTML=""; return; }
   host.innerHTML=rdmOrder.map(u=>{
@@ -2813,6 +2814,7 @@ function renderWiring(){
       +"compared here — relative, so a short off-cut works too.";
   el.textContent = faults.length ? faults.join("\n\n")+"\n\n"+body : body;
   el.style.color = faults.length ? "var(--bad)" : "";
+  if(rows.length || faults.length) reveal("wireChk");   // results are status, not help
   const row=$("wireFaultRow");
   if(row) row.classList.toggle("hidden", !faults.length);
 }
@@ -2868,7 +2870,7 @@ $("fxTap").onclick = () => {
   tapTimes.push(now);
   if (tapTimes.length > 6) tapTimes.shift();
   if (tapTimes.length < 2){
-    $("fxTapHint").textContent = "keep tapping…";
+    $("fxTapHint").textContent = "keep tapping…"; reveal("fxTapHint");
     return;
   }
   let iv = 0;
@@ -3138,7 +3140,7 @@ function retryOtaManifest(force){
 setInterval(()=>retryOtaManifest(false), 60000);   // periodic staleness check
 addEventListener("online",()=>retryOtaManifest(true));
 function setOtaState(t){ $("otaState").textContent=t; }
-function setOtaMsg(t){ $("otaMsg").textContent=t; }
+function setOtaMsg(t){ $("otaMsg").textContent=t; reveal("otaMsg"); }
 function otaProgress(f){ $("otaBarWrap").classList.remove("hidden");
   $("otaBar").style.width=Math.round(Math.max(0,Math.min(1,f))*100)+"%"; }
 function otaHideBar(){ $("otaBarWrap").classList.add("hidden"); $("otaBar").style.width="0"; }
@@ -3761,7 +3763,7 @@ $("appRefresh").onclick = async (e) => {
   e.preventDefault();
   const btn=$("appRefresh");
   btn.disabled=true;
-  $("appUpdMsg").textContent="Checking…";
+  $("appUpdMsg").textContent="Checking…"; reveal("appUpdMsg");
   try{
     const live = await publishedAppVersion();
     if(!live){
@@ -3789,13 +3791,19 @@ $("appRefresh").onclick = async (e) => {
 // id are live status and stay visible; span.mini are inline hints next to a
 // control and stay too. The icon goes after the card's title when it has
 // one, otherwise where the first note sat. (user, 2026-09-10)
+// Also behind the hand: inline span hints that are sentences (≥16 chars —
+// the short range labels like "0.25 – 6.5 A" stay), and status lines tagged
+// data-help whose default text is an explanation; those come back on their
+// own the moment they carry live status (reveal()).
+function reveal(id){ const e=$(id); if(e) e.classList.remove("hidden"); }
 document.querySelectorAll(".tab .card").forEach(card=>{
-  const notes=[...card.querySelectorAll("div.mini:not([id])")]
-    .filter(n=>n.closest(".card")===card && !n.closest(".devcard"));
+  const notes=[...card.querySelectorAll("div.mini:not([id]), span.mini:not([id]), [data-help]")]
+    .filter(n=>n.closest(".card")===card && !n.closest(".devcard"))
+    .filter(n=>n.tagName!=="SPAN" || n.textContent.trim().length>=16);
   if(!notes.length) return;
   notes.forEach(n=>{ n.classList.add("help","hidden"); });
   const btn=document.createElement("button");
-  btn.type="button"; btn.className="ib"; btn.textContent="i";
+  btn.type="button"; btn.className="ib"; btn.textContent="✋";
   btn.title="Show notes"; btn.setAttribute("aria-label","Show notes");
   // A card "title" is a <b>, or a label styled bold (the section headers);
   // an ordinary field label (Name, Hardware…) is not a title.
@@ -3806,7 +3814,7 @@ document.querySelectorAll(".tab .card").forEach(card=>{
   // and takes it inline.
   if(head && head.tagName==="LABEL" && head.parentElement.classList.contains("row")) head.after(btn);
   else if(head) head.appendChild(btn);
-  else { btn.classList.add("solo"); notes[0].before(btn); }
+  else { btn.classList.add("solo"); card.appendChild(btn); }   // no title: bottom of the card
   btn.onclick=e=>{ e.preventDefault(); e.stopPropagation();
     const open=notes[0].classList.contains("hidden");
     notes.forEach(n=>n.classList.toggle("hidden",!open));
