@@ -704,9 +704,12 @@
       </div>
       <div class="ctlrow">
         <button id="btnOtaHosted" class="primary" disabled>Update Firmware</button>
+        <button id="btnOtaCtrlOnly" disabled>Controller only</button>
         <button id="btnOtaCancel" class="danger hidden">Cancel</button>
       </div>
       <div class="mini" id="otaHosted">Checking for the latest firmware…</div>
+      <div class="mini">Controller only skips the port module step. Use it if the link
+        drops during the port module; update the port module afterwards.</div>
       <div class="ctlrow" id="otaRbRow" style="margin-top:8px">
         <button id="btnOtaRollback" class="danger" disabled>Roll back</button>
       </div>
@@ -866,7 +869,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-10d.recover";
+const APP_VER="2026-09-10e.ctrlonly";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -3119,6 +3122,7 @@ function renderOta(){
     if(!otaManifest){
       hb.disabled=false;                       // the button becomes Retry
       hb.textContent="Retry";
+      { const cb=$("btnOtaCtrlOnly"); if(cb){ cb.hidden=true; cb.disabled=true; } }
       hm.textContent=(navigator.onLine===false
         ? "This device is offline, so the latest firmware can't be fetched. "
         : "Couldn't fetch the latest firmware"
@@ -3135,6 +3139,11 @@ function renderOta(){
       const avail = otaUpdateAvailable();
       hb.disabled = !ok || otaBusy || !avail;
       hb.textContent = avail ? "Update Firmware" : "Firmware up to date";
+      // Controller-only is only meaningful when the full run would include
+      // the port module; otherwise the two buttons would do the same thing.
+      const cb=$("btnOtaCtrlOnly");
+      if(cb){ const portStep = !!(otaManifest.stm_port && (stmCaps()&1));
+              cb.hidden = !portStep; cb.disabled = hb.disabled; }
       hm.textContent = !ok
         ? "Available: "+otaManifest.version+" · build "+otaManifest.build
           +" — connect to compare with the controller."
@@ -3413,6 +3422,13 @@ async function runFullUpdate(ctrlOnly){
 $("btnOtaHosted").onclick=async()=>{
   if(!otaManifest){ setOtaState("checking…"); await loadOtaManifest(); return; }
   return runFullUpdate(false);
+};
+// Controller-only: the escape hatch from fc8ac2d (2026-09-04) — when the port
+// module step drops the link every time, the controller image can still be
+// delivered on its own. Removed from the UI once; back by request 2026-09-10.
+$("btnOtaCtrlOnly").onclick=async()=>{
+  if(!otaManifest){ setOtaState("checking…"); await loadOtaManifest(); return; }
+  return runFullUpdate(true);
 };
 $("btnOtaCancel").onclick=()=>{ otaAbort=true; };
 async function runOta(file, opts){
