@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "7d626f5-20260910",
-  "size": 1193136,
-  "crc32": "eb2ea6bf",
-  "sha256": "0cde281e96d644ef03cf532525e2a4b27ef6cf4fd65e48c9f3a530cf65d4aa24",
+  "build": "5e4f431-20260910",
+  "size": 1193152,
+  "crc32": "17d435c2",
+  "sha256": "aa419116a07e6671361ff6b765f46ca77f8840e01e2236dfb24a8052c96394df",
   "date": "2026-09-10",
-  "notes": "FIX: state notify truncated to \"JMB\" in 4940868 (sizeof on a pointer); app recovery path for controllers on that build",
+  "notes": "Reset reason in the BLE state (RR=), shown on the Setup firmware line",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
