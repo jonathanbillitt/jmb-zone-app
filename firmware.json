@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "3d943ec-20260910",
-  "size": 1193376,
-  "crc32": "361de371",
-  "sha256": "3a1febf021b82dc0a5c926458402f063c132bd800f407ead944e6f0899cf4abf",
+  "build": "7a28487-20260910",
+  "size": 1193296,
+  "crc32": "54f18127",
+  "sha256": "60a380e742211993271dd9f8043ac23542d20e453e4cb3592fe2f0f10ee666c5",
   "date": "2026-09-10",
-  "notes": "Push gate 20 -> 10 ms (JMB_PUSH_MS); push-counted pulses size to it; app re-reads the firmware manifest on connect and every 10 min",
+  "notes": "FIX: port-module update crashed the controller at \"sending the port module image\" \u2014 first LittleFS mount ran in the BLE callback",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
