@@ -869,7 +869,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-10f.resetreason";
+const APP_VER="2026-09-10g.manifest";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -3106,10 +3106,15 @@ async function loadOtaManifest(){
 // came back, the network came back, or the user pressed Retry. Rate-limited so
 // a repeatedly-failing fetch cannot storm.
 function retryOtaManifest(force){
-  if(otaManifest) return;
-  if(!force && Date.now()-otaManifestTried < 15000) return;
+  // A manifest loaded at app-open goes stale the moment a new build is
+  // published — the card then says "up to date" against the OLD manifest
+  // (bench 2026-09-10). Forced (on connect) always re-reads; otherwise
+  // re-read when the last read is older than 10 minutes.
+  if(otaManifest && !force && Date.now()-otaManifestTried < 600000) return;
+  if(!otaManifest && !force && Date.now()-otaManifestTried < 15000) return;
   loadOtaManifest();
 }
+setInterval(()=>retryOtaManifest(false), 60000);   // periodic staleness check
 addEventListener("online",()=>retryOtaManifest(true));
 function setOtaState(t){ $("otaState").textContent=t; }
 function setOtaMsg(t){ $("otaMsg").textContent=t; }

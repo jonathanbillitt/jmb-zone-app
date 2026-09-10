@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "3b9b918-20260910",
+  "build": "3d943ec-20260910",
   "size": 1193376,
-  "crc32": "e5d4821f",
-  "sha256": "92a9048a13cbf32f55266a0f237c34b7e144d08f40aaa69343d53430c25d2025",
+  "crc32": "361de371",
+  "sha256": "3a1febf021b82dc0a5c926458402f063c132bd800f407ead944e6f0899cf4abf",
   "date": "2026-09-10",
-  "notes": "Strobe push-counted: every flash the same number of pushes (was 1 or 2 at random)",
+  "notes": "Push gate 20 -> 10 ms (JMB_PUSH_MS); push-counted pulses size to it; app re-reads the firmware manifest on connect and every 10 min",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
