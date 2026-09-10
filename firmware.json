@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "b724279-20260909",
-  "size": 1192704,
-  "crc32": "8a847dea",
-  "sha256": "03d87e948aae2397c476d55ee8c840938bbf019a30429202370efb3a7f2fb3eb",
-  "date": "2026-09-09",
-  "notes": "App: factory PIN tried automatically; RDM scan lists the controller itself first",
+  "build": "832b1b8-20260910",
+  "size": 1192816,
+  "crc32": "0ee1b953",
+  "sha256": "7172b1b5b22857396877e6dc753bf42c0bd1f0ae09092dca31e62231134f8b52",
+  "date": "2026-09-10",
+  "notes": "Police as a push-driven sequence (no flash doubled or dropped); loop monitor reports the mean pass",
   "file": "firmware.bin"
 }
