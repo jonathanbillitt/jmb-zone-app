@@ -199,10 +199,10 @@
      card has one, else where the note was. .on = notes revealed. */
   .ib { display:inline-flex; align-items:center; justify-content:center;
         width:22px; height:22px; border-radius:50%; border:1px solid var(--line);
-        background:transparent; padding:0; margin:0 0 0 8px; font-size:13px;
-        line-height:1; vertical-align:middle; cursor:pointer; flex:none;
-        filter:grayscale(1) opacity(.7); }
-  .ib.on { border-color:var(--acc); filter:none; }
+        background:transparent; padding:0; margin:0 0 0 8px; color:var(--dim);
+        line-height:1; vertical-align:middle; cursor:pointer; flex:none; }
+  .ib svg { width:14px; height:14px; display:block; }
+  .ib.on { border-color:var(--acc); color:var(--acc); }
   .ib.solo { display:flex; margin:8px 0 0; }
   .ctlrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   /* keep a row of buttons on one line across the box, sharing the width evenly */
@@ -879,7 +879,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-10j.hand";
+const APP_VER="2026-09-10k.handglyph";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -3803,7 +3803,15 @@ document.querySelectorAll(".tab .card").forEach(card=>{
   if(!notes.length) return;
   notes.forEach(n=>{ n.classList.add("help","hidden"); });
   const btn=document.createElement("button");
-  btn.type="button"; btn.className="ib"; btn.textContent="✋";
+  btn.type="button"; btn.className="ib";
+  // Person with a raised hand (user's reference image, 2026-09-10): head,
+  // shoulders, one arm up. Inline SVG in currentColor so it dims/lights
+  // with the button state and stays crisp at any pixel density.
+  btn.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'
+    +'<circle cx="9.5" cy="7" r="3.4" fill="currentColor"/>'
+    +'<path fill="currentColor" d="M3 22v-5.2A4.8 4.8 0 0 1 7.8 12h5.7a2.5 2.5 0 0 1 2.5 2.5V22z"/>'
+    +'<path fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" d="M15.8 14.2 20.2 3.6"/>'
+    +'</svg>';
   btn.title="Show notes"; btn.setAttribute("aria-label","Show notes");
   // A card "title" is a <b>, or a label styled bold (the section headers);
   // an ordinary field label (Name, Hardware…) is not a title.
