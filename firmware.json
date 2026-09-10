@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "5e4f431-20260910",
-  "size": 1193152,
-  "crc32": "17d435c2",
-  "sha256": "aa419116a07e6671361ff6b765f46ca77f8840e01e2236dfb24a8052c96394df",
+  "build": "3b9b918-20260910",
+  "size": 1193376,
+  "crc32": "e5d4821f",
+  "sha256": "92a9048a13cbf32f55266a0f237c34b7e144d08f40aaa69343d53430c25d2025",
   "date": "2026-09-10",
-  "notes": "Reset reason in the BLE state (RR=), shown on the Setup firmware line",
+  "notes": "Strobe push-counted: every flash the same number of pushes (was 1 or 2 at random)",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
