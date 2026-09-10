@@ -522,7 +522,9 @@
       <div id="txWarn" class="hidden">Transmitting test DMX — latched levels persist
         across reconnects until Clear.</div>
       <div id="txBusy" class="mini hidden">DMX is being received — transmit unavailable.</div>
-      <input id="txCmd" inputmode="numeric" autocomplete="off" placeholder="1 THRU 5 @ 80">
+      <!-- inputmode=none: the on-screen keypad below is the entry method, so a
+           phone must not raise its own keyboard; a hardware keyboard still types. -->
+      <input id="txCmd" inputmode="none" autocomplete="off" placeholder="1 THRU 5 @ 80">
       <div class="txpad">
         <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="THRU">THRU</button>
         <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button data-k="+">+</button>
@@ -864,7 +866,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-09f.pin-self";
+const APP_VER="2026-09-10a.txpad";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -2365,10 +2367,13 @@ function renderTx(){
 {
   const inp=$("txCmd"), err=$("txErr");
   const put=k=>{ const v=inp.value; if(k==="BS"){ inp.value=v.replace(/\s*\S+\s*$/,""); return; }
-    inp.value=(v+(v&&!/\s$/.test(v)?" ":"")+k+(/^\d$/.test(k)?"":" ")).replace(/^\s+/,""); inp.focus(); };
+    inp.value=(v+(v&&!/\s$/.test(v)?" ":"")+k+(/^\d$/.test(k)?"":" ")).replace(/^\s+/,""); inp.blur(); };
   document.querySelectorAll("#txCard .txpad button[data-k]").forEach(b=>b.onclick=()=>put(b.dataset.k));
   // digits typed back-to-back should join into one number: a digit key after a digit appends
-  document.querySelectorAll("#txCard .txpad button[data-k]").forEach(b=>{ if(/^\d$/.test(b.dataset.k)) b.onclick=()=>{ inp.value=(inp.value+b.dataset.k); inp.focus(); }; });
+  // No inp.focus() from the pad: focusing the field is what raised the phone
+  // keyboard over the keypad (bench 2026-09-10). Blur instead, so a field the
+  // user had tapped drops its keyboard as soon as the pad is used.
+  document.querySelectorAll("#txCard .txpad button[data-k]").forEach(b=>{ if(/^\d$/.test(b.dataset.k)) b.onclick=()=>{ inp.value=(inp.value+b.dataset.k); inp.blur(); }; });
   const go=()=>{
     err.textContent="";
     let pairs; try{ pairs=txParse(inp.value); }catch(e){ err.textContent=String(e); return; }
