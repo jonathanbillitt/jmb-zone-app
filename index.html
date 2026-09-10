@@ -197,13 +197,18 @@
   /* Info icon: static help notes in a card collapse behind it (user,
      2026-09-10 — "not always on show"). Sits after the card title when the
      card has one, else where the note was. .on = notes revealed. */
-  .ib { display:inline-flex; align-items:center; justify-content:center;
-        width:22px; height:22px; border-radius:50%; border:1px solid var(--line);
-        background:transparent; padding:0; margin:0 0 0 8px; color:var(--dim);
-        line-height:1; vertical-align:middle; cursor:pointer; flex:none; }
-  .ib svg { width:14px; height:14px; display:block; }
-  .ib.on { border-color:var(--acc); color:var(--acc); }
-  .ib.solo { display:flex; margin:8px 0 0; }
+  /* Pinned to the card's top-right corner (user, 2026-09-10); the card's
+     header row gets right padding so a right-aligned button never sits
+     under it. Purple = notes open (the app's UV/purple, #b16aff). */
+  .card.hashelp { position:relative; }
+  .card.hashelp > .ctlrow:first-child, .card.hashelp > .row:first-child,
+  .card.hashelp > .port-head:first-child { padding-right:30px; }
+  .ib { position:absolute; top:12px; right:12px; display:inline-flex;
+        align-items:center; justify-content:center; width:24px; height:24px;
+        border-radius:50%; border:1px solid var(--line); background:var(--card2);
+        padding:0; margin:0; color:var(--dim); line-height:1; cursor:pointer; }
+  .ib svg { width:15px; height:15px; display:block; }
+  .ib.on { border-color:#b16aff; color:#b16aff; }
   .ctlrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   /* keep a row of buttons on one line across the box, sharing the width evenly */
   .ctlrow.across { flex-wrap:nowrap; gap:8px; }
@@ -879,7 +884,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-10k.handglyph";
+const APP_VER="2026-09-10l.handcorner";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -3813,16 +3818,9 @@ document.querySelectorAll(".tab .card").forEach(card=>{
     +'<path fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" d="M15.8 14.2 20.2 3.6"/>'
     +'</svg>';
   btn.title="Show notes"; btn.setAttribute("aria-label","Show notes");
-  // A card "title" is a <b>, or a label styled bold (the section headers);
-  // an ordinary field label (Name, Hardware…) is not a title.
-  let head=card.querySelector(":scope > .ctlrow > b, :scope > .row > label, :scope > b, :scope > label");
-  if(head && head.tagName==="LABEL" && +getComputedStyle(head).fontWeight < 600) head=null;
-  // .row labels are a fixed 52px column, so the icon must be a flex SIBLING
-  // (inside the label it wraps onto its own line); a title <b> is free-width
-  // and takes it inline.
-  if(head && head.tagName==="LABEL" && head.parentElement.classList.contains("row")) head.after(btn);
-  else if(head) head.appendChild(btn);
-  else { btn.classList.add("solo"); card.appendChild(btn); }   // no title: bottom of the card
+  // Always the card's top-right corner (absolute; see .ib in the CSS).
+  card.classList.add("hashelp");
+  card.appendChild(btn);
   btn.onclick=e=>{ e.preventDefault(); e.stopPropagation();
     const open=notes[0].classList.contains("hidden");
     notes.forEach(n=>n.classList.toggle("hidden",!open));
