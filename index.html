@@ -866,7 +866,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-10c.pushgap";
+const APP_VER="2026-09-10d.recover";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1195,6 +1195,19 @@ function onState(str){
   if(str.startsWith("JMBK")){ onFlick(str); return; }
   if(str.startsWith("JMBR;")){ onRdm(str); return; }
   const cont = str.startsWith("JMB+;");
+  // RECOVERY for firmware build 4940868 (2026-09-10): its state notify was
+  // truncated to exactly "JMB" by a sizeof slip. The controller only notifies
+  // state once the PIN was accepted, so a bare "JMB" still proves auth: open
+  // the app (empty state) so Setup → Update Firmware can move it forward.
+  if(str==="JMB"){
+    if(!authed){ authed=true; clearTimeout(authTimer);
+      if(pinPending){ savePin(pinPending); pinPending=""; }
+      hideOverlay(); showApp();
+      setOtaMsg("This controller is on a build with a broken status feed (4940868). "
+        +"Use Update Firmware below to move it to the current build.");
+      selectTab("setup"); }
+    return;
+  }
   if(!str.startsWith("JMB;") && !cont) return;
   if(!authed){
     authed=true;
