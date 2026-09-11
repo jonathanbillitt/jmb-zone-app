@@ -886,7 +886,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-11a.univnote";
+const APP_VER="2026-09-11b.busloss";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1273,7 +1273,7 @@ function onState(str){
       // A-F are valid key letters, so a greedy [A-Z]+ parsed "FA0" as key
       // "FA" and the LATCHED fault bit vanished from every badge (agent
       // review — safety-display bug).
-      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
+      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|TX|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
       if(mm) m[mm[1]] = mm[1]==="F" ? parseInt(mm[2],16) : +mm[2];
     }
     ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
@@ -2172,9 +2172,22 @@ function renderDiag(){
   $("flkStat").textContent = kv.FLKON==="1"
       ? `armed${+kv.FLKL?` · ${kv.FLKL} dropped`:""}` : "";
   // port bus
-  let rows="<tr><th>Port</th><th>rx</th><th>crc err</th><th>fault</th></tr>";
+  // sent (controller TX) vs received (port RX): the difference over the last
+  // interval is frames lost on the wire. RX is the port's 16-bit counter, so
+  // the delta is taken modulo 65536. Added 2026-09-11 to settle whether pulse
+  // effects are inconsistent because pushes are being lost.
+  let rows="<tr><th>Port</th><th>sent</th><th>rx</th><th>loss</th><th>crc err</th><th>fault</th></tr>";
+  window.__busPrev=window.__busPrev||{};
   ports.forEach((m,i)=>{
-    rows+=`<tr><td>P${i+1}</td><td class="num">${m.RX??"—"}</td>
+    let loss="—";
+    if(m.TX!==undefined&&m.RX!==undefined){
+      const p=window.__busPrev[i]; const tx=+m.TX, rx=+m.RX;
+      if(p){ const dtx=tx-p.tx, drx=((rx-p.rx)%65536+65536)%65536;
+             if(dtx>0) loss=Math.max(0,dtx-drx)+" / "+dtx; }
+      window.__busPrev[i]={tx,rx};
+    }
+    rows+=`<tr><td>P${i+1}</td><td class="num">${m.TX??"—"}</td><td class="num">${m.RX??"—"}</td>
+           <td class="num">${loss}</td>
            <td class="num">${m.CE??"—"}</td><td>${faultWords(m.F||0)||"—"}</td></tr>`;
   });
   $("diagBus").innerHTML=rows;
@@ -3553,7 +3566,7 @@ function demoTxState(){
 }
 function demoState(){
   const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S${d.s??128},H${n},`+
-    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6500,OT80,L0;`;
+    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6500,OT80,TX${1000*n},L0;`;
   onState(
     "JMB;FW=demo;PORTS=4;CID=7;DMX=1;FPS=44;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=3;ERR=0;"+
     "RDM=42;ANS=42;AGE=23;"+

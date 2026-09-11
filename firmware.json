@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "3829519-20260910",
-  "size": 1193856,
-  "crc32": "8f09e94d",
-  "sha256": "b03a961e1037d053c003e29764c85cb77aa07f00f4b81a0856f5c5805c9bf282",
-  "date": "2026-09-10",
-  "notes": "Strobe + Police: flash starts on the exact schedule, flash LENGTH a fixed push count \u2014 rounding lands in the dark gap",
+  "build": "e58dc35-20260911",
+  "size": 1194032,
+  "crc32": "24d7a07b",
+  "sha256": "52f58ea2dc8872459857ca179e36a85d2e1019c415ce94afc9d618aaaec59ca5",
+  "date": "2026-09-11",
+  "notes": "Bus loss instrument: frames SENT per port (TX) beside the port's RX count; Diag shows lost/sent per interval",
   "file": "firmware.bin"
 }
