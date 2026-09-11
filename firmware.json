@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "57ce6d0-20260911",
-  "size": 1194384,
-  "crc32": "86e24de8",
-  "sha256": "9ddad9453983b514f171f0f524533b42ac7b618f266184cfc638731635106a35",
+  "build": "438e3bf-20260911",
+  "size": 1193728,
+  "crc32": "aff517ef",
+  "sha256": "de01bfb12d6cf957c2233dcd6ff4d9b223c0aad47d6129834c52029440d787ab",
   "date": "2026-09-11",
-  "notes": "Bus health round 2: poll timeouts, controller-side CRC rejects, stray frames, slowest reply; loop tail split into recon/ind/nvs",
+  "notes": "FIX: controller was blocking inside the port-poll reply wait \u2014 console-saturating prints + back-to-back polling. Sticky pulse effects cause found.",
   "file": "firmware.bin"
 }
