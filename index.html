@@ -886,7 +886,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-11d.loopsecs";
+const APP_VER="2026-09-11e.silent";
 // Firmware loop-stall sections (jmb_loopstat.h LP_SEC_*), by index. Append only.
 const LOOP_SECS=["mcp","ble","dmx","net","misc","out","bus","recon","ind","nvs","ui","ota"];
 // Register the service worker so the app works offline once installed to the
@@ -1275,7 +1275,7 @@ function onState(str){
       // A-F are valid key letters, so a greedy [A-Z]+ parsed "FA0" as key
       // "FA" and the LATCHED fault bit vanished from every badge (agent
       // review — safety-display bug).
-      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|TX|TO|EC|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
+      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|TX|TO|EC|TS|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
       if(mm) m[mm[1]] = mm[1]==="F" ? parseInt(mm[2],16) : +mm[2];
     }
     ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
@@ -2179,7 +2179,9 @@ function renderDiag(){
   // the delta is taken modulo 65536. Added 2026-09-11 to settle whether pulse
   // effects are inconsistent because pushes are being lost.
   // Per interval: lost/sent, the port's own CRC rejections (+N since last),
-  // poll timeouts (+N) and controller-side CRC rejections of replies (+N).
+  // poll timeouts (+N) with the "silent" subset (not one byte came back — the
+  // port never answered; the rest are garbled replies, see esp crc), and
+  // controller-side CRC rejections of replies (+N).
   let rows="<tr><th>Port</th><th>sent</th><th>rx</th><th>loss</th><th>crc err</th><th>timeouts</th><th>esp crc</th><th>fault</th></tr>";
   window.__busPrev=window.__busPrev||{};
   const d=(cur,prev,wrap)=>{ if(cur===undefined||prev===undefined) return ""; let x=cur-prev; if(wrap) x=((x%65536)+65536)%65536; return x>0?" (+"+x+")":""; };
@@ -2194,10 +2196,10 @@ function renderDiag(){
     rows+=`<tr><td>P${i+1}</td><td class="num">${m.TX??"—"}</td><td class="num">${m.RX??"—"}</td>
            <td class="num">${loss}</td>
            <td class="num">${m.CE??"—"}${d(+m.CE,p.ce,true)}</td>
-           <td class="num">${m.TO??"—"}${d(+m.TO,p.to,false)}</td>
+           <td class="num">${m.TO??"—"}${d(+m.TO,p.to,false)}${m.TS!==undefined?`<br><span style="opacity:.65;font-size:.85em">${m.TS}${d(+m.TS,p.ts,false)} silent</span>`:""}</td>
            <td class="num">${m.EC??"—"}${d(+m.EC,p.ec,false)}</td>
            <td>${faultWords(m.F||0)||"—"}</td></tr>`;
-    window.__busPrev[i]={tx:+m.TX,rx:+m.RX,ce:+m.CE,to:+m.TO,ec:+m.EC};
+    window.__busPrev[i]={tx:+m.TX,rx:+m.RX,ce:+m.CE,to:+m.TO,ec:+m.EC,ts:+m.TS};
   });
   $("diagBus").innerHTML=rows;
   // Controller loop timing (firmware LPX/LPS/LPN): longest pass in the last
