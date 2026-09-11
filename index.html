@@ -477,6 +477,8 @@
         <b style="flex:1">Universe analyser</b>
         <button id="btnUniv">Open</button>
       </div>
+      <div class="mini">All 512 channels live, numbered, plus a min/max capture that
+        catches a channel moving when it should not. Needs DMX present.</div>
       <div id="univWrap" class="hidden">
         <div class="ctlrow" style="margin-bottom:8px">
           <b style="flex:1">Universe</b>
@@ -491,7 +493,7 @@
           <button class="modechip" data-um="act">Activity</button>
         </div>
         <div id="univGrid" class="ugrid"></div>
-        <div id="univInfo" class="mini" data-help>Each DMX channel, numbered, showing its
+        <div id="univInfo" class="mini">Each DMX channel, numbered, showing its
           live level — tap one for its patch, captured range and change count.</div>
       </div>
     </div>
@@ -884,7 +886,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-10l.handcorner";
+const APP_VER="2026-09-11a.univnote";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
