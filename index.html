@@ -886,7 +886,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-11b.busloss";
+const APP_VER="2026-09-11c.bushealth";
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
@@ -1273,7 +1273,7 @@ function onState(str){
       // A-F are valid key letters, so a greedy [A-Z]+ parsed "FA0" as key
       // "FA" and the LATCHED fault bit vanished from every badge (agent
       // review — safety-display bug).
-      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|TX|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
+      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|TX|TO|EC|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
       if(mm) m[mm[1]] = mm[1]==="F" ? parseInt(mm[2],16) : +mm[2];
     }
     ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
@@ -2176,31 +2176,39 @@ function renderDiag(){
   // interval is frames lost on the wire. RX is the port's 16-bit counter, so
   // the delta is taken modulo 65536. Added 2026-09-11 to settle whether pulse
   // effects are inconsistent because pushes are being lost.
-  let rows="<tr><th>Port</th><th>sent</th><th>rx</th><th>loss</th><th>crc err</th><th>fault</th></tr>";
+  // Per interval: lost/sent, the port's own CRC rejections (+N since last),
+  // poll timeouts (+N) and controller-side CRC rejections of replies (+N).
+  let rows="<tr><th>Port</th><th>sent</th><th>rx</th><th>loss</th><th>crc err</th><th>timeouts</th><th>esp crc</th><th>fault</th></tr>";
   window.__busPrev=window.__busPrev||{};
+  const d=(cur,prev,wrap)=>{ if(cur===undefined||prev===undefined) return ""; let x=cur-prev; if(wrap) x=((x%65536)+65536)%65536; return x>0?" (+"+x+")":""; };
   ports.forEach((m,i)=>{
     let loss="—";
+    const p=window.__busPrev[i]||{};
     if(m.TX!==undefined&&m.RX!==undefined){
-      const p=window.__busPrev[i]; const tx=+m.TX, rx=+m.RX;
-      if(p){ const dtx=tx-p.tx, drx=((rx-p.rx)%65536+65536)%65536;
+      const tx=+m.TX, rx=+m.RX;
+      if(p.tx!==undefined){ const dtx=tx-p.tx, drx=((rx-p.rx)%65536+65536)%65536;
              if(dtx>0) loss=Math.max(0,dtx-drx)+" / "+dtx; }
-      window.__busPrev[i]={tx,rx};
     }
     rows+=`<tr><td>P${i+1}</td><td class="num">${m.TX??"—"}</td><td class="num">${m.RX??"—"}</td>
            <td class="num">${loss}</td>
-           <td class="num">${m.CE??"—"}</td><td>${faultWords(m.F||0)||"—"}</td></tr>`;
+           <td class="num">${m.CE??"—"}${d(+m.CE,p.ce,true)}</td>
+           <td class="num">${m.TO??"—"}${d(+m.TO,p.to,false)}</td>
+           <td class="num">${m.EC??"—"}${d(+m.EC,p.ec,false)}</td>
+           <td>${faultWords(m.F||0)||"—"}</td></tr>`;
+    window.__busPrev[i]={tx:+m.TX,rx:+m.RX,ce:+m.CE,to:+m.TO,ec:+m.EC};
   });
   $("diagBus").innerHTML=rows;
   // Controller loop timing (firmware LPX/LPS/LPN): longest pass in the last
   // 5 s, which section owned it, and how many passes ran over 50 ms. Effects
   // push every ~20 ms, so anything much above that shows as stutter.
   if(kv.LPX!==undefined){
-    const sec=["mcp","ble","dmx","net","misc","out","bus","tail"][+kv.LPS]||"?";
+    const sec=["mcp","ble","dmx","net","misc","out","bus","recon","ind","nvs"][+kv.LPS]||"?";
     const mx=+kv.LPX||0, n=+kv.LPN||0, avg=(+kv.LPA||0)/10, gap=+kv.LPG||0;
     const el=$("loopStat");
     el.textContent=`Loop: average ${avg.toFixed(1)} ms · longest ${mx} ms (${sec}) · ${n} stall${n===1?"":"s"} over 50 ms`
-      +(kv.LPG!==undefined?` · longest push gap ${gap} ms`:"")+" (5 s window)";
-    el.style.color=(mx>=50||n||avg>=15||gap>=40)?"var(--warn)":"";
+      +(kv.LPG!==undefined?` · longest push gap ${gap} ms`:"")+" (5 s window)"
+      +(kv.BRT!==undefined?` · Bus: slowest poll reply ${kv.BRT} ms · stray frames ${kv.BSY}`:"");
+    el.style.color=(mx>=50||n||avg>=15||gap>=40||+kv.BRT>=10||+kv.BSY>0)?"var(--warn)":"";
   }
   renderRdm();
 }
@@ -3566,7 +3574,7 @@ function demoTxState(){
 }
 function demoState(){
   const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S${d.s??128},H${n},`+
-    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6500,OT80,TX${1000*n},L0;`;
+    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6500,OT80,TX${1000*n},TO0,EC0,L0;`;
   onState(
     "JMB;FW=demo;PORTS=4;CID=7;DMX=1;FPS=44;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=3;ERR=0;"+
     "RDM=42;ANS=42;AGE=23;"+
@@ -3577,7 +3585,7 @@ function demoState(){
     "NIP=192.168.1.42;NRS=-52;TF=1;PB=0;CX=3;CA=1;"+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
     `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+demoTxState()+
-    "LPX=9;LPS=5;LPN=0;LPA=31;LPG=22;RR=1;"+
+    "LPX=9;LPS=5;LPN=0;LPA=31;LPG=22;RR=1;BSY=0;BRT=3;"+
     "CN="+Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join("")+";"+
     demoP.map((d,i)=>P(i+1,d)).join(""));
 }

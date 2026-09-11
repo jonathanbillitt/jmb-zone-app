@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "e58dc35-20260911",
-  "size": 1194032,
-  "crc32": "24d7a07b",
-  "sha256": "52f58ea2dc8872459857ca179e36a85d2e1019c415ce94afc9d618aaaec59ca5",
+  "build": "57ce6d0-20260911",
+  "size": 1194384,
+  "crc32": "86e24de8",
+  "sha256": "9ddad9453983b514f171f0f524533b42ac7b618f266184cfc638731635106a35",
   "date": "2026-09-11",
-  "notes": "Bus loss instrument: frames SENT per port (TX) beside the port's RX count; Diag shows lost/sent per interval",
+  "notes": "Bus health round 2: poll timeouts, controller-side CRC rejects, stray frames, slowest reply; loop tail split into recon/ind/nvs",
   "file": "firmware.bin"
 }
