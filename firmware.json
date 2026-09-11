@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "6473be0-20260911",
+  "build": "89aff17-20260911",
   "size": 1194224,
-  "crc32": "9346f488",
-  "sha256": "25e369faff7d965e909e2f75b4a6d1166dd3d4fdf929ff7018601e25c5cf12b6",
+  "crc32": "afc85158",
+  "sha256": "76c585fc7a66bd5765fcfb614b654b5259ceccc4c42791b198e9f0b3ef99db6e",
   "date": "2026-09-11",
-  "notes": "Bus: non-blocking reply wait, drain-before-timeout, and \"silent\" timeouts split out",
+  "notes": "Bus: reply window 15 -> 40 ms (non-blocking wait makes it free; a late reply is delayed, not lost)",
   "file": "firmware.bin"
 }

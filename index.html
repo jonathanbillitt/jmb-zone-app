@@ -418,10 +418,11 @@
       <span id="dmxWarnSrc"></span> is driving the outputs — manual colour, dimmer
       and effects here are <em>overridden</em> until the signal stops.
     </div>
-    <div class="card"><div class="ctlrow">
-      <button id="btnPrep">Clear all</button>
-      <span class="mini" style="margin:0">RGB 100% · FX speed 50% · dimmer 0%</span>
-    </div></div>
+    <div class="card">
+      <!-- Full-width so a thumb from either side of the phone lands on it. -->
+      <button id="btnPrep" class="danger" style="width:100%;padding:14px 12px;font-size:1.05em;margin-top:22px">Clear all</button>
+      <div class="mini" style="text-align:center;margin-top:6px">RGB 100% · FX speed 50% · dimmer 0%</div>
+    </div>
     <div id="ports"></div>
   </div>
 
@@ -555,6 +556,32 @@
   </div>
 
   <div id="tab-setup" class="tab hidden">
+    <!-- Controller identity first (moved above Test sequences 2026-09-11). -->
+    <div class="card">
+      <div class="rows">
+        <div class="row"><label>Name</label>
+          <input type="text" id="setName" maxlength="16" placeholder="name this controller"
+                 style="flex:1" autocomplete="off">
+        </div>
+        <div class="row"><label>ID</label>
+          <input type="number" id="setCid" min="0" max="9999">
+          <button id="btnCidApply">Apply</button>
+          <span class="mini" style="margin:0">on screens, BLE name (next boot), RDM label</span>
+        </div>
+        <div class="row"><label>Apply</label>
+          <select id="setAmode" style="width:130px">
+            <option value="0">Same</option><option value="1">Seq</option>
+            <option value="2">Offset</option></select>
+          <span class="mini" style="margin:0">how base addresses fan out</span>
+        </div>
+        <div class="row"><label>DMX hold</label>
+          <input type="number" id="setHold" min="0" max="60" step="1">
+          <span class="unit">s</span>
+          <button id="btnHoldApply">Apply</button>
+          <span class="mini" style="margin:0">keep last look after DMX loss · 0 = forever</span>
+        </div>
+      </div>
+    </div>
     <div class="card">
       <label style="font-weight:600">Test sequences</label>
       <div class="ctlrow" style="margin-top:6px">
@@ -582,31 +609,6 @@
       <div class="mini">Everything: ID, curve, apply mode, all port patch +
       looks + effects, and this phone's scenes — one shareable file.</div>
       <div class="mini" id="impStatus"></div>
-    </div>
-    <div class="card">
-      <div class="rows">
-        <div class="row"><label>Name</label>
-          <input type="text" id="setName" maxlength="16" placeholder="name this controller"
-                 style="flex:1" autocomplete="off">
-        </div>
-        <div class="row"><label>ID</label>
-          <input type="number" id="setCid" min="0" max="9999">
-          <button id="btnCidApply">Apply</button>
-          <span class="mini" style="margin:0">on screens, BLE name (next boot), RDM label</span>
-        </div>
-        <div class="row"><label>Apply</label>
-          <select id="setAmode" style="width:130px">
-            <option value="0">Same</option><option value="1">Seq</option>
-            <option value="2">Offset</option></select>
-          <span class="mini" style="margin:0">how base addresses fan out</span>
-        </div>
-        <div class="row"><label>DMX hold</label>
-          <input type="number" id="setHold" min="0" max="60" step="1">
-          <span class="unit">s</span>
-          <button id="btnHoldApply">Apply</button>
-          <span class="mini" style="margin:0">keep last look after DMX loss · 0 = forever</span>
-        </div>
-      </div>
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between">
@@ -886,7 +888,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-11e.silent";
+const APP_VER="2026-09-11f.layout";
 // Firmware loop-stall sections (jmb_loopstat.h LP_SEC_*), by index. Append only.
 const LOOP_SECS=["mcp","ble","dmx","net","misc","out","bus","recon","ind","nvs","ui","ota"];
 // Register the service worker so the app works offline once installed to the
