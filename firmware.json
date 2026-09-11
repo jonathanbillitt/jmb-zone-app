@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "438e3bf-20260911",
-  "size": 1193728,
-  "crc32": "aff517ef",
-  "sha256": "de01bfb12d6cf957c2233dcd6ff4d9b223c0aad47d6129834c52029440d787ab",
+  "build": "e2baf68-20260911",
+  "size": 1193984,
+  "crc32": "18fe7d9a",
+  "sha256": "d106fab4122f7870cdc1ce967a1738c6b434c3480375a7a5fc607d6fe9311fb9",
   "date": "2026-09-11",
-  "notes": "FIX: controller was blocking inside the port-poll reply wait \u2014 console-saturating prints + back-to-back polling. Sticky pulse effects cause found.",
+  "notes": "BLE notifies sent from their own task \u2014 the loop no longer waits on the radio",
   "file": "firmware.bin"
 }
