@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "e2baf68-20260911",
-  "size": 1193984,
-  "crc32": "18fe7d9a",
-  "sha256": "d106fab4122f7870cdc1ce967a1738c6b434c3480375a7a5fc607d6fe9311fb9",
+  "build": "31b3d96-20260911",
+  "size": 1194112,
+  "crc32": "cefc71b4",
+  "sha256": "3b7839377383b35df8d3fa767c6538abcf2db2e3db72cffcdbc43288f6f36492",
   "date": "2026-09-11",
-  "notes": "BLE notifies sent from their own task \u2014 the loop no longer waits on the radio",
+  "notes": "Loop: no flash reads on the loop path + \"ble\" section split into ui/ble/ota",
   "file": "firmware.bin"
 }
