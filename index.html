@@ -368,6 +368,13 @@
     gap:22px 30px; flex-wrap:wrap; margin:6px 0 22px; color:#e6e6ef; }
   #connectMarks svg{ height:30px !important; opacity:.92; }
   #hello.hidden ~ #connectMarks{ display:none; }
+  /* Connect intro: the connect screen fades while the unit's own mark flies up
+     and docks against the JMB block, brightens, and its white bars fill purple
+     (see flyMarkToHeader). */
+  .introfade{ transition:opacity .45s ease; opacity:0 !important; pointer-events:none; }
+  #flyMark{ position:fixed; z-index:10000; color:#e6e6ef; pointer-events:none;
+    transform-origin:0 0; will-change:transform,filter; display:block; }
+  #flyMark svg{ display:block; width:auto; }
 </style>
 </head>
 <body>
@@ -896,7 +903,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13f.range-marks";
+const APP_VER="2026-09-13g.connect-intro";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -957,10 +964,23 @@ function showApp(){
   if(typeof demoTimer!=="undefined" && cmdChar||NBLE()&&NBLE().connected){
     clearInterval(demoTimer); $("demoBar").classList.add("hidden");
   }
-  $("hello").classList.add("hidden");
-  $("chips").classList.remove("hidden");
-  $("nav").classList.remove("hidden");
-  selectTab(activeTabName());   // come back where you were, not always Control
+  const hello=$("hello");
+  const reveal=()=>{
+    hello.classList.add("hidden");
+    $("chips").classList.remove("hidden");
+    $("nav").classList.remove("hidden");
+    selectTab(activeTabName());   // come back where you were, not always Control
+  };
+  // Real connection from the connect screen: fade it out (the mark flight is
+  // started by renderProductMark once the state says which model this is).
+  const intro = typeof demoOn!=="undefined" && !demoOn && !hello.classList.contains("hidden")
+    && !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  if(!intro){ reveal(); return; }
+  introPending=true;
+  const fading=["hello","connectSplash","connectMarks"].map(id=>$(id)).filter(Boolean);
+  fading.forEach(el=>el.classList.add("introfade"));
+  setTimeout(()=>{ fading.forEach(el=>el.classList.remove("introfade")); reveal();
+                   setTimeout(()=>{ introPending=false; },1500); },450);
 }
 function hideApp(){
   $("chips").classList.add("hidden");
@@ -2164,12 +2184,64 @@ function renderProductMark(){
   const host = $("prodMark");
   if(!host) return;
   const n = +(kv.VAR ?? kv.PORTS ?? 0);
-  host.innerHTML = PROD_MARKS[n] || "";
+  const svg = PROD_MARKS[n] || "";
+  if(introPending){
+    if(!svg) return;                       // model not known yet — keep waiting
+    introPending=false; flyMarkToHeader(n, host, svg); return;
+  }
+  host.innerHTML = svg;
 }
 // Connect screen: the range, Zone · 4our · 8ight, under the splash. Each mark's
 // id-bearing mask (eight) is renamed so it cannot collide with the header copy.
+// Bars are WHITE here (currentColor); they fill purple during the connect intro.
 { const cm = $("connectMarks");
-  if(cm) cm.innerHTML = [1,4,8].map(n => PROD_MARKS[n].replace(/desc-am-eight/g,"desc-cm-eight")).join(""); }
+  if(cm) cm.innerHTML = [1,4,8].map(n => `<span data-n="${n}">`
+      + PROD_MARKS[n].replace(/desc-am-eight/g,"desc-cm-eight").replace(/fill="#8b34f7"/g,'fill="currentColor"')
+      + `</span>`).join(""); }
+
+// CONNECT INTRO (2026-09-13). When a real controller connects, the connect
+// screen fades away while that unit's wordmark lifts off the row under the
+// splash, flies to the header and docks flush against the JMB block, brightens
+// for a beat, then its white bars fill purple left-to-right — and the header's
+// normal mark takes over. Skipped for demo mode and reduced-motion users.
+let introPending=false;
+function flyMarkToHeader(n, host, svg){
+  const src=document.querySelector(`#connectMarks [data-n="${n}"] svg`);
+  const s=src&&src.getBoundingClientRect();
+  host.innerHTML=svg;
+  const dstSvg=host.querySelector("svg");
+  if(!s||!s.width||!dstSvg||!("animate" in Element.prototype)) return;   // nothing to fly from
+  host.style.visibility="hidden";
+  const d=dstSvg.getBoundingClientRect();
+  src.style.visibility="hidden";
+  const fly=document.createElement("span"); fly.id="flyMark";
+  fly.innerHTML=svg.replace(/fill="#8b34f7"/g,'fill="currentColor"').replace(/desc-am-/g,"desc-fly-");
+  const fs=fly.firstChild; fs.style.height=s.height+"px";
+  fly.style.left=s.left+"px"; fly.style.top=s.top+"px";
+  document.body.appendChild(fly);
+  const done=()=>{ host.style.visibility=""; fly.remove(); src.style.visibility=""; };
+  const guard=setTimeout(done,3500);                       // never leave the header blank
+  const k=d.height/s.height;
+  const flight=fly.animate(
+    [{transform:"translate(0,0) scale(1)"},
+     {transform:`translate(${d.left-s.left}px,${d.top-s.top}px) scale(${k})`}],
+    {duration:700,easing:"cubic-bezier(.2,.7,.2,1)",fill:"forwards"});
+  flight.onfinish=()=>{
+    fly.animate([{filter:"brightness(1)"},{filter:"brightness(1.4)"},{filter:"brightness(1)"}],
+                {duration:420,fill:"forwards"});
+    // purple fills the two bars from the left; the eight's bottom bar keeps its
+    // descender knockout because the overlay clones the bar's mask attribute.
+    const bars=[...fs.querySelectorAll("rect")].filter(r=>r.getAttribute("height")==="24").slice(0,2);
+    const W=bars.length?+bars[0].getAttribute("width"):0;
+    const fills=bars.map(b=>{ const r=b.cloneNode(false); r.setAttribute("fill","#8b34f7");
+      r.setAttribute("width","0"); b.parentNode.insertBefore(r,b.nextSibling); return r; });
+    let t0=0;
+    const step=now=>{ if(!t0) t0=now; const p=Math.min(1,(now-t0)/520); const e=1-Math.pow(1-p,3);
+      fills.forEach(r=>r.setAttribute("width",String(W*e)));
+      if(p<1) requestAnimationFrame(step); else { clearTimeout(guard); setTimeout(done,120); } };
+    setTimeout(()=>requestAnimationFrame(step),260);
+  };
+}
 
 // ---------- Diag tab ----------
 // Index 4 = CRMX. The controller reports it separately from wired even though
