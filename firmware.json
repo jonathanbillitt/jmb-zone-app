@@ -1,16 +1,16 @@
 {
   "version": "2.0.0",
-  "build": "f566eab-20260913",
-  "size": 1194672,
-  "crc32": "888a0ddc",
-  "sha256": "2e61013f14054b7037115ccb5268cd35781086eb29845ffb5079593ac2d604d5",
+  "build": "f4d21dd-20260913",
+  "size": 1195504,
+  "crc32": "f49d6893",
+  "sha256": "1476e55c785610a7618fc4a5df6b841f81065c667d0a4f7bd4769a2dc2db0e80",
   "date": "2026-09-13",
-  "notes": "Effects: pass fx_speed as-is \u2014 the `? : 128` guard turned speed 0 back into full tempo (settings default to 128 anyway)",
+  "notes": "Protocol: SET_PULSE takes the 0xF slot \u2014 BOOT_REQUEST (0xA) is live, the SWD flasher sends it to the supervisor",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
-    "size": 17420,
-    "crc32": "cc44eab7",
-    "sha256": "851c596fbcb3e22b59f01038b478924434bab7c0036b3952282650d0aadc752e"
+    "size": 17972,
+    "crc32": "1a2a0f08",
+    "sha256": "508352e224036c4eebe5c83b992557a8e5d0967f9cf31dc60d64dc9501c6f252"
   }
 }
