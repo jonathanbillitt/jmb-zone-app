@@ -959,7 +959,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13y.adcsite";
+const APP_VER="2026-09-13z.strobecap";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -2561,7 +2561,8 @@ function fxTick(now){
     if(!s||s.fx!==x){ s=fxSt[p]={fx:x,rng:((0x9E3779B9*p)^0xB5297A4D)>>>0||1,vt:0,last:now,
                                 stage:0,n:0,p1:0,p2:0,t_next:0,t_evt:0,hue:0,lvl:0,tgt:0}; }
     let dt=now-s.last; s.last=now; if(dt>200) dt=200;
-    const sf=Math.pow(8,((+(mm.S??128))-128)/127)*((+(kv.BPM||128))/128);
+    let sf=Math.pow(8,((+(mm.S??128))-128)/127)*((+(kv.BPM||128))/128);
+    if(x===13 && sf>2.34) sf=2.34;      // Strobe rate cap — mirrors effects.h (2026-09-13)
     s.vt+=dt*sf;
     const [r,g,b]=fxCompute(x,i,s.vt,s);
     const d=(+(mm.D??100))/100, tr=(+(mm.R??100))/100, tg=(+(mm.G??100))/100, tb=(+(mm.B??100))/100;
