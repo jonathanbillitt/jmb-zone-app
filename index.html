@@ -959,7 +959,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13x.portupdate";
+const APP_VER="2026-09-13y.adcsite";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -2694,7 +2694,7 @@ function renderDiag(){
       rows+=`<tr><td colspan="8" class="mini" style="margin:0;padding:2px 4px 8px">port ${i+1} reports: `
         +(m.PH===0
           ? `port firmware 2.0 — no health counters (update the port module)`
-          : `overruns ${m.OR} · ADC timeouts ${(+m.AT)&0xFFF}${((+m.AT)>>12)?` (${["EOC","EOS","CCRDY","other"].filter((_,b)=>((+m.AT)>>12)&(1<<b)).join("+")})`:""} · loop gap ${m.GP} ms · reply latency ${m.RL} ms (5 s max)`)
+          : `overruns ${m.OR} · ADC timeouts ${(+m.AT)&0xFFF}${((+m.AT)>>12)?` (${["A/B 1st","A/B 2nd","NTC","EOS/CCRDY"].filter((_,b)=>((+m.AT)>>12)&(1<<b)).join("+")})`:""} · loop gap ${m.GP} ms · reply latency ${m.RL} ms (5 s max)`)
         +`</td></tr>`;
     window.__busPrev[i]={tx:+m.TX,rx:+m.RX,ce:+m.CE,to:+m.TO,ec:+m.EC,ts:+m.TS};
   });

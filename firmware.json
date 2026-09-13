@@ -5,12 +5,12 @@
   "crc32": "53ba18db",
   "sha256": "c93a153fff59a9e6ad57071f2ec8136431e1e1678949b1335122462eb53b0217",
   "date": "2026-09-13",
-  "notes": "Port-module update on its own: controller reports the stored port image CRC (SPC), the app offers \"Update port module\" when the published image differs even with the controller up to date",
+  "notes": "Port fw 2.3: ADC timeout mask names the call site (A/B 1st, A/B 2nd, NTC, EOS/CCRDY); ledger round 10 \u2014 bus timing fixed, A pending the eye",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
-    "size": 17436,
-    "crc32": "e587c1f6",
-    "sha256": "b20e3ccf820091b078192c635854dab2bd7d5dce76aa94d1352e1e1760000305"
+    "size": 17420,
+    "crc32": "cc44eab7",
+    "sha256": "851c596fbcb3e22b59f01038b478924434bab7c0036b3952282650d0aadc752e"
   }
 }
