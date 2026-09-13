@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "de21178-20260913",
-  "size": 1194560,
-  "crc32": "ca0e5cfb",
-  "sha256": "11204ca4148d5ee5358d947ab989edde26e49b37ef4bb64df63b9ac6d10cdb40",
+  "build": "220ed68-20260913",
+  "size": 1194688,
+  "crc32": "81ea5f16",
+  "sha256": "6fcd98918b4fa158bd0532ee2fcc3a9ad9221fffd1f978766a0338569234be2a",
   "date": "2026-09-13",
-  "notes": "Strobe: tempo capped at 2.34x (~19 flashes/s, wheel 180) \u2014 beyond that the 10 ms push grid shows as stutter and colour breakup; A closed at the bus level",
+  "notes": "Effects: speed 0 = stop \u2014 continuous effects hold their frame, Strobe and Police go dark (was 1/8 tempo); app preview mirrors it",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
