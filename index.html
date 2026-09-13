@@ -413,8 +413,8 @@
     background:linear-gradient(90deg,#6a2cf5,#5fd7ff);
     transition:width .6s cubic-bezier(.2,.7,.2,1), background .6s; }
   .tbar i.hot{ background:linear-gradient(90deg,#d29922,#f85149); }
-  .row.fxtrim{ opacity:.42; transition:opacity .25s; }
-  .row.fxtrim:hover, .row.fxtrim:focus-within{ opacity:.8; }
+  .row.fxtrim{ opacity:.38; transition:opacity .25s; }
+  .row.fxtrim input[type=range]{ pointer-events:none; }
   .spark{ display:block; width:100%; height:34px; margin-top:6px; }
   @media (prefers-reduced-motion: reduce){
     .tab, .card.faulted, .card.shake, .card.sweep::after, .jbars.indet .fill{ animation:none !important; }
@@ -948,7 +948,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13l.porthealth";
+const APP_VER="2026-09-13m.fxlock";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -1516,10 +1516,12 @@ function renderControl(){
       if(xs) for(const o of xs.options) o.hidden = (cct||dim1) && !CCT_FX.has(+o.value);
     }
     setIf(p,"X",   el=>el.value=m.X??0);
-    // Effect running → the colour sliders are only trims on it: dull them so
-    // they read as secondary (user, 2026-09-13). Still usable.
+    // Effect running → the colour / warm-cool sliders are LOCKED (dulled and
+    // disabled) until the effect is set to Off (user, 2026-09-13: "make them
+    // not work unless the effect is cleared"). The effect owns the colour.
     { const fxOn=(m.X||0)>0;
-      for(const id of ["rowR","rowG","rowB"]){ const r=$(id+p); if(r) r.classList.toggle("fxtrim",fxOn); } }
+      for(const id of ["rowR","rowG","rowB"]){ const r=$(id+p); if(r) r.classList.toggle("fxtrim",fxOn); }
+      for(const id of ["r","g","b"]){ const s=$(id+p); if(s) s.disabled=fxOn; } }
     setIf(p,"PWM", el=>el.value=m.PW??0);
     setIf(p,"OCP", el=>el.value=((m.OC??6500)/1000).toFixed(2));
     setIf(p,"OT",  el=>el.value=m.OT??80);
