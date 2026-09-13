@@ -351,7 +351,13 @@
   /* Feather all four edges to transparent so the badge's neon glow fades into
      the page instead of hard-cutting at the image boundary (no visible rectangle
      — the glow bleeds to the edges, especially cyan along the bottom). */
+  /* Fit the screen, no scrolling (user, 2026-09-13): the badge takes whatever
+     height is left after the header, the connect card and the wordmark row,
+     and keeps its aspect. On a tall phone that is the full 560 px badge; on a
+     short one it shrinks. */
+  body:has(#hello:not(.hidden)){ overflow:hidden; }
   #connectSplash img{ width:min(112vw,560px); height:auto; display:block;
+    max-height:calc(100vh - 360px); max-height:calc(100dvh - 360px); max-width:none;
     -webkit-mask-image:
       linear-gradient(to right, transparent 0, #000 10%, #000 90%, transparent 100%),
       linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%);
@@ -365,7 +371,7 @@
      (2026-09-13). Same PROD_MARKS geometry as the header; letters in the
      page's light ink, bars purple. Wraps on narrow phones. */
   #connectMarks{ display:flex; justify-content:center; align-items:center;
-    gap:22px 30px; flex-wrap:wrap; margin:6px 0 22px; color:#e6e6ef; }
+    gap:22px 30px; flex-wrap:wrap; margin:6px 0 12px; color:#e6e6ef; }
   #connectMarks svg{ height:30px !important; opacity:.92; }
   #hello.hidden ~ #connectMarks{ display:none; }
   /* Connect intro: the connect screen fades while the unit's own mark flies up
@@ -947,7 +953,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13s.cleararm";
+const APP_VER="2026-09-13t.connectfit";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
