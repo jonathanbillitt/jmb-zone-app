@@ -626,7 +626,7 @@
       </div>
       <div class="mini">Link pairs with a CRMX transmitter that's in linking
       mode; Unlink forgets it. Status is data-truth: <b>linked &#8212; no RF</b>
-      means paired but nothing is on air (transmitter off or out of range);
+      means linked but nothing is on air (transmitter off or out of range);
       <b>linked &#8212; no data</b> means the transmitter is there but isn't
       sending DMX.</div>
     </div>
@@ -888,7 +888,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13c.zone";
+const APP_VER="2026-09-13d.crmx-wording";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -2933,7 +2933,7 @@ $("fxSpread").oninput=()=>{ $("fxSpreadV").textContent=$("fxSpread").value+"%"; 
 $("fxSpread").onchange=()=>{ setupTouched=Date.now(); send("SPREAD="+ +$("fxSpread").value); };
 $("crmxLink").onclick=()=>{ send("CRMXLINK");
   $("crmxStatus").textContent="linking…"; };
-$("crmxUnlink").onclick=async()=>{ if(await askConfirm("The controller forgets its paired transmitter.",{title:"Unlink CRMX?",ok:"Unlink",danger:true}))
+$("crmxUnlink").onclick=async()=>{ if(await askConfirm("The controller forgets its linked transmitter.",{title:"Unlink CRMX?",ok:"Unlink",danger:true}))
   send("CRMXUNLINK"); };
 $("crmxAnt").onchange=e=>{ setupTouched=Date.now(); send("CRMXANT="+ +e.target.value); };
 $("netEn").onchange=e=>{ setupTouched=Date.now(); send("NET="+ +e.target.value); };
