@@ -375,6 +375,48 @@
   #flyMark{ position:fixed; z-index:10000; color:#e6e6ef; pointer-events:none;
     transform-origin:0 0; will-change:transform,filter; display:block; }
   #flyMark svg{ display:block; width:auto; }
+
+  /* ── MOTION LANGUAGE (2026-09-13) ─────────────────────────────────────────
+     One idea everywhere: purple filling the JMB bars means "in progress"
+     (.jbars — OTA, RDM scan, connecting). Tabs slide in from the side of
+     travel under a gliding nav pill; a tripped port shakes once and pulses
+     red until cleared, then a green sweep runs across it; telemetry bars
+     glide; port swatches show the live effect. Everything is CSS or rAF,
+     pauses when the tab is hidden, and honours reduced-motion. */
+  #navPill{ position:absolute; top:0; left:0; height:2px; width:0; background:var(--acc);
+    box-shadow:0 0 10px var(--acc); border-radius:0 0 2px 2px;
+    transition:transform .32s cubic-bezier(.2,.7,.2,1), width .32s cubic-bezier(.2,.7,.2,1); }
+  .tab{ animation:tabIn .26s cubic-bezier(.2,.7,.2,1); }
+  @keyframes tabIn{ from{opacity:0; transform:translateX(var(--slide,0)) translateY(4px);}
+                    to{opacity:1; transform:none;} }
+  .jbars{ display:block; width:100%; height:12px; margin-top:8px; }
+  .jbars svg{ display:block; width:100%; height:100%; }
+  .jbars .fill{ transform-box:fill-box; }
+  .jbars .fill rect{ transition:width .25s linear; }
+  .jbars.indet .fill{ animation:jsweep 1.3s cubic-bezier(.45,0,.55,1) infinite; }
+  .jbars.indet .fill rect{ transition:none; }
+  @keyframes jsweep{ 0%{transform:translateX(-40px);} 100%{transform:translateX(100px);} }
+  .card.faulted{ animation:faultPulse 1.6s ease-in-out infinite; }
+  @keyframes faultPulse{
+    0%,100%{ box-shadow:0 10px 26px rgba(0,0,0,.38), 0 0 0 1px rgba(248,81,73,.35); }
+    50%    { box-shadow:0 10px 26px rgba(0,0,0,.38), 0 0 18px 2px rgba(248,81,73,.55); } }
+  .card.shake{ animation:shake .45s cubic-bezier(.36,.07,.19,.97) both; }
+  @keyframes shake{ 10%,90%{transform:translateX(-2px);} 20%,80%{transform:translateX(3px);}
+                    30%,50%,70%{transform:translateX(-5px);} 40%,60%{transform:translateX(5px);} }
+  .card.sweep{ position:relative; overflow:hidden; }
+  .card.sweep::after{ content:""; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(100deg, transparent 25%, rgba(63,185,80,.32) 50%, transparent 75%);
+    transform:translateX(-100%); animation:sweep .8s ease-out forwards; }
+  @keyframes sweep{ to{ transform:translateX(100%); } }
+  .tbar{ height:7px; background:var(--card2); border-radius:5px; overflow:hidden; margin-top:5px; }
+  .tbar i{ display:block; height:100%; width:0; border-radius:5px;
+    background:linear-gradient(90deg,#6a2cf5,#5fd7ff);
+    transition:width .6s cubic-bezier(.2,.7,.2,1), background .6s; }
+  .tbar i.hot{ background:linear-gradient(90deg,#d29922,#f85149); }
+  .spark{ display:block; width:100%; height:34px; margin-top:6px; }
+  @media (prefers-reduced-motion: reduce){
+    .tab, .card.faulted, .card.shake, .card.sweep::after, .jbars.indet .fill{ animation:none !important; }
+    #navPill, .tbar i, .jbars .fill rect{ transition:none !important; } }
 </style>
 </head>
 <body>
@@ -827,6 +869,7 @@
 </main>
 
 <nav id="nav" class="hidden">
+  <i id="navPill" aria-hidden="true"></i>
   <button data-tab="control" class="active"><span class="ico">🎚</span>Control</button>
   <button data-tab="colour"><span class="ico">🎨</span>Colour</button>
   <button data-tab="scenes"><span class="ico">🎬</span>Scenes</button>
@@ -903,7 +946,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13h.demo-intro";
+const APP_VER="2026-09-13i.motion";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -943,12 +986,29 @@ function activeTabName(){
   const b=document.querySelector("#nav button.active");
   return b ? b.dataset.tab : "control";
 }
+const TAB_ORDER=["control","colour","scenes","ports","diag","setup"];
+function movePill(){
+  const b=document.querySelector("#nav button.active"), pill=$("navPill");
+  if(!b||!pill) return;
+  pill.style.width=b.offsetWidth+"px";
+  pill.style.transform=`translateX(${b.offsetLeft}px)`;
+}
+addEventListener("resize",movePill);
 function selectTab(name){
+  const prev=activeTabName();
   document.querySelectorAll("#nav button").forEach(b=>
     b.classList.toggle("active", b.dataset.tab===name));
   document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
   const el=$("tab-"+name);
-  if(el) el.classList.remove("hidden");
+  if(el){
+    // Slide in from the side you travelled from (nav order), so the tabs read
+    // as a row you are moving along rather than pages appearing.
+    const d=TAB_ORDER.indexOf(name)-TAB_ORDER.indexOf(prev);
+    el.style.setProperty("--slide", d>0?"16px":d<0?"-16px":"0px");
+    el.classList.remove("hidden");
+  }
+  movePill();
+  if(name==="control" && typeof fxPreviewKick==="function") fxPreviewKick();
 }
 document.querySelectorAll("#nav button").forEach(btn=>{
   btn.onclick=()=>{
@@ -1055,7 +1115,7 @@ async function connect(){
       else dev=await navigator.bluetooth.requestDevice({
         filters:[{services:[SVC]}], optionalServices:[SVC]});
     }catch(e){ return; }                    // user cancelled the chooser
-    hello("<b>Connecting…</b>");
+    hello("<b>Connecting…</b>"+jbarsHTML("connBars")); jbarsSet($("connBars"), null);
     try{ await gattSetup(); }
     catch(e){
       hello("<b>Couldn't reach the controller.</b>"+
@@ -1083,11 +1143,12 @@ async function onDisconnected(){
   busy=true;
   authed=false; cmdChar=null;
   otacChar=otadChar=otasChar=null; otaProbationSeen=false; if(!otaBusy) renderOta();
+  markDrain();                              // the intro in reverse: bars drain, mark settles away
   hideOverlay(); hideApp();
   univStop();
   try{
     if(dev || NBLE()){          // native path keeps deviceId, not dev — allow reconnect
-      hello("<b>Link dropped — reconnecting…</b>");
+      hello("<b>Link dropped — reconnecting…</b>"+jbarsHTML("connBars")); jbarsSet($("connBars"), null);
       try{
         await sleep(800);
         await gattSetup();
@@ -1457,11 +1518,15 @@ function renderControl(){
     if(wheels[p+".D"] && fresh("D")) wheels[p+".D"].set(m.D??100);
     if(wheels[p+".S"] && fresh("S")) wheels[p+".S"].set(m.S??128);
     if(fresh("L")) paintLabel(p,m.L||"");
-    const [cr,cg,cb]=swatchRGB(m.PE??0, m.R??0, m.G??0, m.B??0);
-    const sw=$("sw"+p);
-    sw.style.background=`rgb(${cr},${cg},${cb})`;
-    sw.style.boxShadow=(cr+cg+cb>40)?`0 0 14px rgba(${cr},${cg},${cb},.55)`:"none";
+    faultChoreo(p, card, flt);
+    if(!swOwned[p]){                         // the effect preview / a scene tween may own the swatch
+      const [cr,cg,cb]=swatchRGB(m.PE??0, m.R??0, m.G??0, m.B??0);
+      const sw=$("sw"+p);
+      sw.style.background=`rgb(${cr},${cg},${cb})`;
+      sw.style.boxShadow=(cr+cg+cb>40)?`0 0 14px rgba(${cr},${cg},${cb},.55)`:"none";
+    }
   });
+  fxPreviewKick();
   // Overlap indicator: an address whose footprint collides with another
   // port's (at a DIFFERENT start) gets an amber outline on its field — a
   // nudge, never a block, since overlap can be deliberate. Identical starts
@@ -1812,6 +1877,12 @@ async function recallScene(sc){
     send(`P${p}.RGB=${t.r},${t.g},${t.b}`);
     send(`P${p}.DIM=${t.d}`);
   });
+  // MIRROR THE RIG: while the firmware runs a static→static crossfade, the
+  // swatch tweens over the same time, so the phone and the light move together.
+  if(useFw) sc.ports.forEach((t,i)=>{
+    if(i>=from.length || from[i].fx || t.x) return;
+    tweenSwatch(i+1, from[i], t, T, (ports[i]||{}).PE??0);
+  });
   let myTimer=null;
   const step=()=>{
     if(myGen!==recallGen){ clearInterval(myTimer); return; }  // superseded → stop THIS timer
@@ -2149,6 +2220,10 @@ function renderColourTargets(n){
 buildCols();
 
 // ---------- Ports tab ----------
+// Ports tab: built once per port, then updated in place so the current and
+// temperature bars GLIDE to each new reading (CSS width transition) and the
+// 60-sample current sparkline accumulates instead of being rebuilt.
+const piHist={};
 function renderPortInfo(){
   const root=$("portInfo");
   ports.forEach((m,idx)=>{
@@ -2157,21 +2232,55 @@ function renderPortInfo(){
     if(!card){
       card=document.createElement("div");
       card.className="card"; card.id="pi"+p;
+      card.innerHTML=`
+        <div class="port-head"><h2 id="pih${p}">Port ${p}</h2>
+          <span class="badge fault hidden" id="pif${p}"></span>
+          <span class="badge off" id="pio${p}">—</span>
+        </div>
+        <table>
+          <tr><th>Patch</th><td class="num" id="pip${p}">—</td></tr>
+          <tr><th>Current</th><td class="num"><span id="pic${p}">—</span>
+            <div class="tbar"><i id="picb${p}"></i></div>
+            <canvas class="spark" id="pis${p}" width="300" height="34" aria-hidden="true"></canvas></td></tr>
+          <tr><th>Temp</th><td class="num"><span id="pit${p}">—</span>
+            <div class="tbar"><i id="pitb${p}"></i></div></td></tr>
+          <tr><th>Source</th><td id="pisrc${p}">—</td></tr>
+        </table>`;
       root.appendChild(card);
     }
     const on=m.O===1, fw=faultWords(m.F||0);
-    card.innerHTML=`
-      <div class="port-head"><h2>Port ${p}${m.L?` <span class="pilabel">· ${esc(m.L)}</span>`:""}</h2>
-        ${fw?`<span class="badge fault">${fw}</span>`:""}
-        <span class="badge ${on?"on":"off"}">${on?"online":"offline"}</span>
-      </div>
-      <table>
-        <tr><th>Patch</th><td class="num">${PERS_NAMES[m.PE]??"?"} @ ${m.A??"—"} · head ${m.H??"—"}</td></tr>
-        <tr><th>Current</th><td class="num">${m.IA!=null?(m.IA/1000).toFixed(2)+" A":"—"}</td></tr>
-        <tr><th>Temp</th><td class="num">${m.T!=null?(m.T/10).toFixed(1)+" °C":"—"}</td></tr>
-        <tr><th>Source</th><td>${kv.DMX==="1"?"DMX":(m.X?FX_NAMES[m.X]:(m.M?"manual":"hold"))}</td></tr>
-      </table>`;
+    $("pih"+p).innerHTML=`Port ${p}${m.L?` <span class="pilabel">· ${esc(m.L)}</span>`:""}`;
+    const bf=$("pif"+p); bf.classList.toggle("hidden",!fw); bf.textContent=fw;
+    const bo=$("pio"+p); bo.className="badge "+(on?"on":"off"); bo.textContent=on?"online":"offline";
+    faultChoreo("pi"+p, card, !!fw);
+    $("pip"+p).textContent=`${PERS_NAMES[m.PE]??"?"} @ ${m.A??"—"} · head ${m.H??"—"}`;
+    const ia=m.IA!=null?+m.IA:null, lim=+(m.OC||6500);
+    $("pic"+p).textContent=ia!=null?(ia/1000).toFixed(2)+" A":"—";
+    const cb=$("picb"+p);
+    cb.style.width=ia!=null?Math.min(100,100*Math.max(0,ia)/lim)+"%":"0";
+    cb.classList.toggle("hot", ia!=null && ia>0.9*lim);
+    const T=m.T!=null?+m.T:null, ot=(+(m.OT||80))*10;
+    $("pit"+p).textContent=T!=null?(T/10).toFixed(1)+" °C":"—";
+    const tb=$("pitb"+p);
+    tb.style.width=T!=null?Math.max(0,Math.min(100,100*T/1000))+"%":"0";   // 0–100 °C scale
+    tb.classList.toggle("hot", T!=null && T>0.9*ot);
+    $("pisrc"+p).textContent=kv.DMX==="1"?"DMX":(m.X?FX_NAMES[m.X]:(m.M?"manual":"hold"));
+    const h=piHist[p]=piHist[p]||[];
+    if(ia!=null){ h.push(Math.max(0,ia)); if(h.length>60) h.shift(); }
+    drawSpark($("pis"+p), h, lim);
   });
+}
+function drawSpark(cv,h,lim){
+  if(!cv) return;
+  const c=cv.getContext("2d"), W=cv.width, H=cv.height;
+  c.clearRect(0,0,W,H);
+  if(h.length<2) return;
+  const mx=Math.max(lim*0.25, ...h)*1.05, n=60;
+  c.beginPath();
+  h.forEach((v,i)=>{ const x=i/(n-1)*W, y=H-2-(v/mx)*(H-4); i?c.lineTo(x,y):c.moveTo(x,y); });
+  c.strokeStyle="#5fd7ff"; c.lineWidth=1.5; c.stroke();
+  c.lineTo((h.length-1)/(n-1)*W,H); c.lineTo(0,H); c.closePath();
+  c.fillStyle="rgba(95,215,255,.12)"; c.fill();
 }
 
 // ---------- product wordmark ----------
@@ -2244,6 +2353,227 @@ function flyMarkToHeader(n, host, svg){
       if(p<1) requestAnimationFrame(step); else { clearTimeout(guard); setTimeout(done,120); } };
     setTimeout(()=>requestAnimationFrame(step),260);
   };
+}
+
+// ═════════════════ MOTION LANGUAGE (2026-09-13) ═════════════════
+const MOTION = !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+// ---- JMB bars as progress: two bars filling purple left→right (f = 0..1),
+// or an indeterminate purple sweep (f = null). Used by OTA, RDM and connecting.
+function jbarsHTML(id){
+  return `<span class="jbars" id="${id}"><svg viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">`
+    +`<rect x="0" y="0" width="100" height="3.5" fill="rgba(230,237,243,.22)"/>`
+    +`<rect x="0" y="8.5" width="100" height="3.5" fill="rgba(230,237,243,.22)"/>`
+    +`<g class="fill"><rect x="0" y="0" width="0" height="3.5" fill="#8b34f7"/>`
+    +`<rect x="0" y="8.5" width="0" height="3.5" fill="#8b34f7"/></g></svg></span>`;
+}
+function jbarsSet(el, f){
+  if(!el) return;
+  const rects=el.querySelectorAll(".fill rect");
+  if(f==null){ el.classList.add("indet"); rects.forEach(r=>r.setAttribute("width","40")); return; }
+  el.classList.remove("indet");
+  const w=Math.round(Math.max(0,Math.min(1,f))*100);
+  rects.forEach(r=>r.setAttribute("width",String(w)));
+}
+
+// ---- Fault choreography: a port that trips shakes once and pulses red until
+// cleared; on clear a green sweep runs across the card. Keyed per card so the
+// Control and Ports tabs each get it.
+const faultPrev={};
+function faultChoreo(key, card, flt){
+  const was=faultPrev[key]; faultPrev[key]=flt;
+  card.classList.toggle("faulted", flt);
+  if(!MOTION || was===undefined || was===flt) return;
+  const cls=flt?"shake":"sweep";
+  card.classList.remove(cls); void card.offsetWidth; card.classList.add(cls);
+  setTimeout(()=>card.classList.remove(cls), flt?600:900);
+}
+
+// ---- LIVE EFFECT PREVIEW. The same effect maths as the controller's
+// effects.h, run in the browser on each port's own virtual clock and painted
+// into the port's swatch every frame — the phone shows what the strip is doing.
+// Speed follows the port's Speed and the rig BPM exactly as the firmware does;
+// the sliders act as RGB trims while an effect runs, and the dimmer scales it.
+// Runs only while the Control tab is showing and the page is visible.
+const swOwned={};                       // swatches currently driven by a preview/tween
+const fxSt={};
+function fxRand(s){ let x=s.rng; x^=x<<13; x>>>=0; x^=x>>>17; x^=x<<5; x>>>=0; s.rng=x||1; return s.rng; }
+function fxFrand(s){ return (fxRand(s)%10000)/10000; }
+function hsv(h,s,v){
+  h=((h%360)+360)%360; v=Math.max(0,Math.min(1,v)); s=Math.max(0,Math.min(1,s));
+  const c=v*s, x=c*(1-Math.abs((h/60)%2-1)), m=v-c; let r,g,b;
+  if(h<60){r=c;g=x;b=0;}else if(h<120){r=x;g=c;b=0;}else if(h<180){r=0;g=c;b=x;}
+  else if(h<240){r=0;g=x;b=c;}else if(h<300){r=x;g=0;b=c;}else{r=c;g=0;b=x;}
+  return [r+m,g+m,b+m];
+}
+const POLICE_START=[0,50,100,250,300,350];
+const TRAFFIC_CT=[[255,141,11],[255,206,166],[227,233,255]];
+function fxCompute(fx, idx, t, s){          // idx = port index 0-based, t = virtual ms
+  const pf=idx, due=x=>(t-x)>=0, m=(a,b)=>((a%b)+b)%b;
+  switch(fx){
+  case 1:{ // Candle
+    if(due(s.t_next)){ const f=fxFrand(s); s.tgt=0.55+0.45*f*f; if(fxFrand(s)<0.04) s.tgt=0.22; s.t_next=t+90+(fxRand(s)%130); }
+    s.lvl+=(s.tgt-s.lvl)*0.30; return hsv(21+4*s.lvl,0.96,0.10+0.85*s.lvl); }
+  case 2:{ // Fire
+    if(due(s.t_next)){ s.tgt=0.30+0.70*fxFrand(s); if(fxFrand(s)<0.06) s.tgt=1; s.t_next=t+40+(fxRand(s)%60); }
+    s.lvl+=(s.tgt-s.lvl)*0.45; return hsv(8+20*s.lvl,1,0.12+0.88*s.lvl); }
+  case 3:{ // Fireworks
+    if(s.stage===0){ if(due(s.t_next)){ s.stage=1; s.t_evt=t; s.hue=fxFrand(s)*360; } return [0,0,0]; }
+    if(s.stage===1){ if(t-s.t_evt>70){ s.stage=2; s.t_evt=t; } return [1,1,1]; }
+    const v=Math.exp(-(t-s.t_evt)/380);
+    if(v<0.02){ s.stage=0; s.t_next=t+((fxFrand(s)<0.25)?120:400+(fxRand(s)%2200)); }
+    return hsv(s.hue,1,v); }
+  case 4:{ // Water
+    const v=0.58+0.17*Math.sin(m(t,11024)*0.00057+pf*1.7)+0.10*Math.sin(m(t,4333)*0.00145+pf*0.9)+0.04*Math.sin(m(t,997)*0.0063);
+    return hsv(195+22*Math.sin(m(t,20268)*0.00031+pf),0.92,v); }
+  case 5:{ // Siren
+    const phase=Math.floor(t/400)+idx, pos=m(t,400)/400, v=0.55+0.45*Math.exp(-pos*3.5);
+    return hsv((phase&1)?225:0,1,v); }
+  case 6:{ // Laser
+    if(s.stage===0){ if(due(s.t_next)){ s.stage=1; s.t_evt=t; s.hue=0; } return [0,0,0]; }
+    const v=Math.exp(-(t-s.t_evt)/90); if(v<0.03){ s.stage=0; s.t_next=t+120+(fxRand(s)%480); }
+    return hsv(s.hue,1,v); }
+  case 7:{ // Club
+    const BEAT=469, beat=Math.floor(t/BEAT), bt=m(t,BEAT)/BEAT;
+    if((beat%16)<2){ return (m(t,125)<40)?[1,1,1]:[0,0,0]; }
+    const bar=Math.floor(beat/4), hue=((bar*137)%360)+pf*30, v=0.35+0.65*Math.exp(-bt*4);
+    return hsv(hue,1,v); }
+  case 8:{ // Lightning
+    if(s.stage===0){ if(due(s.t_next)){ s.stage=1; s.t_evt=t; s.n=2+(fxRand(s)%4); s.p1=30+(fxRand(s)%50); s.p2=550+(fxRand(s)%650); } return [0,0,0]; }
+    const dt=t-s.t_evt, flash=s.p1, v=(dt<flash)?1:Math.exp(-(dt-flash)/130);
+    if(dt>flash+s.p2){ if(s.n) s.n--; if(s.n===0){ s.stage=0; s.t_next=t+2500+(fxRand(s)%7000); } else { s.t_evt=t; s.p1=30+(fxRand(s)%50); s.p2=550+(fxRand(s)%650); } }
+    return hsv(220,0.06,v); }
+  case 9:  return hsv(m(t,11000)*(360/11000)+pf*90,1,0.85);                                  // Rainbow
+  case 10:{ // Aurora
+    const h=150+70*Math.sin(m(t,20944)*0.00030+pf*1.3)+35*Math.sin(m(t,57120)*0.00011);
+    return hsv(h,0.90,0.45+0.35*Math.sin(m(t,29920)*0.00021+pf)); }
+  case 11:{ // Sunset (one-shot, 2 min at designed tempo)
+    if(s.stage===0){ s.stage=1; s.t_evt=t; }
+    const ph=(t-s.t_evt)/120000; if(ph>=1) return [0,0,0];
+    const e=ph*ph*(3-2*ph); return hsv(42-34*e+pf*0.5,0.80+0.20*e,0.95*(1-e)); }
+  case 12:{ // TV Sim
+    if(due(s.t_next)){ s.tgt=0.15+0.75*fxFrand(s); s.hue=(fxFrand(s)<0.15)?40:210+25*fxFrand(s); s.t_next=t+250+(fxRand(s)%1350); }
+    s.lvl+=(s.tgt-s.lvl)*0.55; return hsv(s.hue,0.30,s.lvl); }
+  case 13:  return (m(t,125)<35)?[1,1,1]:[0,0,0];                                            // Strobe 8 Hz
+  case 14:{ // Police: six 28 ms flashes per 1000 ms, odd ports on the other half-cycle
+    const u=m(t-((idx&1)?500:0),1000), on=POLICE_START.some(st=>u>=st&&u<st+28);
+    return hsv(228,1,on?1:0); }
+  case 15:{ const ph=m(t,2500)/2500; return hsv(30,0.35,0.18+0.82*0.5*(1-Math.cos(ph*6.2832))); }   // Pulse
+  case 16:{ // Party
+    const BEAT=469, beat=Math.floor(t/BEAT), bt=m(t,BEAT)/BEAT, bar=Math.floor(beat/4);
+    let hue=((bar*137)%360)+pf*25, sat=1; const hm=m(hue,360);
+    if(hm>85&&hm<165){ hue=165; sat=0.92; }
+    const v=0.45+0.25*Math.sin(bt*3.1416)+(((beat&3)===0)?0.18*Math.exp(-bt*5):0);
+    return hsv(hue,sat,v); }
+  case 17:{ // Traffic
+    const c=TRAFFIC_CT[s.p2%3];
+    if(s.stage===0){ if(due(s.t_next)){ const roll=fxRand(s)%100; s.p2=(roll<55)?2:(roll<80)?1:0; s.p1=1400+(fxRand(s)%2600); s.t_evt=t; s.stage=1; } return [0,0,0]; }
+    let env=0;
+    if(s.stage===1){ const f=(t-s.t_evt)/s.p1; if(f<1) env=f*f; else { s.stage=2; s.t_evt=t; env=1; } }
+    if(s.stage===2){ const dt=t-s.t_evt; if(dt>=200){ s.stage=0; s.t_next=t+800+(fxRand(s)%3400); return [0,0,0]; } const q=1-dt/200; env=q*q; }
+    return [c[0]/255*env,c[1]/255*env,c[2]/255*env]; }
+  case 18:{ // Fluoro
+    if(s.stage===0){ if(due(s.t_next)){ s.stage=1; s.t_evt=t; s.n=3+(fxRand(s)%6); s.p1=25+(fxRand(s)%65); }
+      return hsv(150,0.10,0.93+0.07*Math.sin(m(t,40)*0.1571)); }
+    const dt=t-s.t_evt, on=(Math.floor(dt/(s.p1||1))&1)===0;
+    if(dt>s.p1*2){ s.t_evt=t; s.p1=22+(fxRand(s)%75); if(s.n) s.n--; if(s.n===0){ s.stage=0; s.t_next=t+1500+(fxRand(s)%6500); } }
+    return hsv(150,0.12,on?(0.82+0.18*fxFrand(s)):(0.03+0.06*fxFrand(s))); }
+  case 19:{ // Paparazzi
+    if(s.stage===0){ if(due(s.t_next)){ s.stage=1; s.t_evt=t; } return [0,0,0]; }
+    const v=Math.exp(-(t-s.t_evt)/45); if(v<0.03){ s.stage=0; s.t_next=t+50+(fxRand(s)%750); }
+    return hsv(210,0.04,v); }
+  case 20:{ // Explosion
+    if(s.stage===0){ if(due(s.t_next)){ s.stage=1; s.t_evt=t; } return [0,0,0]; }
+    const dt=t-s.t_evt; if(dt<55) return hsv(35,0.14,1);
+    const v=Math.exp(-(dt-55)/300); if(v<0.03){ s.stage=0; s.t_next=t+1200+(fxRand(s)%5200); }
+    return hsv(18+14*v,1,v*(0.80+0.20*fxFrand(s))); }
+  case 21:{ // Clouds
+    let sun=0.5+0.30*Math.sin(m(t,47000)*0.0001337+pf*0.6)+0.12*Math.sin(m(t,19000)*0.0003307+pf*1.1)+0.05*Math.sin(m(t,7000)*0.0008976);
+    sun=Math.max(0,Math.min(1,sun)); return hsv(214-16*sun,0.05+0.11*(1-sun),0.30+0.70*sun); }
+  default: return [0,0,0];
+  }
+}
+let fxRaf=0;
+function fxTick(now){
+  fxRaf=0;
+  let any=false;
+  ports.forEach((mm,i)=>{
+    const p=i+1, x=+(mm.X||0), sw=$("sw"+p); if(!sw) return;
+    if(!x || kv.DMX==="1" || (+(kv.TSEQ||0))!==0){
+      if(fxSt[p]){ delete fxSt[p]; if(swOwned[p]==="fx") swOwned[p]=false; }
+      return;
+    }
+    if(swOwned[p] && swOwned[p]!=="fx") return;        // a scene tween has it for now
+    any=true;
+    let s=fxSt[p];
+    if(!s||s.fx!==x){ s=fxSt[p]={fx:x,rng:((0x9E3779B9*p)^0xB5297A4D)>>>0||1,vt:0,last:now,
+                                stage:0,n:0,p1:0,p2:0,t_next:0,t_evt:0,hue:0,lvl:0,tgt:0}; }
+    let dt=now-s.last; s.last=now; if(dt>200) dt=200;
+    const sf=Math.pow(8,((+(mm.S??128))-128)/127)*((+(kv.BPM||128))/128);
+    s.vt+=dt*sf;
+    const [r,g,b]=fxCompute(x,i,s.vt,s);
+    const d=(+(mm.D??100))/100, tr=(+(mm.R??100))/100, tg=(+(mm.G??100))/100, tb=(+(mm.B??100))/100;
+    const [cr,cg,cb]=swatchRGB(mm.PE??0, r*tr*d*100, g*tg*d*100, b*tb*d*100);
+    swOwned[p]="fx";
+    sw.style.background=`rgb(${cr|0},${cg|0},${cb|0})`;
+    const lum=cr+cg+cb;
+    sw.style.boxShadow=lum>40?`0 0 ${(8+lum/40)|0}px rgba(${cr|0},${cg|0},${cb|0},.6)`:"none";
+  });
+  if(any && activeTabName()==="control" && !document.hidden) fxRaf=requestAnimationFrame(fxTick);
+}
+function fxPreviewKick(){ if(MOTION && !fxRaf && !document.hidden) fxRaf=requestAnimationFrame(fxTick); }
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden) fxPreviewKick(); });
+
+// ---- Scene recall mirror: tween a port's swatch from→to over the scene's
+// fade time (smoothstep, like the firmware's crossfade), then hand it back.
+const swTween={};
+function tweenSwatch(p, from, to, T, pe){
+  if(!MOTION || !T){ return; }
+  const sw=$("sw"+p); if(!sw) return;
+  const gen=(swTween[p]=(swTween[p]||0)+1);
+  swOwned[p]="tween";
+  const t0=performance.now();
+  const paint=(k)=>{
+    const e=k*k*(3-2*k), L=(a,b)=>a+(b-a)*e;
+    const dd=L(from.d??100,to.d??100)/100;
+    const [cr,cg,cb]=swatchRGB(pe, L(from.r,to.r)*dd, L(from.g,to.g)*dd, L(from.b,to.b)*dd);
+    sw.style.background=`rgb(${cr|0},${cg|0},${cb|0})`;
+    sw.style.boxShadow=(cr+cg+cb>40)?`0 0 14px rgba(${cr|0},${cg|0},${cb|0},.55)`:"none";
+  };
+  const step=now=>{
+    if(swTween[p]!==gen) return;                       // superseded
+    const k=Math.min(1,(now-t0)/T); paint(k);
+    if(k<1) requestAnimationFrame(step); else { swOwned[p]=false; fxPreviewKick(); }
+  };
+  requestAnimationFrame(step);
+}
+
+// ---- Disconnect: the intro in reverse. The header mark's purple drains out
+// of the bars, then the mark settles down and fades as the connect screen
+// returns.
+function markDrain(){
+  const host=$("prodMark"), svg=host&&host.querySelector("svg");
+  if(!svg||!MOTION||$("flyMark")) return;
+  const r=svg.getBoundingClientRect(); if(!r.width) return;
+  const fly=document.createElement("span"); fly.id="flyMark";
+  fly.innerHTML=host.innerHTML.replace(/desc-am-/g,"desc-dr-");
+  const fs=fly.firstChild; fs.style.height=r.height+"px";
+  fly.style.left=r.left+"px"; fly.style.top=r.top+"px";
+  document.body.appendChild(fly);
+  host.innerHTML="";
+  const bars=[...fs.querySelectorAll("rect")].filter(x=>x.getAttribute("height")==="24"&&x.getAttribute("fill")==="#8b34f7").slice(0,2);
+  bars.forEach(b=>{ const w=b.cloneNode(false); w.setAttribute("fill","currentColor"); b.parentNode.insertBefore(w,b); });
+  const W=bars.length?+bars[0].getAttribute("width"):0;
+  let t0=0;
+  const step=now=>{
+    if(!t0) t0=now; const p=Math.min(1,(now-t0)/380);
+    bars.forEach(b=>b.setAttribute("width",String(W*(1-p))));
+    if(p<1) requestAnimationFrame(step);
+    else fly.animate([{transform:"none",opacity:1},{transform:"translateY(60px) scale(.9)",opacity:0}],
+                     {duration:420,easing:"ease-in",fill:"forwards"}).onfinish=()=>fly.remove();
+  };
+  requestAnimationFrame(step);
+  setTimeout(()=>{ if(fly.parentNode) fly.remove(); },1500);
 }
 
 // ---------- Diag tab ----------
@@ -2555,7 +2885,7 @@ function renderTx(){
 
 // ---------- RDM universe controller ----------
 let rdmDevs={}, rdmOrder=[], rdmPhaseTxt="", rdmActive=false, rdmOpenUid=null,
-    rdmSens={}, rdmPend=null;
+    rdmSens={}, rdmPend=null, rdmProg=null;
 $("btnRdmScan").onclick=async()=>{
   if(!bleConnected() && !demoOn) return;
   if(!demoOn && kv.DMX==="1" &&
@@ -2581,6 +2911,7 @@ function onRdm(str){
     if(i>0) f[t.slice(0,i)]=t.slice(i+1); else f[t]=1; });
   if(tag==="PH"){
     rdmActive = f.PH!=="OFF";
+    rdmProg = (f.PH==="INFO" && +f.N>0) ? (+f.I||0)/+f.N : null;   // null = sweep
     rdmPhaseTxt = f.PH==="SCAN" ? `discovering… ${f.N||0} found`
       : f.PH==="INFO" ? `reading devices… ${f.I||0}/${f.N||0}`
       : f.PH==="READY" ? `${f.N||0} device${f.N==="1"?"":"s"} on the line`
@@ -2630,7 +2961,14 @@ function hexEnc(t){ let o=""; for(const c of t){ const v=c.codePointAt(0);
 function renderRdm(){
   $("btnRdmStop").classList.toggle("hidden",!rdmActive);
   $("btnRdmScan").textContent=rdmActive?"Rescan":"Scan";
-  if(rdmPhaseTxt){ $("rdmPhase").textContent=rdmPhaseTxt; reveal("rdmPhase"); }
+  if(rdmPhaseTxt){
+    // While a scan runs the phase line carries the bars: an indeterminate
+    // sweep during discovery, a real fill while device info is read.
+    const ph=$("rdmPhase");
+    ph.innerHTML=esc(rdmPhaseTxt)+(rdmActive?jbarsHTML("rdmBars"):"");
+    if(rdmActive) jbarsSet($("rdmBars"), rdmProg);
+    reveal("rdmPhase");
+  }
   const host=$("rdmDevs");
   if(!rdmOrder.length){ host.innerHTML=""; return; }
   host.innerHTML=rdmOrder.map(u=>{
@@ -3278,9 +3616,11 @@ setInterval(()=>retryOtaManifest(false), 60000);   // periodic staleness check
 addEventListener("online",()=>retryOtaManifest(true));
 function setOtaState(t){ $("otaState").textContent=t; }
 function setOtaMsg(t){ $("otaMsg").textContent=t; reveal("otaMsg"); }
-function otaProgress(f){ $("otaBarWrap").classList.remove("hidden");
-  $("otaBar").style.width=Math.round(Math.max(0,Math.min(1,f))*100)+"%"; }
-function otaHideBar(){ $("otaBarWrap").classList.add("hidden"); $("otaBar").style.width="0"; }
+// Progress = the JMB bars filling purple (the app's one progress motif).
+function otaProgress(f){ const w=$("otaBarWrap"); w.classList.remove("hidden");
+  if(!$("otaBars")){ w.style.height="auto"; w.style.background="none"; w.innerHTML=jbarsHTML("otaBars"); }
+  jbarsSet($("otaBars"), f); }
+function otaHideBar(){ $("otaBarWrap").classList.add("hidden"); jbarsSet($("otaBars"),0); }
 function renderOta(){
   const ok=!!otacChar;                     // connected to OTA-capable firmware
   // RBOK=0 means the other slot is erased (board never OTA'd) — nothing to go
