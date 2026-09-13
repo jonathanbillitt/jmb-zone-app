@@ -903,7 +903,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13g.connect-intro";
+const APP_VER="2026-09-13h.demo-intro";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -971,15 +971,18 @@ function showApp(){
     $("nav").classList.remove("hidden");
     selectTab(activeTabName());   // come back where you were, not always Control
   };
-  // Real connection from the connect screen: fade it out (the mark flight is
-  // started by renderProductMark once the state says which model this is).
-  const intro = typeof demoOn!=="undefined" && !demoOn && !hello.classList.contains("hidden")
+  // Arriving from the connect screen (a real connection OR demo mode): fade it
+  // out; the mark flight is started by renderProductMark once the state says
+  // which model this is. showApp can be called twice on the way in (demo mode
+  // calls it after its first state) — the second call must not restart it.
+  if(introRunning) return;
+  const intro = !hello.classList.contains("hidden")
     && !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   if(!intro){ reveal(); return; }
-  introPending=true;
+  introPending=true; introRunning=true;
   const fading=["hello","connectSplash","connectMarks"].map(id=>$(id)).filter(Boolean);
   fading.forEach(el=>el.classList.add("introfade"));
-  setTimeout(()=>{ fading.forEach(el=>el.classList.remove("introfade")); reveal();
+  setTimeout(()=>{ fading.forEach(el=>el.classList.remove("introfade")); reveal(); introRunning=false;
                    setTimeout(()=>{ introPending=false; },1500); },450);
 }
 function hideApp(){
@@ -2204,7 +2207,7 @@ function renderProductMark(){
 // splash, flies to the header and docks flush against the JMB block, brightens
 // for a beat, then its white bars fill purple left-to-right — and the header's
 // normal mark takes over. Skipped for demo mode and reduced-motion users.
-let introPending=false;
+let introPending=false, introRunning=false;
 function flyMarkToHeader(n, host, svg){
   const src=document.querySelector(`#connectMarks [data-n="${n}"] svg`);
   const s=src&&src.getBoundingClientRect();
