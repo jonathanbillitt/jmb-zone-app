@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "73c5295-20260913",
-  "size": 1194240,
-  "crc32": "a41e3d72",
-  "sha256": "0a5cc63113cc66756e26dbfc5e2eb756fe89353273aacf6778fc88a101982de7",
+  "build": "482a219-20260913",
+  "size": 1194512,
+  "crc32": "53ba18db",
+  "sha256": "c93a153fff59a9e6ad57071f2ec8136431e1e1678949b1335122462eb53b0217",
   "date": "2026-09-13",
-  "notes": "Port fw 2.2: adc_wait cap 9 ms -> 150 us + which-flag mask \u2014 the port's 25-28 ms loop stall (entry A cause found); entry C proven",
+  "notes": "Port-module update on its own: controller reports the stored port image CRC (SPC), the app offers \"Update port module\" when the published image differs even with the controller up to date",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
