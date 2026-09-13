@@ -361,6 +361,13 @@
       linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%);
     mask-composite: intersect; }
   #hello.hidden ~ #connectSplash{ display:none; }
+  /* The three product wordmarks under the splash on the connect screen
+     (2026-09-13). Same PROD_MARKS geometry as the header; letters in the
+     page's light ink, bars purple. Wraps on narrow phones. */
+  #connectMarks{ display:flex; justify-content:center; align-items:center;
+    gap:22px 30px; flex-wrap:wrap; margin:6px 0 22px; color:#e6e6ef; }
+  #connectMarks svg{ height:30px !important; opacity:.92; }
+  #hello.hidden ~ #connectMarks{ display:none; }
 </style>
 </head>
 <body>
@@ -398,6 +405,7 @@
   </div>
 
   <div id="connectSplash"><img src="jmb-splash.png" alt="JMB Lighting"></div>
+  <div id="connectMarks" aria-label="JMB Zone, 4our and 8ight"></div>
 
   <div id="demoBar" class="hidden" style="background:#1e2a3d;border:1px solid #4a6da8;
        color:#9cc0f5;border-radius:12px;padding:8px 12px;margin-bottom:12px;font-size:13px;
@@ -888,7 +896,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13e.zone-z";
+const APP_VER="2026-09-13f.range-marks";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -2158,6 +2166,10 @@ function renderProductMark(){
   const n = +(kv.VAR ?? kv.PORTS ?? 0);
   host.innerHTML = PROD_MARKS[n] || "";
 }
+// Connect screen: the range, Zone · 4our · 8ight, under the splash. Each mark's
+// id-bearing mask (eight) is renamed so it cannot collide with the header copy.
+{ const cm = $("connectMarks");
+  if(cm) cm.innerHTML = [1,4,8].map(n => PROD_MARKS[n].replace(/desc-am-eight/g,"desc-cm-eight")).join(""); }
 
 // ---------- Diag tab ----------
 // Index 4 = CRMX. The controller reports it separately from wired even though
