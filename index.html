@@ -619,8 +619,10 @@
       <div class="ctlrow" style="margin-top:6px">
         <button id="crmxLink" class="primary">Link</button>
         <button id="crmxUnlink" class="danger">Unlink</button>
-        <!-- Antenna select removed 2026-09-13: the TimoTwo has one antenna (u.FL)
-             and no switch; the controller pin behind it was "do not connect". -->
+        <select id="crmxAnt" style="width:110px">
+          <option value="1">Ext antenna</option>
+          <option value="0">Int antenna</option>
+        </select>
       </div>
       <div class="mini">Link pairs with a CRMX transmitter that's in linking
       mode; Unlink forgets it. Status is data-truth: <b>linked &#8212; no RF</b>
@@ -886,7 +888,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13a.antenna";
+const APP_VER="2026-09-13b.antenna-back";
 // Firmware loop-stall sections (jmb_loopstat.h LP_SEC_*), by index. Append only.
 const LOOP_SECS=["mcp","ble","dmx","net","misc","out","bus","recon","ind","nvs","ui","ota"];
 // Register the service worker so the app works offline once installed to the
@@ -2647,6 +2649,7 @@ function renderSetup(){
                    : cx===2 ? (rfOk ? "var(--ok)" : "var(--warn)")
                    : cx===1 ? "var(--warn)" : "var(--dim)";
     st.style.fontWeight = cx>=2 ? "600" : "400";
+    if(document.activeElement!==$("crmxAnt")) $("crmxAnt").value=kv.CA??"1";
   }
   // Chain-listen arm state (CHL) — armed reads amber like the panel banner.
   // Skip refreshes for 2.5s after the user flips it so an in-flight state
@@ -2916,6 +2919,7 @@ $("crmxLink").onclick=()=>{ send("CRMXLINK");
   $("crmxStatus").textContent="linking…"; };
 $("crmxUnlink").onclick=async()=>{ if(await askConfirm("The controller forgets its paired transmitter.",{title:"Unlink CRMX?",ok:"Unlink",danger:true}))
   send("CRMXUNLINK"); };
+$("crmxAnt").onchange=e=>{ setupTouched=Date.now(); send("CRMXANT="+ +e.target.value); };
 $("netEn").onchange=e=>{ setupTouched=Date.now(); send("NET="+ +e.target.value); };
 $("btNameApply").onclick=()=>{
   const t=$("setBtName").value.trim();

@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "cd5067f-20260913",
-  "size": 1194032,
-  "crc32": "58c80418",
-  "sha256": "a9a20d5d792922aadc9d21b59fd35f4ee9234cfaa8bbc100c7db50a778513c75",
+  "build": "639a2aa-20260913",
+  "size": 1194224,
+  "crc32": "8c9319f1",
+  "sha256": "36298b893c4c16bc8664ee0c6bcc8b56bef25ff314b7b3e7e27542ca670df200",
   "date": "2026-09-13",
-  "notes": "ANT_SEL is a phantom: TimoTwo pin 31 is \"do not connect\" \u2014 stop driving it, drop the antenna UI",
+  "notes": "ANT_SEL correction: the fitted module is the original TiMo RX, pin 31 IS antenna select \u2014 keep it",
   "file": "firmware.bin"
 }
