@@ -959,7 +959,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-14b.pulse";
+const APP_VER="2026-09-14c.strobetop";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -2566,6 +2566,8 @@ function fxTick(now){
     // Strobe rate cap mirrors effects.h — only for ports WITHOUT the port-side
     // pulse (port fw < 2.4); a pulse-capable port strobes exactly at any rate.
     if(x===13 && sf>2.34 && (+(mm.PF||0))<0x204) sf=2.34;
+    // Pulse-capable ports: Strobe's upper half is compressed so 255 = ~30 flashes/s
+    if(x===13 && S>128 && (+(mm.PF||0))>=0x204) sf=Math.pow(8,(S-128)/127*0.636)*((+(kv.BPM||128))/128);
     s.vt+=dt*sf;
     const [r,g,b]=(S===0 && (x===13||x===14)) ? [0,0,0] : fxCompute(x,i,s.vt,s);   // Strobe/Police: 0 = off
     const d=(+(mm.D??100))/100, tr=(+(mm.R??100))/100, tg=(+(mm.G??100))/100, tb=(+(mm.B??100))/100;

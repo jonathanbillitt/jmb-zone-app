@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "f4d21dd-20260913",
-  "size": 1195504,
-  "crc32": "f49d6893",
-  "sha256": "1476e55c785610a7618fc4a5df6b841f81065c667d0a4f7bd4769a2dc2db0e80",
+  "build": "95ad8f1-20260913",
+  "size": 1195616,
+  "crc32": "82b95629",
+  "sha256": "e8f396a454ed51d2b7a0fb6d3dab280e83fd229cbdbb70ee992b8dacee52e227",
   "date": "2026-09-13",
-  "notes": "Protocol: SET_PULSE takes the 0xF slot \u2014 BOOT_REQUEST (0xA) is live, the SWD flasher sends it to the supervisor",
+  "notes": "Strobe: upper wheel half compressed on pulse ports so 255 = ~30 flashes/s (above ~40 the eye fuses to white); A closed and proven",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
