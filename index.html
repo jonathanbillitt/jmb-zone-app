@@ -478,7 +478,7 @@
     </div>
     <div class="card">
       <!-- Full-width so a thumb from either side of the phone lands on it. -->
-      <button id="btnPrep" class="danger" style="width:100%;padding:14px 12px;font-size:1.05em;margin-top:22px">Clear all</button>
+      <button id="btnPrep" style="width:100%;padding:14px 12px;font-size:1.05em;margin-top:22px">Clear all</button>
       <div class="mini" style="text-align:center;margin-top:6px">RGB 100% · FX speed 50% · dimmer 0%</div>
     </div>
     <div id="ports"></div>
@@ -947,7 +947,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13o.progressbar";
+const APP_VER="2026-09-13p.clearblue";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -1470,7 +1470,12 @@ function renderControl(){
     }
   }
   const lk=(dmxLive||testOn) && !demoOn;
-  const bp=$("btnPrep"); if(bp){ bp.disabled=lk; bp.style.opacity=lk?".45":""; }
+  const bp=$("btnPrep"); if(bp){ bp.disabled=lk; bp.style.opacity=lk?".45":"";
+    // Blue (the app's primary) only while there is something to clear — any
+    // port with an effect on, the dimmer up, a colour pulled in or the speed
+    // moved; once the rig is already at the cleared state it goes neutral.
+    const dirty=ports.some(m=>(m.X||0)>0 || (+(m.D??0))>0 || (m.R??100)<100 || (m.G??100)<100 || (m.B??100)<100 || (+(m.S??128))!==128);
+    bp.classList.toggle("primary",dirty); bp.classList.remove("danger"); }
   const root=$("ports");
   ports.forEach((m,idx)=>{
     const p=idx+1;
