@@ -355,9 +355,10 @@
      height is left after the header, the connect card and the wordmark row,
      and keeps its aspect. On a tall phone that is the full 560 px badge; on a
      short one it shrinks. */
-  body:has(#hello:not(.hidden)){ overflow:hidden; }
+  /* No scroll lock: a lock plus a page even slightly too tall trapped the
+     card's top under the header on the S21 (2026-09-13). Size to fit instead. */
   #connectSplash img{ width:min(112vw,560px); height:auto; display:block;
-    max-height:calc(100vh - 360px); max-height:calc(100dvh - 360px); max-width:none;
+    max-height:calc(100vh - 440px); max-height:calc(100dvh - 440px); max-width:none;
     -webkit-mask-image:
       linear-gradient(to right, transparent 0, #000 10%, #000 90%, transparent 100%),
       linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%);
@@ -953,7 +954,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13t.connectfit";
+const APP_VER="2026-09-13u.connectfit2";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -986,7 +987,8 @@ const HOT_MS=1600;
 const enc=new TextEncoder(), dec=new TextDecoder();
 const $=id=>document.getElementById(id);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-function hello(html){ $("hello").classList.remove("hidden"); $("hello").innerHTML=html; }
+function hello(html){ $("hello").classList.remove("hidden"); $("hello").innerHTML=html;
+  try{ window.scrollTo(0,0); }catch(_){} }     // the connect screen always starts at the top
 
 // ---------- tabs ----------
 // Nav highlight and visible tab must be set together. showApp() used to unhide
