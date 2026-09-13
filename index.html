@@ -947,7 +947,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13p.clearblue";
+const APP_VER="2026-09-13q.clearprompt";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -3445,7 +3445,10 @@ $("btnHoldApply").onclick=()=>{ setupTouched=Date.now();
   send("HOLD="+Math.max(0,Math.min(60,+$("setHold").value||5))); };
 // ---------- prep / reset-all / undo ----------
 $("btnPrep").onclick=async()=>{
-  if(!await askConfirm("Every port goes to full white, effects off, dimmer down.",{title:"Clear all ports?",ok:"Clear all",danger:true})) return;
+  // Confirm only when the button is armed (blue = something to clear); with the
+  // rig already clear there is nothing to warn about (user, 2026-09-13).
+  if($("btnPrep").classList.contains("primary") &&
+     !await askConfirm("Every port goes to full white, effects off, dimmer down.",{title:"Clear all ports?",ok:"Clear all",danger:true})) return;
   // Clear to a clean programming base: effect OFF, colour full, speed at
   // designed tempo, dimmer down — nothing lights until you raise a wheel.
   ports.forEach((m,i)=>{ const p=i+1;
