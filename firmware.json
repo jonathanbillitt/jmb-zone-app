@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "220ed68-20260913",
-  "size": 1194688,
-  "crc32": "81ea5f16",
-  "sha256": "6fcd98918b4fa158bd0532ee2fcc3a9ad9221fffd1f978766a0338569234be2a",
+  "build": "f566eab-20260913",
+  "size": 1194672,
+  "crc32": "888a0ddc",
+  "sha256": "2e61013f14054b7037115ccb5268cd35781086eb29845ffb5079593ac2d604d5",
   "date": "2026-09-13",
-  "notes": "Effects: speed 0 = stop \u2014 continuous effects hold their frame, Strobe and Police go dark (was 1/8 tempo); app preview mirrors it",
+  "notes": "Effects: pass fx_speed as-is \u2014 the `? : 128` guard turned speed 0 back into full tempo (settings default to 128 anyway)",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
