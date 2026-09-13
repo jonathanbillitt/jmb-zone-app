@@ -948,7 +948,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13k.fixes";
+const APP_VER="2026-09-13l.porthealth";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -957,9 +957,13 @@ function showJsErr(m){
   try{
     let d=document.getElementById("jsErr");
     if(!d){ d=document.createElement("div"); d.id="jsErr";
-      d.style.cssText="position:fixed;left:8px;right:8px;bottom:72px;z-index:9999;background:#3a1215;color:#ffb4b4;font:12px/1.4 monospace;padding:8px 10px;border-radius:8px;white-space:pre-wrap;max-height:40vh;overflow:auto";
+      // pointer-events:none — the strip must never sit over the controls (it
+      // covered the encoder wheels on the S21 after the help-icon error,
+      // 2026-09-13: "encoders locked out"). Fades after 12 s.
+      d.style.cssText="position:fixed;left:8px;right:8px;bottom:72px;z-index:9999;background:#3a1215;color:#ffb4b4;font:12px/1.4 monospace;padding:8px 10px;border-radius:8px;white-space:pre-wrap;max-height:40vh;overflow:auto;pointer-events:none;transition:opacity .6s";
       (document.body||document.documentElement).appendChild(d); }
-    d.textContent+=m+"\n";
+    d.textContent+=m+"\n"; d.style.opacity="1";
+    clearTimeout(d._t); d._t=setTimeout(()=>{ d.style.opacity="0"; setTimeout(()=>{ d.textContent=""; },700); },12000);
   }catch(_){}
 }
 window.addEventListener("error",e=>showJsErr((e.message||"error")+" @"+String(e.filename||"").split("/").pop()+":"+(e.lineno||"?")));
@@ -1389,7 +1393,7 @@ function onState(str){
       // A-F are valid key letters, so a greedy [A-Z]+ parsed "FA0" as key
       // "FA" and the LATCHED fault bit vanished from every badge (agent
       // review — safety-display bug).
-      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|TX|TO|EC|TS|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
+      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|TX|TO|EC|TS|OR|AT|LG|RL|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
       if(mm) m[mm[1]] = mm[1]==="F" ? parseInt(mm[2],16) : +mm[2];
     }
     ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
@@ -2645,6 +2649,12 @@ function renderDiag(){
            <td class="num">${m.TO??"—"}${d(+m.TO,p.to,false)}${m.TS!==undefined?`<br><span style="opacity:.65;font-size:.85em">${m.TS}${d(+m.TS,p.ts,false)} silent</span>`:""}</td>
            <td class="num">${m.EC??"—"}${d(+m.EC,p.ec,false)}</td>
            <td>${faultWords(m.F||0)||"—"}</td></tr>`;
+    // Port-side health (port fw ≥ 2.1): what the PORT saw. Reply latency is
+    // the number entry A is waiting for — the port's own account of how late
+    // it answers; loop gap says what stalled it; overruns / ADC timeouts say why.
+    if(m.OR!==undefined && (kv.DMX!==undefined))
+      rows+=`<tr><td colspan="8" class="mini" style="margin:0;padding:2px 4px 8px">port ${i+1} reports: `
+        +`overruns ${m.OR} · ADC timeouts ${m.AT} · loop gap ${m.LG} ms · reply latency ${m.RL} ms (5 s max)</td></tr>`;
     window.__busPrev[i]={tx:+m.TX,rx:+m.RX,ce:+m.CE,to:+m.TO,ec:+m.EC,ts:+m.TS};
   });
   $("diagBus").innerHTML=rows;
