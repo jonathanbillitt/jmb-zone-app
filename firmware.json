@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "9a56b51-20260913",
-  "size": 1194464,
-  "crc32": "ec694d0c",
-  "sha256": "952de9872d0ae3a2e3b4dfc8f53dd8a2abff972979d14836f36b307d98e786d1",
+  "build": "73c5295-20260913",
+  "size": 1194240,
+  "crc32": "a41e3d72",
+  "sha256": "0a5cc63113cc66756e26dbfc5e2eb756fe89353273aacf6778fc88a101982de7",
   "date": "2026-09-13",
-  "notes": "Port health instrument (port fw 2.1) + error strip no longer blocks touches",
+  "notes": "Bus diag: port-health key LG -> GP (app parser eats L* as the label), PH flag says whether the port sent the counters, longest send / read pass timed (BSM/BRM), 5 s stats print gated",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",

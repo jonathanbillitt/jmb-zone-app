@@ -947,7 +947,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13q.clearprompt";
+const APP_VER="2026-09-13r.busmax";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -1399,7 +1399,7 @@ function onState(str){
       // A-F are valid key letters, so a greedy [A-Z]+ parsed "FA0" as key
       // "FA" and the LATCHED fault bit vanished from every badge (agent
       // review — safety-display bug).
-      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|TX|TO|EC|TS|OR|AT|LG|RL|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
+      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|TX|TO|EC|TS|OR|AT|GP|RL|PH|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
       if(mm) m[mm[1]] = mm[1]==="F" ? parseInt(mm[2],16) : +mm[2];
     }
     ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
@@ -2675,9 +2675,12 @@ function renderDiag(){
     // Port-side health (port fw ≥ 2.1): what the PORT saw. Reply latency is
     // the number entry A is waiting for — the port's own account of how late
     // it answers; loop gap says what stalled it; overruns / ADC timeouts say why.
-    if(m.OR!==undefined && (kv.DMX!==undefined))
+    if(m.OR!==undefined)
       rows+=`<tr><td colspan="8" class="mini" style="margin:0;padding:2px 4px 8px">port ${i+1} reports: `
-        +`overruns ${m.OR} · ADC timeouts ${m.AT} · loop gap ${m.LG} ms · reply latency ${m.RL} ms (5 s max)</td></tr>`;
+        +(m.PH===0
+          ? `port firmware 2.0 — no health counters (update the port module)`
+          : `overruns ${m.OR} · ADC timeouts ${m.AT} · loop gap ${m.GP} ms · reply latency ${m.RL} ms (5 s max)`)
+        +`</td></tr>`;
     window.__busPrev[i]={tx:+m.TX,rx:+m.RX,ce:+m.CE,to:+m.TO,ec:+m.EC,ts:+m.TS};
   });
   $("diagBus").innerHTML=rows;
@@ -2690,7 +2693,8 @@ function renderDiag(){
     const el=$("loopStat");
     el.textContent=`Loop: average ${avg.toFixed(1)} ms · longest ${mx} ms (${sec}) · ${n} stall${n===1?"":"s"} over 50 ms`
       +(kv.LPG!==undefined?` · longest push gap ${gap} ms`:"")+" (5 s window)"
-      +(kv.BRT!==undefined?` · Bus: slowest poll reply ${kv.BRT} ms · stray frames ${kv.BSY}`:"");
+      +(kv.BRT!==undefined?` · Bus: slowest poll reply ${kv.BRT} ms · stray frames ${kv.BSY}`:"")
+      +(kv.BSM!==undefined?` · longest send ${(+kv.BSM/10).toFixed(1)} ms · longest read pass ${(+kv.BRM/10).toFixed(1)} ms`:"");
     el.style.color=(mx>=50||n||avg>=15||gap>=40||+kv.BRT>=10||+kv.BSY>0)?"var(--warn)":"";
   }
   renderRdm();
