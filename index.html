@@ -413,6 +413,8 @@
     background:linear-gradient(90deg,#6a2cf5,#5fd7ff);
     transition:width .6s cubic-bezier(.2,.7,.2,1), background .6s; }
   .tbar i.hot{ background:linear-gradient(90deg,#d29922,#f85149); }
+  .row.fxtrim{ opacity:.42; transition:opacity .25s; }
+  .row.fxtrim:hover, .row.fxtrim:focus-within{ opacity:.8; }
   .spark{ display:block; width:100%; height:34px; margin-top:6px; }
   @media (prefers-reduced-motion: reduce){
     .tab, .card.faulted, .card.shake, .card.sweep::after, .jbars.indet .fill{ animation:none !important; }
@@ -946,7 +948,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13j.demo-models";
+const APP_VER="2026-09-13k.fixes";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -1127,7 +1129,10 @@ async function connect(){
     }
     $("title").textContent=devName()||"JMB Lighting";
     $("btnConnect").classList.add("hidden");
-    $("hello").classList.add("hidden");
+    // The connect screen STAYS under the PIN overlay so the intro (mark flies
+    // from the row under the splash) can run once the PIN is accepted — hiding
+    // it here skipped the intro on every real connection (user, 2026-09-13).
+    hello("<b>Connected.</b><div class='mini'>Unlocking…</div>");
     authed=false;
     askPin();
     autoPin();        // factory PIN, or this controller's remembered PIN
@@ -1152,7 +1157,7 @@ async function onDisconnected(){
       try{
         await sleep(800);
         await gattSetup();
-        $("hello").classList.add("hidden");
+        hello("<b>Reconnected.</b><div class='mini'>Unlocking…</div>");   // stays for the intro
         askPin();
         autoPin();
         return;
@@ -1507,6 +1512,10 @@ function renderControl(){
       if(xs) for(const o of xs.options) o.hidden = (cct||dim1) && !CCT_FX.has(+o.value);
     }
     setIf(p,"X",   el=>el.value=m.X??0);
+    // Effect running → the colour sliders are only trims on it: dull them so
+    // they read as secondary (user, 2026-09-13). Still usable.
+    { const fxOn=(m.X||0)>0;
+      for(const id of ["rowR","rowG","rowB"]){ const r=$(id+p); if(r) r.classList.toggle("fxtrim",fxOn); } }
     setIf(p,"PWM", el=>el.value=m.PW??0);
     setIf(p,"OCP", el=>el.value=((m.OC??6500)/1000).toFixed(2));
     setIf(p,"OT",  el=>el.value=m.OT??80);
@@ -1682,10 +1691,12 @@ function buildCard(p){
   for(const [id,field] of [["r","R"],["g","G"],["b","B"]]){
     d.querySelector("#"+id+p).addEventListener("input",e=>{
       $("v"+field+p).textContent=e.target.value;
-      const cur={R:+$("r"+p).value,G:+$("g"+p).value,B:+$("b"+p).value};
-      const [sr,sg,sb]=swatchRGB((ports[p-1]||{}).PE??0, cur.R, cur.G, cur.B);
-      $("sw"+p).style.background=`rgb(${sr},${sg},${sb})`;
       const m=ports[p-1]||{};
+      if(!((m.X||0)>0)){        // with an effect running the sliders are trims: the
+        const cur={R:+$("r"+p).value,G:+$("g"+p).value,B:+$("b"+p).value};   // live preview
+        const [sr,sg,sb]=swatchRGB(m.PE??0, cur.R, cur.G, cur.B);              // owns the swatch
+        $("sw"+p).style.background=`rgb(${sr},${sg},${sb})`;
+      }
       if((m.X||0)>0 && m.M!==1){
         // EFFECT TRIM: while an effect runs, the sliders MASK its channels
         // (all at full = untouched effect; pull one down to take that colour
@@ -2240,8 +2251,7 @@ function renderPortInfo(){
         <table>
           <tr><th>Patch</th><td class="num" id="pip${p}">—</td></tr>
           <tr><th>Current</th><td class="num"><span id="pic${p}">—</span>
-            <div class="tbar"><i id="picb${p}"></i></div>
-            <canvas class="spark" id="pis${p}" width="300" height="34" aria-hidden="true"></canvas></td></tr>
+            <div class="tbar"><i id="picb${p}"></i></div></td></tr>
           <tr><th>Temp</th><td class="num"><span id="pit${p}">—</span>
             <div class="tbar"><i id="pitb${p}"></i></div></td></tr>
           <tr><th>Source</th><td id="pisrc${p}">—</td></tr>
@@ -2265,9 +2275,7 @@ function renderPortInfo(){
     tb.style.width=T!=null?Math.max(0,Math.min(100,100*T/1000))+"%":"0";   // 0–100 °C scale
     tb.classList.toggle("hot", T!=null && T>0.9*ot);
     $("pisrc"+p).textContent=kv.DMX==="1"?"DMX":(m.X?FX_NAMES[m.X]:(m.M?"manual":"hold"));
-    const h=piHist[p]=piHist[p]||[];
-    if(ia!=null){ h.push(Math.max(0,ia)); if(h.length>60) h.shift(); }
-    drawSpark($("pis"+p), h, lim);
+    // (Sparkline removed 2026-09-13 — user: current must look the same as temp.)
   });
 }
 function drawSpark(cv,h,lim){
@@ -4309,7 +4317,10 @@ document.querySelectorAll(".tab .card").forEach(card=>{
     const open=notes[0].classList.contains("hidden");
     notes.forEach(n=>n.classList.toggle("hidden",!open));
     btn.classList.toggle("on",open);
-    btn.title=btn.getAttribute("aria-label")=open?"Hide notes":"Show notes"; };
+    // (was `btn.title=btn.getAttribute(...)=...` — assigning to a call result
+    // threw "Invalid left-hand side in assignment" on every tap; the toggle
+    // above had already happened so it looked like it worked. 2026-09-13.)
+    const t=open?"Hide notes":"Show notes"; btn.title=t; btn.setAttribute("aria-label",t); };
 });
 
 // If an update run dies, the single most useful fact is WHERE it died. Record
