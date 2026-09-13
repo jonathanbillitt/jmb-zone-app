@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "89aff17-20260911",
-  "size": 1194224,
-  "crc32": "afc85158",
-  "sha256": "76c585fc7a66bd5765fcfb614b654b5259ceccc4c42791b198e9f0b3ef99db6e",
-  "date": "2026-09-11",
-  "notes": "Bus: reply window 15 -> 40 ms (non-blocking wait makes it free; a late reply is delayed, not lost)",
+  "build": "cd5067f-20260913",
+  "size": 1194032,
+  "crc32": "58c80418",
+  "sha256": "a9a20d5d792922aadc9d21b59fd35f4ee9234cfaa8bbc100c7db50a778513c75",
+  "date": "2026-09-13",
+  "notes": "ANT_SEL is a phantom: TimoTwo pin 31 is \"do not connect\" \u2014 stop driving it, drop the antenna UI",
   "file": "firmware.bin"
 }
