@@ -389,13 +389,12 @@
   .tab{ animation:tabIn .26s cubic-bezier(.2,.7,.2,1); }
   @keyframes tabIn{ from{opacity:0; transform:translateX(var(--slide,0)) translateY(4px);}
                     to{opacity:1; transform:none;} }
-  .jbars{ display:block; width:100%; height:12px; margin-top:8px; }
-  .jbars svg{ display:block; width:100%; height:100%; }
-  .jbars .fill{ transform-box:fill-box; }
-  .jbars .fill rect{ transition:width .25s linear; }
-  .jbars.indet .fill{ animation:jsweep 1.3s cubic-bezier(.45,0,.55,1) infinite; }
-  .jbars.indet .fill rect{ transition:none; }
-  @keyframes jsweep{ 0%{transform:translateX(-40px);} 100%{transform:translateX(100px);} }
+  .pbar{ display:block; width:100%; height:14px; margin-top:8px; background:var(--card2);
+    border-radius:7px; overflow:hidden; }
+  .pbar i{ display:block; height:100%; width:0; border-radius:7px;
+    background:linear-gradient(90deg,#6a2cf5,#5fd7ff); transition:width .15s linear; }
+  .pbar.indet i{ width:38%; transition:none; animation:psweep 1.3s cubic-bezier(.45,0,.55,1) infinite; }
+  @keyframes psweep{ 0%{transform:translateX(-110%);} 100%{transform:translateX(270%);} }
   .card.faulted{ animation:faultPulse 1.6s ease-in-out infinite; }
   @keyframes faultPulse{
     0%,100%{ box-shadow:0 10px 26px rgba(0,0,0,.38), 0 0 0 1px rgba(248,81,73,.35); }
@@ -417,8 +416,8 @@
   .row.fxtrim input[type=range]{ pointer-events:none; }
   .spark{ display:block; width:100%; height:34px; margin-top:6px; }
   @media (prefers-reduced-motion: reduce){
-    .tab, .card.faulted, .card.shake, .card.sweep::after, .jbars.indet .fill{ animation:none !important; }
-    #navPill, .tbar i, .jbars .fill rect{ transition:none !important; } }
+    .tab, .card.faulted, .card.shake, .card.sweep::after, .pbar.indet i{ animation:none !important; }
+    #navPill, .tbar i, .pbar i{ transition:none !important; } }
 </style>
 </head>
 <body>
@@ -948,7 +947,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13n.portcards";
+const APP_VER="2026-09-13o.progressbar";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -2395,20 +2394,16 @@ const MOTION = !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduc
 
 // ---- JMB bars as progress: two bars filling purple left→right (f = 0..1),
 // or an indeterminate purple sweep (f = null). Used by OTA, RDM and connecting.
-function jbarsHTML(id){
-  return `<span class="jbars" id="${id}"><svg viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">`
-    +`<rect x="0" y="0" width="100" height="3.5" fill="rgba(230,237,243,.22)"/>`
-    +`<rect x="0" y="8.5" width="100" height="3.5" fill="rgba(230,237,243,.22)"/>`
-    +`<g class="fill"><rect x="0" y="0" width="0" height="3.5" fill="#8b34f7"/>`
-    +`<rect x="0" y="8.5" width="0" height="3.5" fill="#8b34f7"/></g></svg></span>`;
-}
+// Progress bar: the original single purple→cyan gradient bar (user preferred
+// it to the double bars, 2026-09-13), a little thicker. f = 0..1, or null for
+// an indeterminate sweep. Same element for OTA, RDM scan and connecting.
+function jbarsHTML(id){ return `<span class="pbar" id="${id}"><i></i></span>`; }
 function jbarsSet(el, f){
   if(!el) return;
-  const rects=el.querySelectorAll(".fill rect");
-  if(f==null){ el.classList.add("indet"); rects.forEach(r=>r.setAttribute("width","40")); return; }
+  const i=el.querySelector("i");
+  if(f==null){ el.classList.add("indet"); i.style.width=""; return; }
   el.classList.remove("indet");
-  const w=Math.round(Math.max(0,Math.min(1,f))*100);
-  rects.forEach(r=>r.setAttribute("width",String(w)));
+  i.style.width=Math.round(Math.max(0,Math.min(1,f))*100)+"%";
 }
 
 // ---- Fault choreography: a port that trips shakes once and pulses red until
