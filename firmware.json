@@ -5,12 +5,12 @@
   "crc32": "a41e3d72",
   "sha256": "0a5cc63113cc66756e26dbfc5e2eb756fe89353273aacf6778fc88a101982de7",
   "date": "2026-09-13",
-  "notes": "Bus diag: port-health key LG -> GP (app parser eats L* as the label), PH flag says whether the port sent the counters, longest send / read pass timed (BSM/BRM), 5 s stats print gated",
+  "notes": "Port fw 2.2: adc_wait cap 9 ms -> 150 us + which-flag mask \u2014 the port's 25-28 ms loop stall (entry A cause found); entry C proven",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
-    "size": 17388,
-    "crc32": "f7a89ddb",
-    "sha256": "76bf3f63546e75a107910ab3ca4f6f8a64955dc2f04cbdd1733ae3d5bfa2fc82"
+    "size": 17436,
+    "crc32": "e587c1f6",
+    "sha256": "b20e3ccf820091b078192c635854dab2bd7d5dce76aa94d1352e1e1760000305"
   }
 }
