@@ -388,7 +388,7 @@
 <main>
   <div id="hello" class="card">
     <b>Not connected.</b>
-    <div class="mini">Tap Connect and pick your controller (“JMB one #ID-XXXX”).
+    <div class="mini">Tap Connect and pick your controller (“JMB Zone #ID-XXXX”).
     Chrome/Edge only — on iPhone use the Bluefy browser. Bluetooth on.</div>
     <div class="ctlrow" style="margin-top:10px">
       <button id="btnDemo">Explore in demo mode</button>
@@ -768,7 +768,7 @@
       <div class="row"><label>Model</label>
         <select id="setVariant" style="width:150px">
           <option value="">auto-detect</option>
-          <option value="1">JMB one (1 port)</option>
+          <option value="1">JMB Zone (1 port)</option>
           <option value="4">JMB 4our (4 ports)</option>
           <option value="8">JMB 8ight (8 ports)</option>
         </select>
@@ -776,11 +776,11 @@
       </div>
       <div class="mini">Controllers detect their port count on the bus, but
       detection only ever counts <em>up</em> — a unit that boots believing it is
-      bigger than it is (or a screenless <b>JMB one</b>, which has no panel to
+      bigger than it is (or a screenless <b>JMB Zone</b>, which has no panel to
       set it from) needs pinning here once. The controller restarts.</div>
       <div class="row"><label>BT name</label>
         <input type="text" id="setBtName" maxlength="24" style="flex:1"
-               placeholder="JMB one" autocomplete="off">
+               placeholder="JMB Zone" autocomplete="off">
         <button id="btNameApply">Set</button>
       </div>
       <div class="mini">The Bluetooth name is what you see when connecting.
@@ -888,7 +888,22 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13b.antenna-back";
+const APP_VER="2026-09-13c.zone";
+// On-device error surfacing (2026-09-13): browsers without a console (Bluefy
+// on iOS) hide script errors completely — a failed handler just "does
+// nothing". Any uncaught error or rejected promise is printed into a strip at
+// the bottom of the page so it can be read on the phone.
+function showJsErr(m){
+  try{
+    let d=document.getElementById("jsErr");
+    if(!d){ d=document.createElement("div"); d.id="jsErr";
+      d.style.cssText="position:fixed;left:8px;right:8px;bottom:72px;z-index:9999;background:#3a1215;color:#ffb4b4;font:12px/1.4 monospace;padding:8px 10px;border-radius:8px;white-space:pre-wrap;max-height:40vh;overflow:auto";
+      (document.body||document.documentElement).appendChild(d); }
+    d.textContent+=m+"\n";
+  }catch(_){}
+}
+window.addEventListener("error",e=>showJsErr((e.message||"error")+" @"+String(e.filename||"").split("/").pop()+":"+(e.lineno||"?")));
+window.addEventListener("unhandledrejection",e=>showJsErr("promise: "+((e.reason&&e.reason.message)||e.reason)));
 // Firmware loop-stall sections (jmb_loopstat.h LP_SEC_*), by index. Append only.
 const LOOP_SECS=["mcp","ble","dmx","net","misc","out","bus","recon","ind","nvs","ui","ota"];
 // Register the service worker so the app works offline once installed to the
@@ -2132,7 +2147,8 @@ function renderPortInfo(){
 // The controller tells us how many ports it has, so the header names itself:
 // zONe / 4OUr / 8IGHt. Drawn as geometry, so there is no font to load.
 const PROD_MARKS = {
-  1: '<svg viewBox="0 0 274 164" preserveAspectRatio="xMidYMid meet" aria-hidden="true" style="height:44px;width:auto;display:block;vertical-align:middle"><rect x="0" y="0" width="274" height="24" fill="#8b34f7"/><rect x="0" y="140" width="274" height="24" fill="#8b34f7"/><g transform="translate(0,34) scale(1)" fill="none" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter"><g transform="translate(0,0)" stroke="currentColor"><circle cx="48" cy="48" r="40"/></g><g transform="translate(98,0)" stroke="currentColor"><path d="M8 0 V96"/><path d="M8 40 A32 32 0 0 1 72 40"/><path d="M72 40 V96"/></g><g transform="translate(180,0)" stroke="currentColor"><path d="M12.84 70.37 L79.16 25.63"/><path d="M79.16 25.63 A40 40 0 1 0 84.04 60.36"/><circle cx="12.84" cy="70.37" r="8" fill="currentColor" stroke="none"/><circle cx="79.16" cy="25.63" r="8" fill="currentColor" stroke="none"/><polygon points="91.65,62.83 76.43,57.89 76.43,62.83" fill="currentColor" stroke="none"/></g></g></svg>',
+  // 1-port = Zone (styled zOne), docs/brand/zone_wordmark.py app_mark("zone", px=44), bars #8b34f7
+  1: '<svg viewBox="0 0 348 164" preserveAspectRatio="xMidYMid meet" aria-hidden="true" style="height:44px;width:auto;display:block;vertical-align:middle"><rect x="0" y="0" width="348" height="24" fill="#8b34f7"/><rect x="0" y="140" width="348" height="24" fill="#8b34f7"/><g transform="translate(0,34) scale(1)" fill="none" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter"><g transform="translate(0,0)" stroke="currentColor"><polygon points="0.00,0.00 64.00,0.00 64.00,16.00 22.63,80.00 64.00,80.00 64.00,96.00 0.00,96.00 0.00,80.00 41.37,16.00 0.00,16.00" fill="currentColor" stroke="none"/></g><g transform="translate(66,0)" stroke="currentColor"><circle cx="52" cy="48" r="44"/></g><g transform="translate(172,0)" stroke="currentColor"><path d="M8 0 V96"/><path d="M8 40 A32 32 0 0 1 72 40"/><path d="M72 40 V96"/></g><g transform="translate(254,0)" stroke="currentColor"><path d="M12.84 70.37 L79.16 25.63"/><path d="M79.16 25.63 A40 40 0 1 0 84.04 60.36"/><circle cx="12.84" cy="70.37" r="8" fill="currentColor" stroke="none"/><circle cx="79.16" cy="25.63" r="8" fill="currentColor" stroke="none"/><polygon points="91.65,62.83 76.43,57.89 76.43,62.83" fill="currentColor" stroke="none"/></g></g></svg>',
   4: '<svg viewBox="0 0 318 164" preserveAspectRatio="xMidYMid meet" aria-hidden="true" style="height:44px;width:auto;display:block;vertical-align:middle"><rect x="0" y="0" width="318" height="24" fill="#8b34f7"/><rect x="0" y="140" width="318" height="24" fill="#8b34f7"/><g transform="translate(0,34) scale(1)" fill="none" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter"><g transform="translate(0,0)" stroke="currentColor"><rect x="12" y="0" width="16" height="96" fill="currentColor" stroke="none"/><polygon points="20,0 29.67,0 56.60,39.50 37.26,39.50 13.40,4.50" fill="currentColor" stroke="none"/><path d="M0 64 H72"/></g><g transform="translate(74,0)" stroke="currentColor"><circle cx="48" cy="48" r="40"/></g><g transform="translate(172,0)" stroke="currentColor"><path d="M8 0 V56"/><path d="M8 56 A32 32 0 0 0 72 56"/><path d="M72 0 V96"/></g><g transform="translate(254,0)" stroke="currentColor"><path d="M8 0 V96"/><path d="M8 48 A40 40 0 0 1 59.69 9.75"/></g></g></svg>',
   8: '<svg viewBox="0 0 280 164" preserveAspectRatio="xMidYMid meet" aria-hidden="true" style="height:44px;width:auto;display:block;vertical-align:middle"><mask id="desc-am-eight" maskUnits="userSpaceOnUse" x="0" y="140" width="280" height="24"><rect x="0" y="140" width="280" height="24" fill="white"/><g transform="translate(88,34) scale(1)" fill="none" stroke="black" stroke-width="32" stroke-linecap="square" stroke-linejoin="miter"><path d="M64 60 V82 L22 116"/></g></mask><rect x="0" y="0" width="280" height="24" fill="#8b34f7"/><rect x="0" y="140" width="280" height="24" fill="#8b34f7" mask="url(#desc-am-eight)"/><g transform="translate(0,34) scale(1)" fill="none" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter"><g transform="translate(0,0)" stroke="currentColor"><circle cx="32" cy="24" r="16"/><path d="M52.78 52.00 A24 24 0 1 1 32 40"/></g><g transform="translate(60,0)" stroke="currentColor"><path d="M16 24 V96"/><rect x="6" y="1" width="20" height="20" fill="currentColor" stroke="none"/></g><g transform="translate(88,0)" stroke="currentColor"><circle cx="36" cy="60" r="28"/><path d="M64 60 V82 L22 116"/></g><g transform="translate(164,0)" stroke="currentColor"><path d="M8 0 V96"/><path d="M8 60 A28 28 0 0 1 64 60 V96"/></g><g transform="translate(224,0)" stroke="currentColor"><path d="M28 4 V78 A18 18 0 0 0 52 94"/><path d="M8 24 H48"/></g></g></svg>'
 };
@@ -2728,7 +2744,7 @@ $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.val
 $("btnVariant").onclick=async()=>{
   const v=$("setVariant").value;
   if(!v){ tellUser("Pick a model first, then tap Set.",{title:"Model"}); return; }
-  const names={1:"JMB one",4:"JMB 4our",8:"JMB 8ight"};
+  const names={1:"JMB Zone",4:"JMB 4our",8:"JMB 8ight"};
   if(!await askConfirm(`This controller will be set to ${names[v]} and restart.`,
                        {title:"Set model?",ok:"Set and restart"})) return;
   setupTouched=Date.now();
@@ -3066,7 +3082,7 @@ $("btnExport").onclick=()=>{
   a.href=URL.createObjectURL(blob);
   {
     const n=+(kv.VAR ?? kv.PORTS ?? 0);
-    const prod=n===1?"one":n===8?"8ight":"4our";
+    const prod=n===1?"zone":n===8?"8ight":"4our";
     // Local date + HHMM so same-day exports stay distinct and sort in order.
     const d=new Date(), p2=x=>String(x).padStart(2,"0");
     const ds=`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}`;
@@ -3623,7 +3639,7 @@ function demoUnivMM(){
 }
 const DEMO_DEVS=[
   {u:"4C50000123AB",a:1,fp:8,pe:2,pt:6,sn:1,md:"LED PAR QUAD",lb:"Stage L Par",mf:"LiteCo"},
-  {u:"4A4D00C0FFEE",a:101,fp:10,pe:5,pt:5,sn:8,md:"JMB one",lb:"Booth strip",mf:"JMB Lighting"},
+  {u:"4A4D00C0FFEE",a:101,fp:10,pe:5,pt:5,sn:8,md:"JMB Zone",lb:"Booth strip",mf:"JMB Lighting"},
   {u:"48590000BEEF",a:200,fp:3,pe:1,pt:2,sn:2,md:"Hazer 900",lb:"",mf:"HazeWorks"}];
 function demoDevRow(d){
   onState(`JMBR;DEV;U=${d.u};A=${d.a};FP=${d.fp};PE=${d.pe};PT=${d.pt};SN=${d.sn};`+

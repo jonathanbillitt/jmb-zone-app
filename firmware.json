@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "639a2aa-20260913",
+  "build": "4538000-20260913",
   "size": 1194224,
-  "crc32": "8c9319f1",
-  "sha256": "36298b893c4c16bc8664ee0c6bcc8b56bef25ff314b7b3e7e27542ca670df200",
+  "crc32": "646d9e5f",
+  "sha256": "db527e22a9fa78ae6889835f762e3d7337b621d9ad5e619ec1abcbd16e2698e0",
   "date": "2026-09-13",
-  "notes": "ANT_SEL correction: the fitted module is the original TiMo RX, pin 31 IS antenna select \u2014 keep it",
+  "notes": "Zone: the 1-port model is \"JMB Zone\" \u2014 wordmark, app, website, BLE name; on-device JS error strip",
   "file": "firmware.bin"
 }
