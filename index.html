@@ -948,7 +948,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13m.fxlock";
+const APP_VER="2026-09-13n.portcards";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -1137,6 +1137,13 @@ async function connect(){
     // from the row under the splash) can run once the PIN is accepted — hiding
     // it here skipped the intro on every real connection (user, 2026-09-13).
     hello("<b>Connected.</b><div class='mini'>Unlocking…</div>");
+    // A real link supersedes the demo entirely: stop its seeder and drop its
+    // ports so the controller's own count builds the cards from scratch.
+    if(typeof demoOn!=="undefined" && demoOn){
+      demoOn=false; clearInterval(demoTimer); demoTimer=null; clearInterval(demoFlkTimer);
+      $("demoBar").classList.add("hidden");
+      ports.length=0; prunePortCards(); $("ports").innerHTML=""; $("portInfo").innerHTML="";
+    }
     authed=false;
     askPin();
     autoPin();        // factory PIN, or this controller's remembered PIN
@@ -1169,7 +1176,7 @@ async function onDisconnected(){
     }
     $("btnConnect").classList.remove("hidden");
     hello("<b>Disconnected.</b><div class='mini'>Tap Connect to rejoin.</div>");
-    $("ports").innerHTML="";
+    $("ports").innerHTML=""; $("portInfo").innerHTML=""; ports.length=0; prunePortCards();
   }finally{ busy=false; }
 }
 // SERIALIZED write queue (agent review): Android allows ONE in-flight GATT
@@ -1541,6 +1548,7 @@ function renderControl(){
       sw.style.boxShadow=(cr+cg+cb>40)?`0 0 14px rgba(${cr},${cg},${cb},.55)`:"none";
     }
   });
+  prunePortCards();
   fxPreviewKick();
   // Overlap indicator: an address whose footprint collides with another
   // port's (at a DIFFERENT start) gets an amber outline on its field — a
@@ -2283,6 +2291,19 @@ function renderPortInfo(){
     $("pisrc"+p).textContent=kv.DMX==="1"?"DMX":(m.X?FX_NAMES[m.X]:(m.M?"manual":"hold"));
     // (Sparkline removed 2026-09-13 — user: current must look the same as temp.)
   });
+  prunePortCards();
+}
+// Any card beyond the live port count goes — whatever route left it there
+// (demo → real connect, model switch, reconnect to a smaller unit). Bench
+// 2026-09-13: Ports tab showed four cards while connected to a Zone.
+function prunePortCards(){
+  const n=ports.length;
+  for(let i=n+1;i<=8;i++){
+    const c1=$("port"+i), c2=$("pi"+i);
+    if(c1) c1.remove(); if(c2) c2.remove();
+    delete wheels[i+".D"]; delete wheels[i+".S"];
+    delete faultPrev[i]; delete faultPrev["pi"+i]; delete fxSt[i]; delete swOwned[i];
+  }
 }
 function drawSpark(cv,h,lim){
   if(!cv) return;
