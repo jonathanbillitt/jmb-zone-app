@@ -947,7 +947,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-13r.busmax";
+const APP_VER="2026-09-13s.cleararm";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -1474,7 +1474,9 @@ function renderControl(){
     // Blue (the app's primary) only while there is something to clear — any
     // port with an effect on, the dimmer up, a colour pulled in or the speed
     // moved; once the rig is already at the cleared state it goes neutral.
-    const dirty=ports.some(m=>(m.X||0)>0 || (+(m.D??0))>0 || (m.R??100)<100 || (m.G??100)<100 || (m.B??100)<100 || (+(m.S??128))!==128);
+    // (Speed deliberately not counted: "50 %" reports as 127, and it means
+    // nothing with no effect running — it kept the button armed forever.)
+    const dirty=ports.some(m=>(m.X||0)>0 || (+(m.D??0))>0 || (m.R??100)<100 || (m.G??100)<100 || (m.B??100)<100);
     bp.classList.toggle("primary",dirty); bp.classList.remove("danger"); }
   const root=$("ports");
   ports.forEach((m,idx)=>{
