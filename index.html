@@ -803,12 +803,15 @@
       </div>
       <div class="ctlrow">
         <button id="btnOtaHosted" class="primary" disabled>Update Firmware</button>
-        <button id="btnOtaCtrlOnly" disabled>Controller only</button>
+        <button id="btnOtaCtrlOnly" class="devonly" disabled>Controller only</button>
         <button id="btnOtaCancel" class="danger hidden">Cancel</button>
       </div>
       <div class="mini" id="otaHosted">Checking for the latest firmware…</div>
-      <div class="mini">Controller only skips the port module step. Use it if the link
-        drops during the port module; update the port module afterwards.</div>
+      <div class="mini">Update Firmware installs whichever of the controller and the
+        port module has a newer image; a port module already on the published image
+        is left alone.</div>
+      <div class="mini devonly">Controller only (Developer) skips a pending port module
+        step. Use it if the link drops during the port module; update the port module afterwards.</div>
       <div class="ctlrow" id="otaRbRow" style="margin-top:8px">
         <button id="btnOtaRollback" class="danger" disabled>Roll back</button>
       </div>
@@ -1016,7 +1019,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-14g.otafix";
+const APP_VER="2026-09-14h.otaport";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -3837,9 +3840,8 @@ function renderOta(){
     }else{
       const running=kv.FWB||"";
       const same=running && running===otaManifest.build;
-      // "Already installed" refers to the CONTROLLER build. The port module is
-      // re-flashed regardless, so the button stays live either way — it just
-      // says what the run will actually do.
+      // The button says what the run will actually do: controller, port
+      // module, or both — each only when its published image differs.
       const avail = otaUpdateAvailable();
       hb.disabled = !ok || otaBusy || !avail;
       hb.textContent = !avail ? "Firmware up to date"
@@ -3847,7 +3849,7 @@ function renderOta(){
       // Controller-only is only meaningful when the full run would include
       // the port module; otherwise the two buttons would do the same thing.
       const cb=$("btnOtaCtrlOnly");
-      if(cb){ const portStep = !!(otaManifest.stm_port && (stmCaps()&1));
+      if(cb){ const portStep = !!(otaManifest.stm_port && (stmCaps()&1) && portUpdateAvailable());
               cb.hidden = !portStep; cb.disabled = hb.disabled; }
       hm.textContent = !ok
         ? "Available: "+otaManifest.version+" · build "+otaManifest.build
@@ -4081,7 +4083,10 @@ async function runFullUpdate(ctrlOnly){
   // whose STM FLASH blocks the BLE callback drops the link before the fixed
   // firmware can be installed. The combined run would die at the port step
   // every time, so the fix could never arrive through the path it fixes.
-  const stmInfo = (!ctrlOnly && (stmCaps()&1) && otaManifest.stm_port)
+  // The port step runs only when the published port image differs from the
+  // one the controller last flashed (SPC) — a controller-only build no longer
+  // drags every port through a reflash (user, 2026-09-14).
+  const stmInfo = (!ctrlOnly && (stmCaps()&1) && otaManifest.stm_port && portUpdateAvailable())
                 ? otaManifest.stm_port : null;
   const both = !!stmInfo;
   if(!await askConfirm(
