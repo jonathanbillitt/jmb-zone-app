@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "13c12bb-20260914",
-  "size": 1197024,
-  "crc32": "2331f7fe",
-  "sha256": "f11ff7298d59332557cf21bdc3dc3447dfcd8ee9090ab1869229239ce3199491",
+  "build": "1fae2d2-20260914",
+  "size": 1197104,
+  "crc32": "16731ccf",
+  "sha256": "6d723df436221b658fb27dd1218f8778fd9f3ccfce6af1641728adc2fcf42f7a",
   "date": "2026-09-14",
-  "notes": "OCP ceiling 6.75 A on 5 mOhm boards (jmb_ocp_cap_ma), 6.5 A stays on 10 mOhm",
+  "notes": "RDM scan: every session end notifies PH=OFF with why; the 3-minute idle watchdog now reaches the app",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",

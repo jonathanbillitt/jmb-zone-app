@@ -598,7 +598,8 @@
       </div>
       <div class="mini" id="rdmPhase" data-help>Discover and edit every RDM fixture on the
         thru line — address, personality, label, identify and sensors, like a
-        RDM tester. Scanning takes over the output line while active.</div>
+        RDM tester. Scanning takes over the output line while active; the
+        controller hands it back after 3 minutes without a command.</div>
       <div id="rdmDevs"></div>
     </div>
 
@@ -1019,7 +1020,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-14i.ocp675";
+const APP_VER="2026-09-14j.rdmidle";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -3055,7 +3056,12 @@ function onRdm(str){
     rdmPhaseTxt = f.PH==="SCAN" ? `discovering… ${f.N||0} found`
       : f.PH==="INFO" ? `reading devices… ${f.I||0}/${f.N||0}`
       : f.PH==="READY" ? `${f.N||0} device${f.N==="1"?"":"s"} on the line`
+      // W: why it ended — 1 = the controller's 3-minute idle watchdog released
+      // the line (a scan left open no longer holds the rig).
+      : f.PH==="OFF" ? (f.W==="1" ? "stopped — idle for 3 minutes, thru released"
+                       : f.W==="2" ? "" : "stopped — thru released")
       : "";
+    if(f.PH==="OFF") rdmPend=null;
   }else if(tag==="DEV"){
     if(!/^[0-9A-Fa-f]{1,16}$/.test(f.U||"")) return;   // wire data, not trusted
     const d={uid:f.U, addr:+f.A||0, fp:+f.FP||0, pe:+f.PE||0, pt:+f.PT||0,
