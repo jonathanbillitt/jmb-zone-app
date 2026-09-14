@@ -189,11 +189,16 @@
   nav button .ico { display:block; font-size:17px; margin-bottom:1px; }
   /* PIN box sits in the TOP part of the screen, not centred — a centred box
      lands under the phone's number pad and needs a scroll to reach Unlock. */
-  #overlay, #cfOv { position:fixed; inset:0; background:rgba(5,8,12,.82); display:flex;
+  #overlay, #cfOv, #btOv { position:fixed; inset:0; background:rgba(5,8,12,.82); display:flex;
              align-items:flex-start; justify-content:center; z-index:10;
              padding-top:max(24px,6vh); overflow-y:auto; }
   #cfOv { z-index:12; }
-  #overlay .box, #cfOv .box { background:var(--card); border:1px solid var(--line);
+  #btOv { z-index:11; }
+  #btOv .box button { width:100%; margin-top:8px; padding:12px; }
+  #btOv .kn { text-align:left; margin-top:4px; }
+  #btOv .kn code { color:var(--acc); font-size:12px; }
+  .sig { cursor:pointer; }
+  #overlay .box, #cfOv .box, #btOv .box { background:var(--card); border:1px solid var(--line);
                   border-radius:16px; padding:26px; width:min(340px,90vw);
                   text-align:center; }
   #overlay input { width:100%; margin:14px 0; padding:11px; font-size:18px;
@@ -892,6 +897,13 @@
           <button id="btnCalReset" style="padding-left:8px;padding-right:8px">Reset</button>
         </div>
         <div class="mini" id="calLine"></div>
+        <div class="row" style="margin-top:6px">
+          <input type="number" id="calAmb" min="-10" max="60" step="0.1" placeholder="ambient °C" style="width:100px">
+          <button id="btnCalTemp">Calibrate temperature</button>
+        </div>
+        <div class="mini" id="calTempLine">With the unit powered but dark and at room temperature
+          for a while, enter the true ambient. Outputs hold dark for 2.5 s, then every port's
+          offset is captured; a port more than 10 °C out is flagged, not stored.</div>
         <div class="row"><label>Command</label>
           <input type="text" id="devCmd" placeholder="raw command, e.g. P1.CALCUR=0" style="flex:1" autocomplete="off">
           <button id="devSend">Send</button>
@@ -942,6 +954,19 @@
     <button id="cfNo" style="flex:1">Cancel</button>
     <button id="cfYes" class="primary" style="flex:1">OK</button>
   </div>
+</div></div>
+
+<!-- Connection sheet: tapping the Bluetooth mark in the header (user, 2026-09-14).
+     Which unit this is, how strong the link is, and the ways out of it. -->
+<div id="btOv" class="hidden"><div class="box">
+  <b id="btTitle"></b>
+  <div class="mini" id="btMsg" style="white-space:pre-line;margin-top:6px"></div>
+  <div id="btKnown" class="mini" style="margin-top:8px"></div>
+  <button id="btIdent">Flash to find</button>
+  <button id="btSwitch">Connect to another controller</button>
+  <button id="btDisc" class="danger">Disconnect</button>
+  <button id="btDemoExit" class="danger hidden">Exit demo</button>
+  <button id="btClose">Close</button>
 </div></div>
 
 <div id="overlay" class="hidden">
@@ -1003,7 +1028,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-14e.devmode";
+const APP_VER="2026-09-14f.btsheet";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -1480,7 +1505,7 @@ function onState(str){
       // A-F are valid key letters, so a greedy [A-Z]+ parsed "FA0" as key
       // "FA" and the LATCHED fault bit vanished from every badge (agent
       // review — safety-display bug).
-      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|TX|TO|EC|TS|OR|AT|GP|RL|PH|PF|KA|KB|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
+      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|TX|TO|EC|TS|OR|AT|GP|RL|PH|PF|KA|KB|TC|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
       if(mm) m[mm[1]] = mm[1]==="F" ? parseInt(mm[2],16) : +mm[2];
     }
     ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
@@ -3308,6 +3333,12 @@ function renderSetup(){
     const sel=+cp.value||1, pm=ports[sel-1]||{};
     $("calLine").textContent=`P${sel} reads ${pm.IA!=null?(pm.IA/1000).toFixed(3)+" A":"—"} · gain A ${pm.KA?(pm.KA/1000).toFixed(3):"1.000"} · B ${pm.KB?(pm.KB/1000).toFixed(3):"1.000"}. `
       +`Drive a steady load of 0.25 A or more, read the true current on a meter, enter it in mA, Calibrate.`;
+    // Temperature: stored offset per port + the last cal's verdict (TCR).
+    const TCRW={0:"offline",1:"OK",2:"temp fault (>10 °C out — not stored)",3:"current fault (load present)"};
+    const tcr=kv.TCR?kv.TCR.split(","):null;
+    const offs=ports.map((m,i)=>`P${i+1} ${m.T!=null?(m.T/10).toFixed(1)+" °C":"—"}${m.TC?` (offset ${(m.TC/10>0?"+":"")+(m.TC/10).toFixed(1)})`:""}${tcr&&tcr[i]!=null?` · last cal: ${TCRW[+tcr[i]]??tcr[i]}`:""}`).join(" · ");
+    const tl=$("calTempLine");
+    if(ports.length) tl.textContent=offs+". With the unit powered but dark and at room temperature for a while, enter the true ambient, Calibrate temperature. Outputs hold dark for 2.5 s; a port more than 10 °C out is flagged, not stored.";
   }
   {
     const n=kv.VAR??kv.PORTS;
@@ -3338,6 +3369,12 @@ $("btnCal").onclick=()=>{
   send(`P${p}.CALCUR=${ma}`);
 };
 $("btnCalReset").onclick=()=>{ const p=+$("calPort").value||1; send(`P${p}.CALCUR=0`); };
+$("btnCalTemp").onclick=async()=>{
+  const a=+$("calAmb").value;
+  if(!(a>=-10&&a<=60)||$("calAmb").value===""){ tellUser("Enter the true ambient temperature in °C (−10 to 60).",{title:"Calibrate temperature"}); return; }
+  if(!await askConfirm(`Ambient ${a.toFixed(1)} °C. Every port goes dark for 2.5 s, then its temperature offset is captured against this.`,{title:"Calibrate temperature?",ok:"Calibrate"})) return;
+  send("TEMPCAL="+Math.round(a*10));
+};
 $("devSend").onclick=()=>{ const s=$("devCmd").value.trim(); if(s){ send(s); $("devCmd").value=""; } };
 $("devCmd").addEventListener("keydown",e=>{ if(e.key==="Enter") $("devSend").click(); });
 $("btnVariant").onclick=async()=>{
@@ -4198,6 +4235,37 @@ $("btnConnect").onclick=()=>{
     clearInterval(demoFlkTimer); ports=[]; kv={};
     $("demoBar").classList.add("hidden"); }
   connect();
+};
+// ---------- Connection sheet (tap the Bluetooth mark in the header) ----------
+function openBtSheet(){
+  const n=+(kv.VAR??kv.PORTS??0), cn=hexDec(kv.CN);
+  const raw=kv.BRS!=null?+kv.BRS:null;
+  const word=raw==null||raw===0?"measuring":raw>-60?"excellent":raw>-70?"good":raw>-80?"fair":"weak";
+  $("btTitle").textContent=demoOn?"Demo controller":(cn||devName()||"Controller");
+  $("btMsg").textContent=demoOn
+    ? `Example data — nothing you do here reaches a controller.`
+    : `${devName()||"—"}${n?` · ${n}-port`:""}\nSignal ${word}${raw?` (${raw} dBm)`:""}${kv.FW?` · firmware ${kv.FW}`:""}`;
+  const k=loadKnown().filter(e=>e.ble!==devName());
+  $("btKnown").innerHTML=k.length?"<b>Also known to this phone</b>"+k.map(e=>
+    `<div class="kn"><code>${esc(e.ble)}</code> ${esc(e.cn||"(unnamed)")}${e.n?` · ${e.n}-port`:""}</div>`).join(""):"";
+  $("btIdent").classList.toggle("hidden",demoOn);
+  $("btDisc").classList.toggle("hidden",demoOn);
+  $("btDemoExit").classList.toggle("hidden",!demoOn);
+  $("btOv").classList.remove("hidden");
+}
+function closeBtSheet(){ $("btOv").classList.add("hidden"); }
+$("sigWrap").onclick=openBtSheet;
+$("btClose").onclick=closeBtSheet;
+$("btOv").onclick=e=>{ if(e.target===$("btOv")) closeBtSheet(); };
+$("btIdent").onclick=()=>{ send("IDENT"); closeBtSheet(); };
+$("btDisc").onclick=()=>{ closeBtSheet(); $("btnDisc").click(); };
+$("btDemoExit").onclick=()=>{ closeBtSheet(); $("btnDemoExit").click(); };
+$("btSwitch").onclick=()=>{
+  closeBtSheet();
+  if(demoOn){ $("btnConnect").click(); return; }
+  // Drop this link first; the chooser opens once the controller is gone.
+  $("btnDisc").click();
+  setTimeout(()=>connect(),400);
 };
 // ---------- DEMO MODE ----------
 // Browse the whole app with example data and no hardware: store reviewers and

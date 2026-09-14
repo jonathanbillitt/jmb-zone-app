@@ -1,16 +1,16 @@
 {
   "version": "2.0.0",
-  "build": "8f3d143-20260914",
-  "size": 1195968,
-  "crc32": "fab02771",
-  "sha256": "1d700c2c9e695e68728eec1722ad10c86537437410d3c5bc90a14f2e7f9536eb",
+  "build": "b0e548f-20260914",
+  "size": 1196464,
+  "crc32": "64c53ae9",
+  "sha256": "64971836f69a20aab704dc27689687b06bafea2b90392651cb0091a20fe908b9",
   "date": "2026-09-14",
-  "notes": "App: Cal current row on one line at phone width (no label, compact fields)",
+  "notes": "Connection sheet on the Bluetooth mark; app-driven temperature sensor cal; port fw 2.6 NTC timeout fix",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
-    "size": 18076,
-    "crc32": "0676a875",
-    "sha256": "ee0393577f4536aa205607b1b375a8cc8d182225399121ee65e5ffc85b892619"
+    "size": 18132,
+    "crc32": "0c20ec5f",
+    "sha256": "f5d9567c5d4be7b60f6a48cf132157d75bde81ce8ba7a94a40007f45f4c85e3d"
   }
 }
