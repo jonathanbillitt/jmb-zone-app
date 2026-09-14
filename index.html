@@ -161,6 +161,13 @@
                  transition:.15s; }
   .toggle input:checked + span { background:#123a5e; border-color:var(--acc); }
   .toggle input:checked + span::after { left:22px; background:var(--acc); }
+  .toggle.sm { width:34px; height:19px; }
+  .toggle.sm span::after { width:13px; height:13px; }
+  .toggle.sm input:checked + span::after { left:17px; }
+  /* Developer mode: bench/test detail (bus counters, loop timing, module lines,
+     crash marker, shunt + current calibration, raw commands) sits behind
+     Setup → Developer (user, 2026-09-14). Latched per phone. */
+  body:not(.dev) .devonly { display:none !important; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
   th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
   th { color:var(--dim); font-weight:500; font-size:12px; }
@@ -358,7 +365,7 @@
   /* No scroll lock: a lock plus a page even slightly too tall trapped the
      card's top under the header on the S21 (2026-09-13). Size to fit instead. */
   #connectSplash img{ width:min(112vw,560px); height:auto; display:block;
-    max-height:calc(100vh - 440px); max-height:calc(100dvh - 440px); max-width:none;
+    max-height:calc(100vh - 480px); max-height:calc(100dvh - 480px); max-width:none;
     -webkit-mask-image:
       linear-gradient(to right, transparent 0, #000 10%, #000 90%, transparent 100%),
       linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%);
@@ -368,6 +375,11 @@
       linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%);
     mask-composite: intersect; }
   #hello.hidden ~ #connectSplash{ display:none; }
+  #hello.hidden ~ #knownList{ display:none !important; }
+  #knownList{ margin-top:0; padding:10px 14px; }
+  #knownList b{ color:var(--text); font-weight:600; }
+  #knownList .kn{ display:flex; gap:8px; align-items:baseline; margin-top:3px; }
+  #knownList .kn code{ color:var(--acc); font-size:12px; }
   /* The three product wordmarks under the splash on the connect screen
      (2026-09-13). Same PROD_MARKS geometry as the header; letters in the
      page's light ink, bars purple. Wraps on narrow phones. */
@@ -466,6 +478,10 @@
     Nothing you tap is sent anywhere.</div>
   </div>
 
+  <!-- Controllers this phone has connected to before: Bluetooth name (what the
+       pairing list shows) against the controller's own name, so you know which
+       box you are about to join (user, 2026-09-14). -->
+  <div id="knownList" class="card mini hidden"></div>
   <div id="connectSplash"><img src="jmb-splash.png" alt="JMB Lighting"></div>
   <div id="connectMarks" aria-label="JMB Zone, 4our and 8ight"></div>
 
@@ -592,7 +608,7 @@
       <div id="rdmDevs"></div>
     </div>
 
-    <div class="card">
+    <div class="card devonly">
       <b>Port bus</b>
       <table id="diagBus"></table>
       <div class="mini" id="loopStat"></div>
@@ -685,7 +701,7 @@
         <label style="font-weight:600">CRMX Wireless</label>
         <span class="mini" id="crmxStatus" style="margin:0">&#8212;</span>
       </div>
-      <div class="row"><span class="mini" id="crmxRaw" style="margin:0;flex:1"></span></div>
+      <div class="row devonly"><span class="mini" id="crmxRaw" style="margin:0;flex:1"></span></div>
       <div class="ctlrow" style="margin-top:6px">
         <button id="crmxLink" class="primary">Link</button>
         <button id="crmxUnlink" class="danger">Unlink</button>
@@ -855,6 +871,32 @@
       </div>
       <div class="mini">The Bluetooth name is what you see when connecting.
         It changes at the controller's next restart.</div>
+      <div class="devonly" style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">
+        <div class="row"><label>Shunt</label>
+          <select id="setShunt" style="width:160px">
+            <option value="0">auto by model</option>
+            <option value="5">5 mΩ (Zone, .3 boards)</option>
+            <option value="10">10 mΩ (stock .2 module)</option>
+          </select>
+          <span class="mini" id="shuntLine" style="margin:0"></span>
+        </div>
+        <div class="mini">The current-sense shunt fitted to the port module. Auto = 5 mΩ
+          on a Zone, 10 mΩ on a 4our/8ight. The wrong value halves or doubles every
+          current reading and the trip point. Needs port firmware 2.5.</div>
+        <!-- No label: 52 px + four fields overflowed a phone-width card (Reset
+             dropped to its own line). The calLine text underneath names it. -->
+        <div class="row" style="margin-top:6px">
+          <select id="calPort" style="width:52px"></select>
+          <input type="number" id="calMa" min="250" max="13000" step="1" placeholder="meter mA" style="width:80px">
+          <button id="btnCal">Calibrate current</button>
+          <button id="btnCalReset" style="padding-left:8px;padding-right:8px">Reset</button>
+        </div>
+        <div class="mini" id="calLine"></div>
+        <div class="row"><label>Command</label>
+          <input type="text" id="devCmd" placeholder="raw command, e.g. P1.CALCUR=0" style="flex:1" autocomplete="off">
+          <button id="devSend">Send</button>
+        </div>
+      </div>
     </div>
     <div class="card">
       <b>Documentation</b>
@@ -872,8 +914,10 @@
         <label style="font-weight:600">App</label>
         <span class="mini" id="appVerTxt" style="margin:0"></span>
       </div>
-      <div class="ctlrow">
+      <div class="ctlrow" style="align-items:center">
         <button id="appRefresh">Look for app update</button>
+        <label class="toggle sm" title="Developer mode" style="margin-left:auto"><input type="checkbox" id="devMode"><span></span></label>
+        <span class="mini" style="margin:0">Developer</span>
       </div>
       <div class="mini" id="appUpdMsg" data-help>The app checks for its own update every
         time it opens. This forces a fresh check and reloads.</div>
@@ -959,13 +1003,15 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-14c.strobetop";
+const APP_VER="2026-09-14e.devmode";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
 // the bottom of the page so it can be read on the phone.
 function showJsErr(m){
   try{
+    // Bench strip only — Developer mode (Setup). Users never see script noise.
+    if(!document.body||!document.body.classList.contains("dev")) return;
     let d=document.getElementById("jsErr");
     if(!d){ d=document.createElement("div"); d.id="jsErr";
       // pointer-events:none — the strip must never sit over the controls (it
@@ -1058,7 +1104,7 @@ function showApp(){
     && !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   if(!intro){ reveal(); return; }
   introPending=true; introRunning=true;
-  const fading=["hello","connectSplash","connectMarks"].map(id=>$(id)).filter(Boolean);
+  const fading=["hello","knownList","connectSplash","connectMarks"].map(id=>$(id)).filter(Boolean);
   fading.forEach(el=>el.classList.add("introfade"));
   setTimeout(()=>{ fading.forEach(el=>el.classList.remove("introfade")); reveal(); introRunning=false;
                    setTimeout(()=>{ introPending=false; },1500); },450);
@@ -1082,6 +1128,28 @@ function stateHandler(ev){ onState(dec.decode(ev.target.value)); }
 // call below falls through to the original Web Bluetooth path — unchanged.
 const NBLE=()=>window.JmbNativeBle||null;
 const devName=()=>NBLE()?NBLE().name:((dev&&dev.name)||"");
+// KNOWN CONTROLLERS: Bluetooth name (as the pairing list shows it) → the
+// controller's own name + port count, recorded on every authenticated
+// connection and shown on the connect screen so the chooser's entries mean
+// something (user, 2026-09-14). Per phone, most recent first, max 6.
+function loadKnown(){ try{ return JSON.parse(localStorage.getItem("jmbKnown")||"[]"); }catch(_){ return []; } }
+function recordKnown(cn, n){
+  const ble=devName(); if(!ble || demoOn) return;
+  let k=loadKnown().filter(e=>e.ble!==ble);
+  k.unshift({ble, cn:cn||"", n:+n||0, at:Date.now()});
+  k=k.slice(0,6);
+  try{ localStorage.setItem("jmbKnown", JSON.stringify(k)); }catch(_){}
+  renderKnown();
+}
+function renderKnown(){
+  const el=$("knownList"); if(!el) return;
+  const k=loadKnown();
+  if(!k.length){ el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  el.innerHTML="<b>Controllers this phone knows</b>"+k.map(e=>
+    `<div class="kn"><code>${esc(e.ble)}</code><span>${esc(e.cn||"(unnamed)")}${e.n?` · ${e.n}-port`:""}</span></div>`).join("");
+}
+renderKnown();
 // PIN memory is PER-DEVICE and ONLY for a PIN that was manually entered for
 // THAT controller. Keyed strictly by the controller's name — NO global
 // fallback: a controller you've never unlocked shows a blank PIN screen and
@@ -1412,7 +1480,7 @@ function onState(str){
       // A-F are valid key letters, so a greedy [A-Z]+ parsed "FA0" as key
       // "FA" and the LATCHED fault bit vanished from every badge (agent
       // review — safety-display bug).
-      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|TX|TO|EC|TS|OR|AT|GP|RL|PH|PF|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
+      const mm=f.match(/^(PW|OC|OT|PE|IA|IB|RX|CE|CV|TX|TO|EC|TS|OR|AT|GP|RL|PH|PF|KA|KB|A|M|R|G|B|D|O|F|X|S|H|T)(-?[0-9A-F]+)$/);
       if(mm) m[mm[1]] = mm[1]==="F" ? parseInt(mm[2],16) : +mm[2];
     }
     ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
@@ -1422,7 +1490,8 @@ function onState(str){
   setChip("chipFps","fps", kv.FPS??"—");
   setChip("chipCid","ID",  kv.CID??"—");
   if(n){ const cn=hexDec(kv.CN);
-    $("title").textContent=(cn||devName()||"JMB Lighting")+" · "+n+"-port"; }
+    $("title").textContent=(cn||devName()||"JMB Lighting")+" · "+n+"-port";
+    recordKnown(cn, n); }
   if(n && n!==colPortsN){ renderColourTargets(n); colPortsN=n; }
   renderControl(); renderPortInfo(); renderDiag(); renderSetup();
   renderProductMark(); renderOta();
@@ -3218,10 +3287,28 @@ function renderSetup(){
       crs=" · crashed in "+(BC[bc]||("loop section "+(LS[ls]||ls)))+" at "+(up/1000).toFixed(1)+"s";
     }
   }
-  $("fwLine").textContent="Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+
-    " ports · "+(kv.HRS??0)+" h powered"+
+  // Uptime / boot reason / crash marker are bench detail → Developer mode.
+  $("fwLine").innerHTML=esc("Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+
+    " ports · "+(kv.HRS??0)+" h powered")+
+    '<span class="devonly">'+esc(
     (kv.UP!=null ? " · up "+(+kv.UP)+"s" : "")+
-    (kv.RR!=null ? " · last boot: "+(RR[+kv.RR]||("reason "+kv.RR)) : "")+crs;
+    (kv.RR!=null ? " · last boot: "+(RR[+kv.RR]||("reason "+kv.RR)) : "")+crs)+'</span>';
+  // Developer: shunt + current calibration
+  if(document.activeElement!==$("setShunt"))
+    $("setShunt").value = kv.SHM==="1" ? String(kv.SH??0) : "0";
+  {
+    const oldPort=ports.some(m=>m.PF!==undefined && m.PH!==0 && (+m.PF)<0x205);
+    $("shuntLine").textContent = kv.SH!=null
+      ? `${kv.SH} mΩ${kv.SHM==="1"?"":" (auto)"}`+(oldPort?" · port fw < 2.5 ignores this — update the port module":"")
+      : "";
+    $("shuntLine").style.color = oldPort ? "var(--warn)" : "";
+    const cp=$("calPort");
+    if(cp.options.length!==ports.length)
+      cp.innerHTML=ports.map((_,i)=>`<option value="${i+1}">P${i+1}</option>`).join("");
+    const sel=+cp.value||1, pm=ports[sel-1]||{};
+    $("calLine").textContent=`P${sel} reads ${pm.IA!=null?(pm.IA/1000).toFixed(3)+" A":"—"} · gain A ${pm.KA?(pm.KA/1000).toFixed(3):"1.000"} · B ${pm.KB?(pm.KB/1000).toFixed(3):"1.000"}. `
+      +`Drive a steady load of 0.25 A or more, read the true current on a meter, enter it in mA, Calibrate.`;
+  }
   {
     const n=kv.VAR??kv.PORTS;
     $("varLine").textContent = n
@@ -3235,6 +3322,24 @@ function renderSetup(){
     $("setBtName").value=hexDec(kv.BTN)||"";
 }
 $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.value); };
+// ---------- Developer mode (Setup → App card, small latched slider) ----------
+function setDev(on){
+  document.body.classList.toggle("dev",!!on);
+  $("devMode").checked=!!on;
+  try{ localStorage.setItem("jmbDev",on?"1":"0"); }catch(_){}
+}
+setDev((()=>{ try{ return localStorage.getItem("jmbDev")==="1"; }catch(_){ return false; } })());
+$("devMode").onchange=e=>setDev(e.target.checked);
+$("setShunt").onchange=e=>{ setupTouched=Date.now(); send("SHUNT="+ +e.target.value); };
+$("calPort").onchange=()=>renderSetup();
+$("btnCal").onclick=()=>{
+  const p=+$("calPort").value||1, ma=Math.round(+$("calMa").value);
+  if(!(ma>=250&&ma<=13000)){ tellUser("Enter the meter reading in mA (250 to 13000).",{title:"Calibrate current"}); return; }
+  send(`P${p}.CALCUR=${ma}`);
+};
+$("btnCalReset").onclick=()=>{ const p=+$("calPort").value||1; send(`P${p}.CALCUR=0`); };
+$("devSend").onclick=()=>{ const s=$("devCmd").value.trim(); if(s){ send(s); $("devCmd").value=""; } };
+$("devCmd").addEventListener("keydown",e=>{ if(e.key==="Enter") $("devSend").click(); });
 $("btnVariant").onclick=async()=>{
   const v=$("setVariant").value;
   if(!v){ tellUser("Pick a model first, then tap Set.",{title:"Model"}); return; }
@@ -4119,7 +4224,7 @@ function demoTxState(){
 }
 function demoState(){
   const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S${d.s??128},H${n},`+
-    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6500,OT80,TX${1000*n},TO0,EC0,L0;`;
+    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6500,OT80,TX${1000*n},TO0,EC0,PH1,PF517,KA1000,KB1000,L0;`;
   onState(
     `JMB;FW=demo;PORTS=${demoF.var};CID=7;DMX=1;FPS=44;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=3;ERR=0;`+
     "RDM=42;ANS=42;AGE=23;"+
@@ -4128,6 +4233,7 @@ function demoState(){
     `FLKON=${demoF.flkon};FLKL=0;`+
     `NET=${demoF.net};NW=${demoF.net};NUN=${demoF.nun};SRC=${demoF.net?1:0};`+
     "NIP=192.168.1.42;NRS=-52;TF=1;PB=0;CX=3;CA=1;"+
+    `SH=${demoF.sh||(demoF.var===1?5:10)};SHM=${demoF.sh?1:0};`+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
     `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+demoTxState()+
     "LPX=9;LPS=5;LPN=0;LPA=31;LPG=22;RR=1;BSY=0;BRT=3;"+
@@ -4201,6 +4307,7 @@ function demoCmd(s){
   if(m=s.match(/^CHARM=(\d)/)){ demoF.chl=+m[1]; demoState(); return; }
   if(s.startsWith("BTNAME=")){ demoF.btn=s.slice(7); demoState(); return; }
   if(m=s.match(/^BPM=(\d+)/)){ demoF.bpm=+m[1]; demoState(); return; }
+  if(m=s.match(/^SHUNT=(\d+)/)){ demoF.sh=+m[1]; demoState(); return; }
   if(m=s.match(/^P(\d)\.FXS=(\d+)/)){ demoP[+m[1]-1].s=+m[2]; return; }
   if(m=s.match(/^NET=(\d)/)){ demoF.net=+m[1]; demoState(); return; }
   if(m=s.match(/^WUNI=(\d+)/)){ demoF.nun=+m[1]; demoState(); return; }

@@ -1,16 +1,16 @@
 {
   "version": "2.0.0",
-  "build": "95ad8f1-20260913",
-  "size": 1195616,
-  "crc32": "82b95629",
-  "sha256": "e8f396a454ed51d2b7a0fb6d3dab280e83fd229cbdbb70ee992b8dacee52e227",
-  "date": "2026-09-13",
-  "notes": "Strobe: upper wheel half compressed on pulse ports so 255 = ~30 flashes/s (above ~40 the eye fuses to white); A closed and proven",
+  "build": "8f3d143-20260914",
+  "size": 1195968,
+  "crc32": "fab02771",
+  "sha256": "1d700c2c9e695e68728eec1722ad10c86537437410d3c5bc90a14f2e7f9536eb",
+  "date": "2026-09-14",
+  "notes": "App: Cal current row on one line at phone width (no label, compact fields)",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
-    "size": 17972,
-    "crc32": "1a2a0f08",
-    "sha256": "508352e224036c4eebe5c83b992557a8e5d0967f9cf31dc60d64dc9501c6f252"
+    "size": 18076,
+    "crc32": "0676a875",
+    "sha256": "ee0393577f4536aa205607b1b375a8cc8d182225399121ee65e5ffc85b892619"
   }
 }
