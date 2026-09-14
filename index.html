@@ -195,8 +195,6 @@
   #cfOv { z-index:12; }
   #btOv { z-index:11; }
   #btOv .box button { width:100%; margin-top:8px; padding:12px; }
-  #btOv .kn { text-align:left; margin-top:4px; }
-  #btOv .kn code { color:var(--acc); font-size:12px; }
   .sig { cursor:pointer; }
   #overlay .box, #cfOv .box, #btOv .box { background:var(--card); border:1px solid var(--line);
                   border-radius:16px; padding:26px; width:min(340px,90vw);
@@ -370,7 +368,7 @@
   /* No scroll lock: a lock plus a page even slightly too tall trapped the
      card's top under the header on the S21 (2026-09-13). Size to fit instead. */
   #connectSplash img{ width:min(112vw,560px); height:auto; display:block;
-    max-height:calc(100vh - 480px); max-height:calc(100dvh - 480px); max-width:none;
+    max-height:calc(100vh - 440px); max-height:calc(100dvh - 440px); max-width:none;
     -webkit-mask-image:
       linear-gradient(to right, transparent 0, #000 10%, #000 90%, transparent 100%),
       linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%);
@@ -380,11 +378,6 @@
       linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%);
     mask-composite: intersect; }
   #hello.hidden ~ #connectSplash{ display:none; }
-  #hello.hidden ~ #knownList{ display:none !important; }
-  #knownList{ margin-top:0; padding:10px 14px; }
-  #knownList b{ color:var(--text); font-weight:600; }
-  #knownList .kn{ display:flex; gap:8px; align-items:baseline; margin-top:3px; }
-  #knownList .kn code{ color:var(--acc); font-size:12px; }
   /* The three product wordmarks under the splash on the connect screen
      (2026-09-13). Same PROD_MARKS geometry as the header; letters in the
      page's light ink, bars purple. Wraps on narrow phones. */
@@ -483,10 +476,6 @@
     Nothing you tap is sent anywhere.</div>
   </div>
 
-  <!-- Controllers this phone has connected to before: Bluetooth name (what the
-       pairing list shows) against the controller's own name, so you know which
-       box you are about to join (user, 2026-09-14). -->
-  <div id="knownList" class="card mini hidden"></div>
   <div id="connectSplash"><img src="jmb-splash.png" alt="JMB Lighting"></div>
   <div id="connectMarks" aria-label="JMB Zone, 4our and 8ight"></div>
 
@@ -961,7 +950,6 @@
 <div id="btOv" class="hidden"><div class="box">
   <b id="btTitle"></b>
   <div class="mini" id="btMsg" style="white-space:pre-line;margin-top:6px"></div>
-  <div id="btKnown" class="mini" style="margin-top:8px"></div>
   <button id="btIdent">Flash to find</button>
   <button id="btSwitch">Connect to another controller</button>
   <button id="btDisc" class="danger">Disconnect</button>
@@ -1028,7 +1016,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-14f.btsheet";
+const APP_VER="2026-09-14g.otafix";
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -1129,7 +1117,7 @@ function showApp(){
     && !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   if(!intro){ reveal(); return; }
   introPending=true; introRunning=true;
-  const fading=["hello","knownList","connectSplash","connectMarks"].map(id=>$(id)).filter(Boolean);
+  const fading=["hello","connectSplash","connectMarks"].map(id=>$(id)).filter(Boolean);
   fading.forEach(el=>el.classList.add("introfade"));
   setTimeout(()=>{ fading.forEach(el=>el.classList.remove("introfade")); reveal(); introRunning=false;
                    setTimeout(()=>{ introPending=false; },1500); },450);
@@ -1153,28 +1141,9 @@ function stateHandler(ev){ onState(dec.decode(ev.target.value)); }
 // call below falls through to the original Web Bluetooth path — unchanged.
 const NBLE=()=>window.JmbNativeBle||null;
 const devName=()=>NBLE()?NBLE().name:((dev&&dev.name)||"");
-// KNOWN CONTROLLERS: Bluetooth name (as the pairing list shows it) → the
-// controller's own name + port count, recorded on every authenticated
-// connection and shown on the connect screen so the chooser's entries mean
-// something (user, 2026-09-14). Per phone, most recent first, max 6.
-function loadKnown(){ try{ return JSON.parse(localStorage.getItem("jmbKnown")||"[]"); }catch(_){ return []; } }
-function recordKnown(cn, n){
-  const ble=devName(); if(!ble || demoOn) return;
-  let k=loadKnown().filter(e=>e.ble!==ble);
-  k.unshift({ble, cn:cn||"", n:+n||0, at:Date.now()});
-  k=k.slice(0,6);
-  try{ localStorage.setItem("jmbKnown", JSON.stringify(k)); }catch(_){}
-  renderKnown();
-}
-function renderKnown(){
-  const el=$("knownList"); if(!el) return;
-  const k=loadKnown();
-  if(!k.length){ el.classList.add("hidden"); return; }
-  el.classList.remove("hidden");
-  el.innerHTML="<b>Controllers this phone knows</b>"+k.map(e=>
-    `<div class="kn"><code>${esc(e.ble)}</code><span>${esc(e.cn||"(unnamed)")}${e.n?` · ${e.n}-port`:""}</span></div>`).join("");
-}
-renderKnown();
+// (A "controllers this phone knows" list lived here for one build, 2026-09-14d;
+// the user did not need it — the answer is distinct Bluetooth names/IDs.)
+try{ localStorage.removeItem("jmbKnown"); }catch(_){}
 // PIN memory is PER-DEVICE and ONLY for a PIN that was manually entered for
 // THAT controller. Keyed strictly by the controller's name — NO global
 // fallback: a controller you've never unlocked shows a blank PIN screen and
@@ -1515,8 +1484,7 @@ function onState(str){
   setChip("chipFps","fps", kv.FPS??"—");
   setChip("chipCid","ID",  kv.CID??"—");
   if(n){ const cn=hexDec(kv.CN);
-    $("title").textContent=(cn||devName()||"JMB Lighting")+" · "+n+"-port";
-    recordKnown(cn, n); }
+    $("title").textContent=(cn||devName()||"JMB Lighting")+" · "+n+"-port"; }
   if(n && n!==colPortsN){ renderColourTargets(n); colPortsN=n; }
   renderControl(); renderPortInfo(); renderDiag(); renderSetup();
   renderProductMark(); renderOta();
@@ -3443,8 +3411,8 @@ function renderIdentMsg(){
   el.textContent = "Flash identifies this controller for 5 seconds — tap it "
     + "after connecting to check you're on the right unit. "
     + (oneOff
-        ? "This unit has no screen, so it blinks its outputs."
-        : "It strobes the screen; the outputs are untouched.");
+        ? "Its indicators pulse together; the strip is never touched."
+        : "Its screens strobe; the strip is never touched.");
 }
 
 // Shown on the unlock screen, where someone is already waiting — better than
@@ -3983,11 +3951,23 @@ function setStmMsg(t){ $("stmMsg").textContent=t; }
 // Download an image and prove it before anything is opened on the controller.
 // Shared by the port-module and combined flows so the two cannot drift apart.
 async function fetchVerified(info, fallbackName){
-  const r=await fetch(info.file||fallbackName);
-  if(!r.ok) throw new Error("HTTP "+r.status);
-  const buf=await r.arrayBuffer();
+  // The image URL carries the manifest's checksum, so a CDN or service-worker
+  // copy of the PREVIOUS image can never be paired with a fresh manifest
+  // (bench 2026-09-14: "downloaded 1195968 bytes, manifest says 1196464" ten
+  // minutes after a publish — Pages caches firmware.bin for 600 s). One retry
+  // straight from the origin if the first copy still disagrees.
+  const name=info.file||fallbackName;
+  const get=async(bust)=>{
+    const r=await fetch(name+"?v="+(info.crc32||info.build||Date.now())+(bust?"&r="+Date.now():""),
+                        {cache:bust?"no-store":"default"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    return await r.arrayBuffer();
+  };
+  let buf=await get(false);
+  if(buf.byteLength!==info.size) buf=await get(true);
   if(buf.byteLength!==info.size)
-    throw new Error("downloaded "+buf.byteLength+" bytes, manifest says "+info.size);
+    throw new Error("downloaded "+buf.byteLength+" bytes, manifest says "+info.size
+      +" — a stale copy is still being served; try again in a few minutes");
   const n=await crc32Async(buf);
   const got=n.toString(16).padStart(8,"0");
   if(got!==info.crc32) throw new Error("checksum mismatch ("+got+" vs "+info.crc32+")");
@@ -4245,9 +4225,6 @@ function openBtSheet(){
   $("btMsg").textContent=demoOn
     ? `Example data — nothing you do here reaches a controller.`
     : `${devName()||"—"}${n?` · ${n}-port`:""}\nSignal ${word}${raw?` (${raw} dBm)`:""}${kv.FW?` · firmware ${kv.FW}`:""}`;
-  const k=loadKnown().filter(e=>e.ble!==devName());
-  $("btKnown").innerHTML=k.length?"<b>Also known to this phone</b>"+k.map(e=>
-    `<div class="kn"><code>${esc(e.ble)}</code> ${esc(e.cn||"(unnamed)")}${e.n?` · ${e.n}-port`:""}</div>`).join(""):"";
   $("btIdent").classList.toggle("hidden",demoOn);
   $("btDisc").classList.toggle("hidden",demoOn);
   $("btDemoExit").classList.toggle("hidden",!demoOn);

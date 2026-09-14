@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "b0e548f-20260914",
-  "size": 1196464,
-  "crc32": "64c53ae9",
-  "sha256": "64971836f69a20aab704dc27689687b06bafea2b90392651cb0091a20fe908b9",
+  "build": "4f0f119-20260914",
+  "size": 1196768,
+  "crc32": "f714e65c",
+  "sha256": "17278a8c94050459fbaa177854234f59ce08ff4189abf461b2cacd68ef29b15d",
   "date": "2026-09-14",
-  "notes": "Connection sheet on the Bluetooth mark; app-driven temperature sensor cal; port fw 2.6 NTC timeout fix",
+  "notes": "Flash to find never touches the strip; OTA image fetch cache-busted; known-controllers list removed",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
