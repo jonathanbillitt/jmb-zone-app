@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "4f0f119-20260914",
+  "build": "40e29a7-20260914",
   "size": 1196768,
-  "crc32": "f714e65c",
-  "sha256": "17278a8c94050459fbaa177854234f59ce08ff4189abf461b2cacd68ef29b15d",
+  "crc32": "b1d8c8ec",
+  "sha256": "ec1632d3668c0a057f8363736a2b2570e272a7331f61a558ca26d8bf084e985a",
   "date": "2026-09-14",
-  "notes": "Flash to find never touches the strip; OTA image fetch cache-busted; known-controllers list removed",
+  "notes": "CRMX unlink: hold LINK_SW low 4 s (spec says more than 3 s; 3000 ms was the boundary)",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
