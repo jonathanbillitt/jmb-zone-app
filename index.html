@@ -1019,7 +1019,10 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-14h.otaport";
+const APP_VER="2026-09-14i.ocp675";
+// Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
+// 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
+function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -1614,7 +1617,10 @@ function renderControl(){
       for(const id of ["rowR","rowG","rowB"]){ const r=$(id+p); if(r) r.classList.toggle("fxtrim",fxOn); }
       for(const id of ["r","g","b"]){ const s=$(id+p); if(s) s.disabled=fxOn; } }
     setIf(p,"PWM", el=>el.value=m.PW??0);
-    setIf(p,"OCP", el=>el.value=((m.OC??6500)/1000).toFixed(2));
+    setIf(p,"OCP", el=>el.value=((m.OC??ocpCapA()*1000)/1000).toFixed(2));
+    // Ceiling follows the fitted shunt (SH): 6.5 A on 10 mΩ, 6.75 A on 5 mΩ.
+    { const oc=$("ocp"+p), rr=$("ocpr"+p), cap=ocpCapA();
+      if(oc && oc.max!==String(cap)){ oc.max=String(cap); if(rr) rr.innerHTML=`0.25&nbsp;&ndash;&nbsp;${cap}&nbsp;A`; } }
     setIf(p,"OT",  el=>el.value=m.OT??80);
     setIf(p,"CRV", el=>el.value=m.CV??0);
     for(const c of ["R","G","B"]){
@@ -1700,7 +1706,7 @@ function buildCard(p){
         <div class="row"><label>Current</label>
           <input type="number" id="ocp${p}" min="0.25" max="6.5" step="0.25">
           <span class="unit">A</span>
-          <span class="mini" style="margin:0 0 0 8px;color:var(--dim)">0.25&nbsp;&ndash;&nbsp;6.5&nbsp;A</span></div>
+          <span class="mini" id="ocpr${p}" style="margin:0 0 0 8px;color:var(--dim)">0.25&nbsp;&ndash;&nbsp;6.5&nbsp;A</span></div>
         <div class="row"><label>Temp trip</label>
           <input type="number" id="ot${p}" min="40" max="110" step="5">
           <span class="unit">°C</span>
@@ -1722,7 +1728,7 @@ function buildCard(p){
     touch("PWM"); send(`P${p}.PWM=${+e.target.value}`);
   });
   d.querySelector("#ocp"+p).addEventListener("change",e=>{
-    let a=Math.max(0.25,Math.min(6.5,+e.target.value||6.5));
+    let a=Math.max(0.25,Math.min(ocpCapA(),+e.target.value||ocpCapA()));
     a=Math.round(a/0.25)*0.25; e.target.value=a;
     touch("OCP"); send(`P${p}.OCP=${Math.round(a*1000)}`);
   });

@@ -1,11 +1,11 @@
 {
   "version": "2.0.0",
-  "build": "40e29a7-20260914",
-  "size": 1196768,
-  "crc32": "b1d8c8ec",
-  "sha256": "ec1632d3668c0a057f8363736a2b2570e272a7331f61a558ca26d8bf084e985a",
+  "build": "13c12bb-20260914",
+  "size": 1197024,
+  "crc32": "2331f7fe",
+  "sha256": "f11ff7298d59332557cf21bdc3dc3447dfcd8ee9090ab1869229239ce3199491",
   "date": "2026-09-14",
-  "notes": "CRMX unlink: hold LINK_SW low 4 s (spec says more than 3 s; 3000 ms was the boundary)",
+  "notes": "OCP ceiling 6.75 A on 5 mOhm boards (jmb_ocp_cap_ma), 6.5 A stays on 10 mOhm",
   "file": "firmware.bin",
   "stm_port": {
     "file": "stm_port.bin",
