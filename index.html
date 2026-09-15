@@ -696,6 +696,8 @@
         <label style="font-weight:600">CRMX Wireless</label>
         <span class="mini" id="crmxStatus" style="margin:0">&#8212;</span>
       </div>
+      <!-- LumenRadio's approved "CRMX by LumenRadio" mark (received 2026-09-15). -->
+      <img src="crmx-lumenradio-dark.png" alt="CRMX by LumenRadio" style="height:34px;width:auto;margin:6px 0 2px;display:block">
       <div class="row devonly"><span class="mini" id="crmxRaw" style="margin:0;flex:1"></span></div>
       <div class="ctlrow" style="margin-top:6px">
         <button id="crmxLink" class="primary">Link</button>
@@ -705,11 +707,12 @@
           <option value="0">Int antenna</option>
         </select>
       </div>
-      <div class="mini">Link pairs with a CRMX transmitter that's in linking
+      <div class="mini">Link joins a CRMX transmitter that's in linking
       mode; Unlink forgets it. Status is data-truth: <b>linked &#8212; no RF</b>
       means linked but nothing is on air (transmitter off or out of range);
       <b>linked &#8212; no data</b> means the transmitter is there but isn't
       sending DMX.</div>
+      <div class="mini" style="opacity:.7">CRMX&trade; is a trademark of LumenRadio AB.</div>
     </div>
     <!-- Network DMX (sACN/Art-Net over Wi-Fi) PARKED 2026-08-20 — hidden; the
          controller no longer starts WiFi. Elements kept so existing JS is inert
@@ -1020,7 +1023,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-14j.rdmidle";
+const APP_VER="2026-09-15a.crmxmark";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
