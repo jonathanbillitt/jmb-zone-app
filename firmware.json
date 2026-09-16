@@ -1,16 +1,10 @@
 {
   "version": "2.0.0",
-  "build": "1fae2d2-20260914",
-  "size": 1197104,
-  "crc32": "16731ccf",
-  "sha256": "6d723df436221b658fb27dd1218f8778fd9f3ccfce6af1641728adc2fcf42f7a",
-  "date": "2026-09-14",
-  "notes": "RDM scan: every session end notifies PH=OFF with why; the 3-minute idle watchdog now reaches the app",
-  "file": "firmware.bin",
-  "stm_port": {
-    "file": "stm_port.bin",
-    "size": 18132,
-    "crc32": "0c20ec5f",
-    "sha256": "f5d9567c5d4be7b60f6a48cf132157d75bde81ce8ba7a94a40007f45f4c85e3d"
-  }
+  "build": "a024de9-20260916",
+  "size": 1201760,
+  "crc32": "e47586bd",
+  "sha256": "6846ccfff1fc6806f0e791e0d98d656e7b1ac174ef34a456951117c469a1dbb2",
+  "date": "2026-09-16",
+  "notes": "DMX: dual-input arbitration (wired pin vs CRMX/alt) replaces the XLR switch dependency; DMX_RX_FROM_TTL removed; DI= state + app chip",
+  "file": "firmware.bin"
 }

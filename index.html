@@ -1023,7 +1023,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-16a.docs";
+const APP_VER="2026-09-16b.input";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1489,7 +1489,8 @@ function onState(str){
     }
     ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
   }
-  setChip("chipDmx","DMX", kv.DMX==="1"?"live":"none", kv.DMX==="1"?"ok":"bad");
+  // DI= which input the receiver follows: 1 = the CRMX line (wired quiet).
+  setChip("chipDmx","DMX", kv.DMX==="1"?(kv.DI==="1"?"live · CRMX":"live"):"none", kv.DMX==="1"?"ok":"bad");
   renderTx();
   setChip("chipFps","fps", kv.FPS??"—");
   setChip("chipCid","ID",  kv.CID??"—");
@@ -1550,7 +1551,8 @@ function renderControl(){
   if(w){
     w.classList.toggle("hidden", !dmxLive || testOn);
     if(dmxLive){
-      const src=["a network source","DMX","sACN","Art-Net","CRMX"][+(kv.SRC||1)]||"DMX";
+      let src=["a network source","DMX","sACN","Art-Net","CRMX"][+(kv.SRC||1)]||"DMX";
+      if(src==="DMX" && kv.DI==="1") src="CRMX";
       $("dmxWarnSrc").textContent=src+(kv.FPS?` (${kv.FPS} fps)`:"");
     }
   }
@@ -4291,7 +4293,7 @@ function demoState(){
   const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S${d.s??128},H${n},`+
     `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6500,OT80,TX${1000*n},TO0,EC0,PH1,PF517,KA1000,KB1000,L0;`;
   onState(
-    `JMB;FW=demo;PORTS=${demoF.var};CID=7;DMX=1;FPS=44;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=3;ERR=0;`+
+    `JMB;FW=demo;PORTS=${demoF.var};CID=7;DMX=1;FPS=44;DI=0;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=3;ERR=0;`+
     "RDM=42;ANS=42;AGE=23;"+
     `CAPON=${demoF.capon};CAPMS=${demoF.capon?Date.now()-demoF.capt0:0};CFL=43;CFH=45;`+
     `VAR=${demoF.var};VARM=${demoF.varm};BTN=${demoF.btn};`+
