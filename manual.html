@@ -38,7 +38,7 @@ blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #b7ade6; 
 </style></head><body>
 <div id="jmbsearch"><input type="search" placeholder="Search this manual — e.g. port bus" aria-label="Search this manual"><div class="jr"></div></div>
 <h1>JMB Lighting — User Manual</h1>
-<p>JMB one / 4our / 8ight · Firmware 2.x · 2026-08-20 · 4-port shown
+<p>JMB Zone / 4our / 8ight · Firmware 2.x · 2026-09-16 · 4-port shown
 (1/8-port variants identical unless noted)</p>
 <hr />
 <h2>1. Front panel</h2>
@@ -147,6 +147,11 @@ no USB, no cable, no Wi-Fi.</p>
   no way to send a build meant for a different product. The card names the
   version and build about to be installed, and the build the controller is
   running, so you can see whether an update would change anything.</li>
+<li><strong>Only what differs is installed.</strong> The controller and its port module each
+  have their own image; the run installs the one(s) that have changed and
+  leaves a port module already on the published image alone, so a
+  controller-only build is a controller-only update. If the button reads
+  <em>Update port module</em>, that is all it will touch.</li>
 <li><strong>Checked twice before it runs.</strong> The app verifies the download's size and
   checksum <em>before</em> opening a transfer, and the controller re-checks the
   checksum across the Bluetooth link before the image is made bootable. A bad
@@ -161,7 +166,12 @@ no USB, no cable, no Wi-Fi.</p>
   is a previous version stored, which happens after your first update.</li>
 <li><strong>Do not power the unit off during an update.</strong> If one fails part way, the
   unit keeps the firmware it already had — nothing is committed until it has
-  been checked — and it can simply be retried over Bluetooth.</li>
+  been checked — and it can simply be retried over Bluetooth. If the app
+  reports <em>a stale copy is still being served</em>, the download site has not yet
+  caught up with a very recent publish: wait a few minutes and try again.</li>
+<li><strong>Controller only</strong> (Developer mode, §6 Setup) skips a pending port-module
+  step. It exists for one case — a port step that drops the link every time —
+  and is otherwise unnecessary.</li>
 </ul>
 <blockquote>
 <p>Keep the app open and the phone unlocked until an update finishes. Outputs
@@ -178,9 +188,15 @@ Siren, Laser, Club, Lightning, Rainbow, Aurora, Sunset, TV Sim, Strobe,
 Police, Pulse, Party, Traffic, <strong>Fluoro, Paparazzi, Explosion, Clouds</strong>). Set
 from Port Settings → Effect, the app, or DMX channel 8 of the FX personality. Speed 0–255 (128 = designed tempo)
 from the app or DMX channel 9. While an effect runs, the app's <strong>RGB
-sliders become its colour trim</strong> — all at full = the untouched effect;
-pull one down to take that colour out (Rainbow minus blue, say). The trim
-is a live tool: it resets to full at power-up. <strong>Effects never start on
+sliders are greyed out</strong> — the effect owns the colour; clear the effect to
+get them back (the dimmer and speed wheels stay live). <strong>Speed 0 stops an
+effect</strong>: a continuous look freezes on its current frame, Strobe and Police
+go dark. <strong>Strobe and Police are clocked on the port module itself</strong> — the
+controller sends the flash pattern once and the port keeps time on its own
+clock, so the rate is exact at every speed and identical across every unit
+running it. The top of the Strobe speed wheel is compressed: above the
+mid-point the rate rises more gently, and 255 is about 30 flashes a second,
+the fastest the eye still reads as a strobe. <strong>Effects never start on
 their own.</strong> When
 DMX is absent, an effect runs only from the moment you deliberately pick
 it (panel or app) — a saved effect does not auto-run at power-up, and a
@@ -253,7 +269,17 @@ count. Tap a card to edit it in place — <strong>identify</strong> (flash the f
 find it), <strong>start address</strong>, <strong>personality</strong>, <strong>label</strong>, and live <strong>sensor
 reads</strong>. Scanning takes over the output line while it runs, so with an
 upstream desk live the app asks before taking over; the session releases the
-thru automatically when you stop (or after 3 minutes idle).</p>
+thru automatically when you stop, or <strong>3 minutes after your last command</strong> —
+the app then reads <em>stopped — idle for 3 minutes, thru released</em>, so a scan
+left open at a gig never holds the rig.</p>
+<blockquote>
+<p><strong>Discovery flashes fixtures.</strong> When a desk (or this app) runs RDM
+discovery, every fixture it finds — this controller's ports included —
+flashes its output at full for a moment, and E1.20 <em>Identify</em> flashes it
+until switched off. That is the standard behaviour every RDM device shares;
+it is not the same as the app's <em>Flash to find</em>, which never touches an
+output (§6 Setup).</p>
+</blockquote>
 <hr />
 <h2>6. The app</h2>
 <p><strong>https://app.jmblighting.co.uk/</strong> — runs in <strong>Chrome or Edge</strong> on Android or a
@@ -264,7 +290,15 @@ the list. The factory PIN (<strong>0123</strong>) is tried for you, so a new con
 straight away. A controller with its own PIN (set in Setup → Change PIN) asks
 for it once per phone, then remembers it for that controller only — a PIN typed
 for one unit is never offered to another. If a controller has just been
-reflashed, toggle the phone's Bluetooth off and on once first.</p>
+reflashed, toggle the phone's Bluetooth off and on once first. The pairing
+list shows each controller by its <strong>Bluetooth name and ID</strong> (Setup → BT name /
+ID), so give every unit its own before a multi-unit job; two Zones with the
+factory name look identical in that list.</p>
+<p>Once connected, <strong>tap the Bluetooth mark in the header</strong> for the connection
+sheet: which controller this is, its Bluetooth name and port count, the link
+quality and firmware, and the ways out — <strong>Flash to find</strong>, <strong>Connect to
+another controller</strong> (drops this link and reopens the chooser) and
+<strong>Disconnect</strong>.</p>
 <p>Everything the app sends goes <strong>straight to the controller over Bluetooth</strong> —
 no account, no cloud, no internet needed once it has loaded, and nothing about
 your rig leaves the phone. The app also <strong>updates itself</strong>: opened with any
@@ -294,9 +328,11 @@ banner appears — your manual moves here are overridden until that signal stops
 which is <em>why</em> the faders would otherwise seem to do nothing.</p>
 <p>Open <strong>Advanced &amp; protection</strong> on a card for that port's safety and quality
 settings: <strong>PWM mode</strong> (the dimming carrier frequency — see §8), <strong>current
-limit</strong>, <strong>temperature trip</strong>, <strong>dimmer curve</strong> (<strong>Linear / Soft / Theatre</strong> —
-how fader travel maps to brightness), and a <strong>Clear fault &amp; re-enable</strong> button
-that appears only while the port is latched.</p>
+limit</strong> (0.25 A up to the unit's ceiling — <strong>6.75 A</strong> on units with the 5 mΩ
+current sense, which is every Zone, <strong>6.5 A</strong> on earlier 4our/8ight modules;
+the field's range shows which), <strong>temperature trip</strong>, <strong>dimmer curve</strong>
+(<strong>Linear / Soft / Theatre</strong> — how fader travel maps to brightness), and a
+<strong>Clear fault &amp; re-enable</strong> button that appears only while the port is latched.</p>
 <h3>Colour — dial a look, don't push channels</h3>
 <p>A console-style picker for the selected ports (choose <strong>All</strong> or one port at the
 top). Its five columns — <strong>Dim, Hue, Sat, Kelvin</strong> and <strong>ΔUV</strong> — are all views of
@@ -359,9 +395,10 @@ the wire. Each tool answers a specific question:</p>
   Scanning takes over the output line while it runs.</p>
 </li>
 <li>
-<p><strong>Port bus</strong> — a health table for the internal link to each output module (RX
-  count, CRC errors, fault state), for diagnosing a port that has stopped
-  responding.</p>
+<p><strong>Port bus</strong> (Developer mode only, see Setup) — a health table for the
+  internal link to each output module (frames sent and received, CRC errors,
+  timeouts, the module's own loop and reply timing) plus the controller's loop
+  timing, for diagnosing a port that has stopped responding.</p>
 </li>
 <li><strong>Transmit DMX</strong> — sends a test universe from the OUT socket while no DMX is
   being received (greyed while a desk is live). Desk syntax on the keypad:
@@ -372,19 +409,48 @@ the wire. Each tool answers a specific question:</p>
 </ul>
 <h3>Setup — controller and housekeeping</h3>
 <p>Controller <strong>ID</strong> and <strong>Bluetooth name</strong> (what the pairing list shows), <strong>apply
-mode</strong> (how a change made to "All" fans out across the ports), <strong>CRMX wireless</strong>
-(link / unlink / antenna select). The status distinguishes three things, because
-a CRMX link survives the transmitter being switched off: <strong>linked — no RF</strong>
-(amber) means linked but nothing is on air — transmitter off or out of range;
-<strong>linked — no data</strong> means the transmitter is present but isn't sending DMX; and
-<strong>linked · N Hz</strong> is a live stream,
-<strong>Firmware update over Bluetooth</strong> (§2a), <strong>Flash to find</strong> (identifies this
-controller for 5 s so you can pick it out of a rack: units with a front panel
-strobe their screen and leave the rig untouched; the screenless <strong>JMB one</strong>
-blinks its own outputs instead, being the only thing it can show you with), <strong>Reset all ports</strong> with an <strong>Undo</strong>, <strong>show-file export / import</strong>
-(one <strong>.jmb</strong> file carrying the whole rig — addresses, heads, labels, looks and
-scenes — reloadable on any phone or controller), <strong>change PIN</strong>, and
+mode</strong> (how a change made to "All" fans out across the ports), and the
+<strong>CRMX by LumenRadio</strong> card: <strong>Link</strong>, <strong>Unlink</strong> and antenna select. Two
+things about linking that follow from how CRMX works: a receiver is linked
+<em>by the transmitter</em> — put the transmitter into link mode and any unlinked
+receiver in range joins — so the Link button matters on the transmitter, not
+here; and <strong>Unlink</strong> makes the controller forget its transmitter so it can be
+claimed by another (on units with a link button on the enclosure, holding it
+for more than 3 seconds does the same; a short tap is ignored). The status
+distinguishes three things, because a CRMX link survives the transmitter being
+switched off: <strong>linked — no RF</strong> (amber) means linked but nothing is on air —
+transmitter off or out of range; <strong>linked — no data</strong> means the transmitter is
+present but isn't sending DMX; and <strong>linked · N Hz</strong> is a live stream.
+Then <strong>Firmware update over Bluetooth</strong> (§2a), <strong>Flash to find</strong> (identifies
+this controller for 5 s so you can pick it out of a rack — <strong>it never touches
+the strip</strong>: a Zone pulses all its indicator lights together, a 4our or 8ight
+strobes its screens), <strong>Reset all ports</strong> with an <strong>Undo</strong>, <strong>show-file export /
+import</strong> (one <strong>.jmb</strong> file carrying the whole rig — addresses, heads, labels,
+looks and scenes — reloadable on any phone or controller), <strong>change PIN</strong>, and
 <strong>Disconnect</strong>.</p>
+<p><strong>Developer mode</strong> — the small slider to the right of <em>Look for app update</em> at
+the foot of Setup, remembered per phone. Off (the default) hides the bench
+detail an operator never needs: the Diag <em>Port bus</em> table, the CRMX module
+signal lines, uptime and last-boot reason, and the script-error strip. On, it
+also reveals the calibration rows in the Hardware card:</p>
+<ul>
+<li><strong>Shunt</strong> — which current-sense resistor the unit's port module carries. <em>Auto</em>
+  is right for every unit as shipped (5 mΩ on a Zone, 10 mΩ on a stock 4our or
+  8ight module). Only change it if the hardware has been modified: the wrong
+  value halves or doubles every current reading <em>and</em> the trip point.</li>
+<li><strong>Cal current</strong> — calibrates a port's current reading against a meter. Drive
+  a steady load of at least 0.25 A, read the true current on a bench meter,
+  type it in mA and tap <em>Calibrate current</em>; the stored gains show on the line
+  beneath. <em>Reset</em> returns to unity.</li>
+<li><strong>Calibrate temperature</strong> — captures each port's sensor offset against a
+  known ambient. Leave the unit powered but dark at room temperature for ten
+  minutes, enter the true ambient from a trusted thermometer, and every port's
+  offset is stored. A port more than <strong>10 °C</strong> out is refused and flagged: that
+  size of error is a faulty sensor, not drift, and must never be calibrated
+  away.</li>
+<li><strong>Command</strong> — sends a raw controller command, for bench work.</li>
+<li><strong>Controller only</strong> in the Firmware card (§2a).</li>
+</ul>
 <p><strong>Test sequences</strong> (Setup, top of the tab) drive every port directly, overriding
 every source — <strong>live DMX included</strong> — until switched <strong>Off</strong>. A banner appears
 on the Control tab while a test runs, with its own <em>Stop test</em> button, and the
@@ -511,6 +577,12 @@ only the flicker frequency changes.</p>
   protections are current- and temperature-based, so they work identically
   on either rail; at 12 V each port delivers half the wattage for the same
   current limit</li>
+<li>Current limit ceiling: 6.75 A per port on 5 mΩ-sense units (every Zone),
+  6.5 A on earlier 4our/8ight modules</li>
+<li>Flash to find never lights the strip; RDM discovery and Identify from a
+  desk do — that is the RDM standard</li>
+<li>An RDM scan left open releases the thru line after 3 minutes idle</li>
+<li>Developer mode (Setup, bottom slider) holds the bench and calibration tools</li>
 </ul>
 <script>
 (function(){

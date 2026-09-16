@@ -38,8 +38,8 @@ blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #b7ade6; 
 </style></head><body>
 <div id="jmbsearch"><input type="search" placeholder="Search this manual — e.g. port bus" aria-label="Search this manual"><div class="jr"></div></div>
 <h1>JMB Lighting — Safety &amp; Safe Operation Guide</h1>
-<p>JMB one / 4our / 8ight LED lighting controllers · Read before installation
-and keep for future reference.</p>
+<p>JMB Zone / 4our / 8ight LED lighting controllers · Read before installation
+and keep for future reference. · 2026-09-16</p>
 <blockquote>
 <p><strong>DRAFT — legal review required.</strong> Technical content reflects the shipped
 design. Passages marked <strong>[LEGAL]</strong> need wording confirmed or supplied by
@@ -66,13 +66,14 @@ for misuse.]</strong></p>
   Do not open the enclosure: no user-serviceable parts inside; hazardous
   voltages are present when connected. Disconnect from the mains before any
   cleaning, fuse replacement or cabling work.</li>
-<li><strong>JMB one</strong> is powered from an external 12 V or 24 V DC supply or battery
+<li><strong>JMB Zone</strong> is powered from an external 12 V or 24 V DC supply or battery
   pack. Use a supply rated for the connected load, with the correct polarity;
   the unit is not protected against reverse supply connection at the input.</li>
-<li>Output circuits are separated extra-low voltage (24 V DC). Route output
-  wiring away from mains cabling.</li>
-<li>Use conductor sizes rated for the configured port current (up to 6.5 A per
-  output). Undersized strip feed wiring is a fire risk that no controller
+<li>Output circuits are separated extra-low voltage (12 or 24 V DC). Route
+  output wiring away from mains cabling.</li>
+<li>Use conductor sizes rated for the configured port current (up to <strong>6.75 A</strong>
+  per output on Zone units and 5 mΩ-sense modules, 6.5 A on earlier 4our/8ight
+  modules). Undersized strip feed wiring is a fire risk that no controller
   protection can fully remove.</li>
 </ul>
 <h2>3. Fuses</h2>
@@ -88,8 +89,17 @@ replaceable cartridge fuse.</p>
 </ul>
 <h2>4. Load limits and heat</h2>
 <ul>
-<li>Maximum per-output current: <strong>6.5 A</strong> (configurable lower; set the limit to
-  suit the connected strip). Total load must remain within the PSU rating.</li>
+<li>Maximum per-output current: <strong>6.75 A</strong> on Zone units and 5 mΩ-sense
+  modules, <strong>6.5 A</strong> on earlier 4our/8ight modules (configurable lower; set the
+  limit to suit the connected strip — the app's current field shows the
+  ceiling that applies). Total load must remain within the PSU rating.</li>
+<li><strong>Calibration controls (app → Setup → Developer mode) change what the
+  protection measures.</strong> The <em>Shunt</em> setting must match the fitted hardware —
+  a wrong value halves or doubles every current reading and the trip point;
+  leave it on <em>Auto</em> unless the unit has been modified. <em>Calibrate temperature</em>
+  refuses any port more than 10 °C from ambient: that is a faulty sensor, and
+  a fault must be repaired, never calibrated away. Calibrate current only
+  against a trusted meter.</li>
 <li>Mount with free airflow. Do not cover the enclosure, stack heat-producing
   equipment on it, or enclose it without ventilation. Ambient operating
   range: 0–40 °C. <strong>[Confirm final ambient rating before print.]</strong></li>
@@ -105,6 +115,12 @@ light</strong>. A small percentage of people may experience seizures when expose
 to flashing light, even with no prior history.</p>
 <ul>
 <li>Warn cast, crew and audience before using strobe effects.</li>
+<li><strong>RDM discovery and Identify flash fixtures at full.</strong> Any RDM console
+  (or the app's RDM scan) running discovery makes every fixture it finds
+  flash momentarily, and Identify flashes a fixture until switched off. This
+  is the RDM standard and cannot be disabled on the fixture side. The app's
+  <em>Flash to find</em> never lights a fixture: it uses the controller's own
+  indicators or screens.</li>
 <li>Do not aim strobing fixtures at stairways, exits or moving-machinery areas.</li>
 <li>Stop use immediately if anyone experiences dizziness, disorientation or
   involuntary movement. <strong>[LEGAL: standard PSE warning wording.]</strong></li>
@@ -124,9 +140,14 @@ dark.</strong></p>
 </ul>
 <h2>7. Radio equipment</h2>
 <p>The unit contains Bluetooth® Low Energy and, when fitted, a CRMX™ 2.4 GHz
-radio. Do not use where radio transmitters are prohibited. The radio link is
-not a safety-of-life channel: do not build safety functions (e.g. emergency
-blackout for egress lighting) solely on the wireless path.
+radio (CRMX by LumenRadio). Do not use where radio transmitters are
+prohibited. The radio link is not a safety-of-life channel: do not build
+safety functions (e.g. emergency blackout for egress lighting) solely on the
+wireless path. A CRMX receiver stays linked to its transmitter across power
+cycles; on wireless loss the controller <strong>holds the last look</strong> rather than
+going dark or starting an effect. Unlinking (app, or holding a unit's link
+button for over 3 seconds) makes the unit available to any transmitter in
+link mode — establish who owns the rig before unlinking on a working set.
 <strong>[Compliance: Radio Equipment Regulations / RED assessment + Bluetooth SIG
 qualification to be completed before sale.]</strong></p>
 <h2>8. Installation practice</h2>
@@ -140,6 +161,12 @@ qualification to be completed before sale.]</strong></p>
 <li>The DMX/CRMX input, app and front panel all change live output. Establish
   who has control before working on fixtures — a port can light at any time
   while the system is powered. <strong>Isolate power before touching wiring.</strong></li>
+<li>The app's <strong>RDM scan takes over the output line</strong> while it runs, so
+  downstream fixtures lose their DMX for the duration; it releases the line
+  when stopped or after 3 minutes idle. Do not start a scan during a take.</li>
+<li><strong>Firmware updates</strong>: outputs go dark for a few seconds while a port
+  module is updated and the controller restarts at the end. Update between
+  setups, never during a live show.</li>
 </ul>
 <h2>9. Maintenance, service and modification</h2>
 <p>No user-serviceable parts inside any unit. Cleaning: dry or slightly damp
