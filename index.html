@@ -1054,7 +1054,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-19b.noscroll";
+const APP_VER="2026-09-19c.demo";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -4306,8 +4306,11 @@ let demoTimer=null, demoOn=false, demoFlkTimer=null;
 // analyser has example data — the whole Diag tab works without hardware.
 // Eight demo ports so the demo can be any model (Setup → Model switches it,
 // 1 / 4 / 8, no restart). Effects on some ports so the live swatch preview
-// shows straight away: Candle, manual teal, Pulse on the white port, Rainbow.
-const demoP=[{a:1,pe:0,r:100,g:100,b:100,x:1,s:128},{a:4,pe:0,r:0,g:80,b:100,x:0,s:128},
+// shows straight away — but NOT on port 1: an effect locks the colour sliders
+// (the 2026-09-13 rule), which read as a greyed-out port on the first card a
+// visitor sees, and it is the only card on the 1-port demo (user, 2026-09-19).
+// Port 1 = manual warm white, port 2 = Candle, Pulse on the white port, Rainbow.
+const demoP=[{a:1,pe:0,r:100,g:85,b:60,x:0,s:128},{a:4,pe:0,r:100,g:100,b:100,x:1,s:128},
              {a:7,pe:2,r:100,g:100,b:0,x:15,s:128},{a:10,pe:4,r:100,g:100,b:100,x:9,s:128},
              {a:20,pe:0,r:100,g:100,b:100,x:2,s:128},{a:23,pe:0,r:100,g:0,b:60,x:0,s:128},
              {a:26,pe:0,r:100,g:100,b:100,x:14,s:128},{a:29,pe:4,r:100,g:100,b:100,x:4,s:128}];
