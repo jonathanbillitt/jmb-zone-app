@@ -356,6 +356,17 @@
      the connect card is showing, the whole page background goes to the badge's
      near-black so the badge blends in and it reads as one image. */
   body:has(#hello:not(.hidden)){ background:#000006; }
+  /* Connect card: every message it shows (Not connected / Connecting… /
+     Disconnected) is a centred headline with its note underneath; the demo
+     button sits centred and back-lit in the accent so it reads as the second
+     way in, not a footnote. */
+  #hello{ text-align:center; padding:18px 16px 16px; }
+  #hello > b{ display:block; font-size:19px; font-weight:600; letter-spacing:.2px; }
+  #hello .mini{ margin-top:8px; }
+  #hello .ctlrow{ justify-content:center; margin-top:14px; }
+  #btnDemo{ color:var(--acc); border-color:rgba(77,163,255,.55);
+    background:rgba(77,163,255,.10); padding:10px 22px;
+    box-shadow:0 0 16px rgba(77,163,255,.32), inset 0 0 12px rgba(77,163,255,.14); }
   #connectSplash{ display:flex; justify-content:center; overflow:hidden;
     margin:14px calc(50% - 50vw) 0; }
   /* Feather all four edges to transparent so the badge's neon glow fades into
@@ -465,15 +476,15 @@
 </div>
 
 <main>
+  <!-- Connect card (tidied 2026-09-19): one centred headline, one line of
+       how-to, and a lit Demo button with no explainer — demo speaks for itself. -->
   <div id="hello" class="card">
-    <b>Not connected.</b>
+    <b>Not connected</b>
     <div class="mini">Tap Connect and pick your controller (“JMB Zone #ID-XXXX”).
     Chrome/Edge only — on iPhone use the Bluefy browser. Bluetooth on.</div>
-    <div class="ctlrow" style="margin-top:10px">
-      <button id="btnDemo">Explore in demo mode</button>
+    <div class="ctlrow">
+      <button id="btnDemo">Demo mode</button>
     </div>
-    <div class="mini">Browse every tab with example data — no controller needed.
-    Nothing you tap is sent anywhere.</div>
   </div>
 
   <div id="connectSplash"><img src="jmb-splash.png" alt="JMB Lighting"></div>
@@ -1023,7 +1034,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-16b.input";
+const APP_VER="2026-09-19a.connect";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }

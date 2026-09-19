@@ -131,6 +131,11 @@ last DMX look holds until you set something else. Outputs soft-start over
 universe, so everything downstream (patch, FX personality, the diagnostics
 viewer, RDM) treats the radio exactly like a cable. The header on every screen
 names the winner: <strong>DMX</strong> or <strong>CRMX</strong>.</p>
+<p><strong>DMX thru is active, not a loop-through.</strong> The OUT socket is re-driven by its
+own line transceiver, so the signal leaving the unit is a fresh copy of what
+arrived (bit-for-bit, no software in the path) and a long daisy-chain stays
+clean however many units are in it. Downstream fixtures' RDM answers are
+relayed back up to the desk through the same path.</p>
 <h2>2a. Firmware update over Bluetooth (BLE OTA)</h2>
 <p>The controller updates its own firmware straight over Bluetooth from the app —
 no USB, no cable, no Wi-Fi.</p>
@@ -485,7 +490,7 @@ live.</p>
 offers the effects that read on a white strip (Candle, Fire, Lightning, TV Sim,
 Strobe, Pulse, Fluoro, Paparazzi, Explosion); the colour-only effects are hidden
 so you can't pick one that would do nothing.</p>
-<p><strong>Demo mode.</strong> <em>Explore in demo mode</em> on the connect screen walks the entire app
+<p><strong>Demo mode.</strong> <em>Demo mode</em> on the connect screen walks the entire app
 — every tab, the analyser, even an RDM scan that discovers example fixtures —
 with no controller present. Nothing a demo user touches goes anywhere; it is for
 learning the app or showing it off before the hardware is in front of you.</p>
