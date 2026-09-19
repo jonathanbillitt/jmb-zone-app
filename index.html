@@ -387,8 +387,28 @@
     mask-image:
       linear-gradient(to right, transparent 0, #000 10%, #000 90%, transparent 100%),
       linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%);
-    mask-composite: intersect; }
+    mask-composite: intersect; object-fit:contain; }
   #hello.hidden ~ #connectSplash{ display:none; }
+  /* Connect screen never scrolls (user, 2026-09-19): while the connect card is
+     up the page is one viewport-high column — header, card, badge, wordmarks —
+     and the badge is the only thing that flexes, so it shrinks before anything
+     else can overflow (the old 100dvh−440px cap left no room for notch/home-bar
+     insets, so iPhones and cut-out Androids still scrolled). Below 480 px of
+     height (landscape) there is no room for card + marks at all, so that falls
+     back to normal scrolling rather than trapping the card under the header
+     (the 2026-09-13 lesson). The 64 px nav allowance goes too: no nav here. */
+  @media (min-height:480px){
+    body:has(#hello:not(.hidden)){ height:100vh; height:100dvh; overflow:hidden;
+      display:flex; flex-direction:column;
+      padding-bottom:env(safe-area-inset-bottom); }
+    body:has(#hello:not(.hidden)) main{ flex:1; min-height:0; width:100%;
+      display:flex; flex-direction:column; padding-bottom:8px; }
+    body:has(#hello:not(.hidden)) #connectSplash{ flex:1; min-height:0;
+      align-items:center; }
+    body:has(#hello:not(.hidden)) #connectSplash img{ width:auto; height:auto;
+      max-width:min(112vw,560px); max-height:100%; }
+    body:has(#hello:not(.hidden)) #connectMarks{ flex:none; margin-bottom:4px; }
+  }
   /* The three product wordmarks under the splash on the connect screen
      (2026-09-13). Same PROD_MARKS geometry as the header; letters in the
      page's light ink, bars purple. Wraps on narrow phones. */
@@ -1034,7 +1054,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-19a.connect";
+const APP_VER="2026-09-19b.noscroll";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
