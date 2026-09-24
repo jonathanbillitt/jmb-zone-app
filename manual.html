@@ -518,6 +518,23 @@ fixture legitimately has an unused output.</p>
 its over-temp trip, it eases the output down over the last 10 °C (to a 30 %
 floor) so a hot fixture <em>rides through</em> instead of hard-latching mid-show. The
 latch stays as the real-fault backstop.</p>
+<p><strong>Controller current limit</strong> (Setup → Current Limit; app → Setup, under the
+controller's name): the most current the whole controller may draw, in 0.5 A
+steps up to the product maximum — <strong>6.75 A</strong> on the Zone, <strong>27 A</strong> on the 4our,
+<strong>54 A</strong> on the 8ight. Set it to the supply you have brought (a 10 A PSU on a
+4our → 10 A). <strong>Limit Lock</strong> freezes the value: the row shows it with a <code>*</code> on
+the panel; in the app the <strong>padlock</strong> beside the field applies the value and
+locks it in one press — the field fades and only the padlock stays live until
+it is pressed again — so a hirer cannot raise it. <strong>Current Fold</strong> (on by default) is what happens when the draw reaches the
+limit: every output is scaled back together — colour and balance unchanged,
+brightness down — until the draw sits under the limit, then eases back up. With
+Current Fold off the limit is only <em>reported</em> and the per-port trips remain the
+protection.</p>
+<p>While either fold is scaling the outputs the panel footer reads <strong>FOLD C</strong> /
+<strong>FOLD T</strong> (the port screens show <code>CFOLD 82%</code> / <code>TFOLD 70%</code>), the app shows a
+<em>Fold</em> chip in the header — <strong>red</strong> for current fold, <strong>orange</strong> for thermal —
+and the live percentage under the limit field. Tap a chip for its detail box
+(the green <em>DMX live</em> chip works the same way).</p>
 <hr />
 <h2>8. Camera &amp; slow-motion work</h2>
 <p>Each port dims with a high-frequency PWM carrier, set per port under <strong>Port

@@ -76,6 +76,22 @@
           padding:3px 11px; font-size:12px; color:var(--dim); }
   .chip b { color:var(--text); font-weight:600; }
   .chip.ok b { color:var(--ok); } .chip.bad b { color:var(--bad); }
+  .chip.warn { border-color:var(--warn); } .chip.warn b { color:var(--warn); }
+  .chip.tap { cursor:pointer; }
+  /* Tappable status chips carry their colour on the border too: green = live
+     DMX (information), orange = thermal fold (heat), red = current fold (the
+     limit is cutting the output). The info boxes use the same three. */
+  .chip.ok.tap { border-color:var(--ok); } .chip.bad.tap { border-color:var(--bad); }
+  .dmxwarn.good { background:#12301c; border-color:var(--ok); color:var(--ok); }
+  .dmxwarn.good strong { color:var(--ok); }
+  .dmxwarn.bad { background:#3a1518; border-color:var(--bad); color:var(--bad); }
+  .dmxwarn.bad strong { color:var(--bad); }
+  /* Current limit: the field and Apply fade while locked; the padlock is the
+     only live control then (user, 2026-09-24). */
+  #setLim:disabled { opacity:.45; }
+  button.lock { min-width:44px; padding:6px 8px; font-size:17px; line-height:1; }
+  button.lock.on { border-color:var(--warn); background:#3d2f14; }
+  .dmxwarn { cursor:pointer; }   /* tap the box to close it */
   main { padding:10px 16px 24px; max-width:720px; margin:0 auto; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px;
           padding:14px 16px; margin-top:12px; }
@@ -493,6 +509,8 @@
   <span class="chip" id="chipDmx">DMX <b>—</b></span>
   <span class="chip" id="chipFps">fps <b>—</b></span>
   <span class="chip" id="chipCid">ID <b>—</b></span>
+  <!-- Only while a current / thermal fold is scaling the outputs. -->
+  <span class="chip warn hidden" id="chipFold">Fold <b>—</b></span>
 </div>
 
 <main>
@@ -517,17 +535,28 @@
     <button id="btnDemoExit" style="flex:none">Exit demo</button>
   </div>
 
+  <!-- Info boxes for the orange header chips (user, 2026-09-24): the chip
+       carries the state; tapping it opens the box on whichever tab is showing,
+       tapping again or tapping the box closes it. -->
+  <div id="dmxWarn" class="dmxwarn good hidden">
+    <strong>Live DMX in control</strong>
+    <span id="dmxWarnSrc"></span> is driving the outputs — manual colour, dimmer
+    and effects here are <em>overridden</em> until the signal stops.
+  </div>
+  <!-- Current / thermal fold in force: the controller is scaling brightness
+       back to hold the current limit (Setup → controller card) or ride out a
+       hot port. Same wording as the FOLD C / FOLD T footer on the screen. -->
+  <div id="foldWarn" class="dmxwarn hidden">
+    <strong id="foldWarnTitle">Fold active</strong>
+    <span id="foldWarnTxt"></span>
+  </div>
+
   <div id="tab-control" class="tab hidden">
     <div id="testWarn" class="testwarn hidden">
       <span style="flex:1"><strong>Test sequence running</strong>
       <span id="testWarnName"></span> is driving every port and <em>overrides
       every source</em> — live DMX included — until it is switched off.</span>
       <button id="btnTestStop">Stop test</button>
-    </div>
-    <div id="dmxWarn" class="dmxwarn hidden">
-      <strong>Live DMX in control</strong>
-      <span id="dmxWarnSrc"></span> is driving the outputs — manual colour, dimmer
-      and effects here are <em>overridden</em> until the signal stops.
     </div>
     <div class="card">
       <!-- Full-width so a thumb from either side of the phone lands on it. -->
@@ -692,6 +721,30 @@
           <button id="btnHoldApply">Apply</button>
           <span class="mini" style="margin:0">keep last look after DMX loss · 0 = forever</span>
         </div>
+        <!-- Limits (user, 2026-09-24): the controller's total current cap, never
+             above the product max (Zone 6.75 A · 4our 27 A · 8ight 54 A), in
+             0.5 A steps; the small slider LOCKS it. Current fold = scale every
+             output back to hold the cap; thermal fold moved here from its own
+             card so all protection sits under the controller's name, as on
+             the screen's Setup menu. -->
+        <div class="row"><label>Current limit</label>
+          <input type="number" id="setLim" min="0.5" max="6.75" step="0.5">
+          <span class="unit">A</span>
+          <button id="btnLimApply">Apply</button>
+          <button id="btnLimLock" class="lock" title="Lock / unlock the limit">🔓</button>
+          <span class="mini" id="setLimNote" style="margin:0"></span>
+        </div>
+        <div class="row"><label>Current fold</label>
+          <select id="setCfold" style="width:90px"><option value="1">On</option>
+            <option value="0">Off</option></select>
+          <span class="mini" style="margin:0">scale all outputs back to hold the limit</span>
+        </div>
+        <div class="row"><label>Thermal fold</label>
+          <select id="setFold" style="width:90px"><option value="1">On</option>
+            <option value="0">Off</option></select>
+          <span class="mini" style="margin:0">dim a hot port over its last 10°C instead of tripping</span>
+        </div>
+        <div class="mini" id="foldStatus" style="margin-top:4px"></div>
       </div>
     </div>
     <div class="card">
@@ -777,20 +830,6 @@
       <div class="mini">A lighting console (or an Art-Net node) on the same Wi-Fi
       router streams the universe here — no DMX cable to the fixtures. Wired DMX
       still works and out-prioritises the network on a tie.</div>
-    </div>
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <label style="font-weight:600">Protection</label>
-      </div>
-      <div class="rows">
-        <div class="row"><label>Thermal fold</label>
-          <select id="setFold" style="width:90px"><option value="1">On</option>
-            <option value="0">Off</option></select>
-          <span class="mini" style="margin:0">dim a hot port instead of tripping</span>
-        </div>
-      </div>
-      <div class="mini">Thermal foldback eases a port down over the last 10°C
-      before its trip so it rides through instead of hard-latching.</div>
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between">
@@ -1054,7 +1093,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-19c.demo";
+const APP_VER="2026-09-24b.limits";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1521,10 +1560,15 @@ function onState(str){
     ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
   }
   // DI= which input the receiver follows: 1 = the CRMX line (wired quiet).
-  setChip("chipDmx","DMX", kv.DMX==="1"?(kv.DI==="1"?"live · CRMX":"live"):"none", kv.DMX==="1"?"ok":"bad");
+  setChip("chipDmx","DMX", kv.DMX==="1"?(kv.DI==="1"?"live · CRMX":"live"):"none", kv.DMX==="1"?"ok tap":"bad");
   renderTx();
   setChip("chipFps","fps", kv.FPS??"—");
   setChip("chipCid","ID",  kv.CID??"—");
+  // FC / FT = the current / thermal fold scale in force (100 = none).
+  { const fc=+(kv.FC??100), ft=+(kv.FT??100), on=fc<100||ft<100;
+    if(on) setChip("chipFold","Fold",(fc<100?`C ${fc}%`:"")+(fc<100&&ft<100?" · ":"")+(ft<100?`T ${ft}%`:""),
+                   fc<100?"bad tap":"warn tap");   // red = current, orange = thermal
+    $("chipFold").classList.toggle("hidden",!on); }
   if(n){ const cn=hexDec(kv.CN);
     $("title").textContent=(cn||devName()||"JMB Lighting")+" · "+n+"-port"; }
   if(n && n!==colPortsN){ renderColourTargets(n); colPortsN=n; }
@@ -1551,6 +1595,14 @@ function setChip(id,label,val,cls){
   el.innerHTML=esc(label)+" <b>"+esc(val)+"</b>";
   el.className="chip"+(cls?" "+cls:"");
 }
+// Tap an orange chip for its info box; the next state line keeps it in step.
+const infoOpen={dmx:false,fold:false};
+$("chipDmx").onclick=()=>{ if(kv.DMX!=="1" || +(kv.TSEQ||0)) return;
+  infoOpen.dmx=!infoOpen.dmx; $("dmxWarn").classList.toggle("hidden",!infoOpen.dmx); };
+$("chipFold").onclick=()=>{ infoOpen.fold=!infoOpen.fold;
+  $("foldWarn").classList.toggle("hidden",!infoOpen.fold); };
+$("dmxWarn").onclick=()=>{ infoOpen.dmx=false; $("dmxWarn").classList.add("hidden"); };
+$("foldWarn").onclick=()=>{ infoOpen.fold=false; $("foldWarn").classList.add("hidden"); };
 function faultWords(f){ return FAULTS.filter(([b])=>f&b).map(([,t])=>t).join("+")||""; }
 function setIf(p,key,apply){
   const el=$(key.toLowerCase()+p);
@@ -1578,13 +1630,31 @@ function renderControl(){
     tw.classList.toggle("hidden", !testOn);
     if(testOn) $("testWarnName").textContent = (+kv.TSEQ===1) ? "Fade" : "Step RGBW";
   }
+  // Orange chips = something is overriding or scaling the outputs; the boxes
+  // open only from a tap on the chip and drop away when the condition clears.
   const w=$("dmxWarn");
   if(w){
-    w.classList.toggle("hidden", !dmxLive || testOn);
+    const on=dmxLive && !testOn; if(!on) infoOpen.dmx=false;
+    w.classList.toggle("hidden", !(on && infoOpen.dmx));
     if(dmxLive){
       let src=["a network source","DMX","sACN","Art-Net","CRMX"][+(kv.SRC||1)]||"DMX";
       if(src==="DMX" && kv.DI==="1") src="CRMX";
       $("dmxWarnSrc").textContent=src+(kv.FPS?` (${kv.FPS} fps)`:"");
+    }
+  }
+  const fw=$("foldWarn");
+  if(fw){
+    const fc=+(kv.FC??100), ft=+(kv.FT??100), on=fc<100||ft<100;
+    if(!on) infoOpen.fold=false;
+    fw.classList.toggle("hidden", !(on && infoOpen.fold));
+    fw.classList.toggle("bad", fc<100);          // red = current fold, orange = thermal only
+    if(on){
+      $("foldWarnTitle").textContent = fc<100 ? "Current fold active" : "Thermal fold active";
+      const lim=(+(kv.CL||0)/10).toFixed(1);
+      $("foldWarnTxt").innerHTML = fc<100
+        ? `Current fold — every output is scaled to <em>${fc}%</em> to hold the ${lim} A limit`
+          + (ft<100 ? `; thermal fold has the hottest port at <em>${ft}%</em>.` : ".")
+        : `Thermal fold — the hottest port is scaled to <em>${ft}%</em> to ride out its temperature.`;
     }
   }
   const lk=(dmxLive||testOn) && !demoOn;
@@ -3236,6 +3306,23 @@ function renderSetup(){
   if(document.activeElement!==$("netEn"))  $("netEn").value=kv.NET??"0";
   if(document.activeElement!==$("netUni")) $("netUni").value=kv.NUN??"1";
   if(document.activeElement!==$("setFold")) $("setFold").value=kv.TF??"1";
+  if(document.activeElement!==$("setCfold")) $("setCfold").value=kv.CF??"1";
+  // Current limit: CL = effective limit, CLM = product max (both 0.1 A). Typed
+  // in amps, 0.5 A steps; the switch beside it locks the field (user, 2026-09-24).
+  { const clm=+(kv.CLM||68), cl=+(kv.CL||clm), lock=kv.CLK==="1";
+    const f=$("setLim");
+    f.max=(clm/10).toString();
+    if(document.activeElement!==f) f.value=(cl/10).toString();
+    f.disabled=lock; $("btnLimApply").disabled=lock;
+    const lb=$("btnLimLock"); lb.textContent=lock?"🔒":"🔓"; lb.classList.toggle("on",lock);
+    $("setLimNote").textContent = lock
+      ? `locked at ${cl/10} A — tap the padlock to unlock`
+      : `total current the controller may draw · up to ${clm/10} A · padlock applies and locks`;
+    const fc=+(kv.FC??100), ft=+(kv.FT??100), st=$("foldStatus");
+    st.textContent = fc<100 ? `Current fold active — outputs at ${fc}%`+(ft<100?` · thermal fold at ${ft}%`:"")
+                   : ft<100 ? `Thermal fold active — hottest port at ${ft}%`
+                   : kv.OL==="1" ? "Draw is over the limit — current fold is off, so only the per-port trips protect it"
+                   : ""; }
   // Effects: spread
   if(document.activeElement!==$("fxBpm")) $("fxBpm").value=kv.BPM??"128";
   if(document.activeElement!==$("fxSpread")){ $("fxSpread").value=kv.SPR??"0";
@@ -3372,6 +3459,23 @@ function renderSetup(){
     $("setBtName").value=hexDec(kv.BTN)||"";
 }
 $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.value); };
+$("setCfold").onchange=e=>{ setupTouched=Date.now(); send("CFOLD="+ +e.target.value); };
+// Apply sends the limit in 0.1 A; at or above the product max it sends 0
+// (= "the max"), which is also what the firmware stores for anything over.
+function limApply(){
+  const f=$("setLim"), clm=+(kv.CLM||68);
+  let da=Math.round((+f.value||0)*10); if(da<5) da=5; if(da>=clm) da=0;
+  f.value=((da||clm)/10).toString(); send("PSUDA="+da);
+}
+$("btnLimApply").onclick=()=>{ setupTouched=Date.now(); limApply(); };
+$("setLim").onkeydown=e=>{ if(e.key==="Enter") $("btnLimApply").click(); };
+// Padlock: unlocked → apply what is in the field, then lock it; locked → unlock.
+$("btnLimLock").onclick=()=>{ setupTouched=Date.now();
+  const locked = kv.CLK==="1";
+  if(!locked) limApply();
+  send("CLOCK="+(locked?0:1));
+  $("setLim").disabled=!locked; $("btnLimApply").disabled=!locked;
+  $("btnLimLock").textContent=locked?"🔓":"🔒"; $("btnLimLock").classList.toggle("on",!locked); };
 // ---------- Developer mode (Setup → App card, small latched slider) ----------
 function setDev(on){
   document.body.classList.toggle("dev",!!on);
@@ -4315,7 +4419,15 @@ const demoP=[{a:1,pe:0,r:100,g:85,b:60,x:0,s:128},{a:4,pe:0,r:100,g:100,b:100,x:
              {a:20,pe:0,r:100,g:100,b:100,x:2,s:128},{a:23,pe:0,r:100,g:0,b:60,x:0,s:128},
              {a:26,pe:0,r:100,g:100,b:100,x:14,s:128},{a:29,pe:4,r:100,g:100,b:100,x:4,s:128}];
 const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1,bpm:128,btn:'44656D6F20526967',txa:0,
-             var:4, varm:0};
+             var:4, varm:0, cl:0, clk:0, cf:1, tf:1};   // cl 0 = product max (0.1 A units)
+// Demo mirror of the firmware's limit maths: max = 6.75 A × ports; the fold
+// scale is what would hold the summed demo port currents under the limit.
+function demoLimits(){
+  const n=demoF.var, clm=Math.floor(675*n/10), cl=(demoF.cl===0||demoF.cl>clm)?clm:demoF.cl;   // 67 / 270 / 540
+  let draw=0; for(let k=0;k<n;k++) draw+=(120+k*40)+(118+k*40);          // mA, as the port lines below
+  const over=draw>cl*100, fc=(demoF.cf&&over)?Math.max(10,Math.round(cl*100*100/draw)):100;
+  return `CL=${cl};CLM=${clm};CLK=${demoF.clk};CF=${demoF.cf};FC=${fc};FT=100;OL=${over?1:0};`;
+}
 const demoTx={};                       // ch -> level, the demo transmitter's latch
 function demoTxState(){
   const chs=Object.keys(demoTx).map(Number).sort((a,b)=>a-b);
@@ -4333,7 +4445,7 @@ function demoState(){
     `VAR=${demoF.var};VARM=${demoF.varm};BTN=${demoF.btn};`+
     `FLKON=${demoF.flkon};FLKL=0;`+
     `NET=${demoF.net};NW=${demoF.net};NUN=${demoF.nun};SRC=${demoF.net?1:0};`+
-    "NIP=192.168.1.42;NRS=-52;TF=1;PB=0;CX=3;CA=1;"+
+    `NIP=192.168.1.42;NRS=-52;TF=${demoF.tf};PB=${demoF.cl};`+demoLimits()+"CX=3;CA=1;"+
     `SH=${demoF.sh||(demoF.var===1?5:10)};SHM=${demoF.sh?1:0};`+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
     `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+demoTxState()+
@@ -4409,6 +4521,10 @@ function demoCmd(s){
   if(s.startsWith("BTNAME=")){ demoF.btn=s.slice(7); demoState(); return; }
   if(m=s.match(/^BPM=(\d+)/)){ demoF.bpm=+m[1]; demoState(); return; }
   if(m=s.match(/^SHUNT=(\d+)/)){ demoF.sh=+m[1]; demoState(); return; }
+  if(m=s.match(/^PSUDA=(\d+)/)){ if(!demoF.clk) demoF.cl=+m[1]; demoState(); return; }
+  if(m=s.match(/^CLOCK=(\d)/)){ demoF.clk=+m[1]; demoState(); return; }
+  if(m=s.match(/^CFOLD=(\d)/)){ demoF.cf=+m[1]; demoState(); return; }
+  if(m=s.match(/^TFOLD=(\d)/)){ demoF.tf=+m[1]; demoState(); return; }
   if(m=s.match(/^P(\d)\.FXS=(\d+)/)){ demoP[+m[1]-1].s=+m[2]; return; }
   if(m=s.match(/^NET=(\d)/)){ demoF.net=+m[1]; demoState(); return; }
   if(m=s.match(/^WUNI=(\d+)/)){ demoF.nun=+m[1]; demoState(); return; }
