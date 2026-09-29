@@ -205,20 +205,54 @@
   nav button .ico { display:block; font-size:17px; margin-bottom:1px; }
   /* PIN box sits in the TOP part of the screen, not centred — a centred box
      lands under the phone's number pad and needs a scroll to reach Unlock. */
-  #overlay, #cfOv, #btOv { position:fixed; inset:0; background:rgba(5,8,12,.82); display:flex;
+  #overlay, #cfOv, #btOv, #wbOv, #pwOv, #supOv { position:fixed; inset:0; background:rgba(5,8,12,.82); display:flex;
              align-items:flex-start; justify-content:center; z-index:10;
              padding-top:max(24px,6vh); overflow-y:auto; }
   #cfOv { z-index:12; }
   #btOv { z-index:11; }
   #btOv .box button { width:100%; margin-top:8px; padding:12px; }
   .sig { cursor:pointer; }
-  #overlay .box, #cfOv .box, #btOv .box { background:var(--card); border:1px solid var(--line);
+  #overlay .box, #cfOv .box, #btOv .box, #wbOv .box, #pwOv .box, #supOv .box { background:var(--card); border:1px solid var(--line);
                   border-radius:16px; padding:26px; width:min(340px,90vw);
                   text-align:center; }
   #overlay input { width:100%; margin:14px 0; padding:11px; font-size:18px;
                    text-align:center; letter-spacing:6px; background:var(--card2);
                    color:var(--text); border:1px solid var(--line); border-radius:9px; }
   #overlay .err { color:var(--bad); font-size:13px; min-height:18px; margin-top:8px; }
+  /* White balance widget, PWM library editor, support sheet (2026-09-29) */
+  #wbOv, #pwOv, #supOv { z-index:11; }
+  #wbOv .box, #pwOv .box, #supOv .box { text-align:left; width:min(400px,94vw); padding:20px; margin-bottom:24px; }
+  .wbrow, .pwrow { margin-top:14px; }
+  .pwrow { border-top:1px solid var(--line); padding-top:12px; }
+  .wbhead { display:flex; justify-content:space-between; align-items:baseline;
+            font-size:13px; color:var(--dim); }
+  .wbhead b { color:var(--text); font-size:16px; font-variant-numeric:tabular-nums; }
+  .wbrow input[type=range] { width:100%; height:30px; accent-color:var(--acc); margin:2px 0 6px; }
+  .wbrow.r input[type=range] { accent-color:var(--r); }
+  .wbrow.g input[type=range] { accent-color:var(--g); }
+  .wbrow.b input[type=range] { accent-color:var(--b); }
+  .wbrow.ww input[type=range] { accent-color:#ffb454; }
+  .wbrow.cw input[type=range] { accent-color:#bfe3ff; }
+  .wbrow.uv input[type=range] { accent-color:#b16aff; }
+  .wbsteps { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .wbsteps button { padding:10px 0; font-variant-numeric:tabular-nums; }
+  .wbnote { border:1px solid var(--line); border-radius:9px; padding:8px 10px;
+            font-size:12.5px; margin-top:12px; color:var(--dim); }
+  .wbnote.live { border-color:var(--ok); color:var(--ok); }
+  .wbnote.dmx  { border-color:var(--warn); color:var(--warn); }
+  .badge.wb { background:#3d2f14; color:var(--warn); cursor:pointer; }
+  #btnWbReset.glow { border-color:var(--warn); color:var(--warn); }
+  .pwrow input[type=number] { background:var(--card2); color:var(--text);
+            border:1px solid var(--line); border-radius:8px; padding:8px; font-size:15px; }
+  #supOv textarea { width:100%; box-sizing:border-box; margin-top:12px; padding:10px;
+            font:14px/1.4 inherit; background:var(--card2); color:var(--text);
+            border:1px solid var(--line); border-radius:9px; resize:vertical; }
+  #supOv pre { max-height:34vh; overflow:auto; font:11px/1.45 monospace; color:var(--dim);
+            background:var(--bg); border:1px solid var(--line); border-radius:8px;
+            padding:8px; white-space:pre-wrap; word-break:break-all; margin:8px 0 0; }
+  #supOv details { margin-top:10px; font-size:13px; color:var(--dim); }
+  #supOv summary { cursor:pointer; }
+  .suprow { display:flex; gap:8px; align-items:center; margin-top:10px; font-size:13px; color:var(--dim); }
   .mini { color:var(--dim); font-size:12px; margin-top:8px; }
   /* Info icon: static help notes in a card collapse behind it (user,
      2026-09-10 — "not always on show"). Sits after the card title when the
@@ -560,7 +594,10 @@
     </div>
     <div class="card">
       <!-- Full-width so a thumb from either side of the phone lands on it. -->
-      <button id="btnPrep" style="width:100%;padding:14px 12px;font-size:1.05em;margin-top:22px">Clear all</button>
+      <div class="ctlrow" style="margin-top:22px;align-items:stretch;flex-wrap:nowrap">
+        <button id="btnPrep" style="flex:2;padding:14px 12px;font-size:1.05em">Clear all</button>
+        <button id="btnWbReset" class="hidden" style="flex:1;padding:14px 8px">Reset white balance</button>
+      </div>
       <div class="mini" style="text-align:center;margin-top:6px">RGB 100% · FX speed 50% · dimmer 0%</div>
     </div>
     <div id="ports"></div>
@@ -994,6 +1031,7 @@
       </div>
       <div class="ctlrow" style="align-items:center">
         <button id="appRefresh">Look for app update</button>
+        <button id="btnSupport">Support</button>
         <label class="toggle sm" title="Developer mode" style="margin-left:auto"><input type="checkbox" id="devMode"><span></span></label>
         <span class="mini" style="margin:0">Developer</span>
       </div>
@@ -1032,6 +1070,44 @@
   <button id="btDisc" class="danger">Disconnect</button>
   <button id="btDemoExit" class="danger hidden">Exit demo</button>
   <button id="btClose">Close</button>
+</div></div>
+
+<!-- White balance: a master per colour of ONE port, applied after the dimmer
+     curve. Opening it fades the port to full (never under live DMX). -->
+<div id="wbOv" class="hidden"><div class="box">
+  <b id="wbTitle">White balance</b>
+  <div class="wbnote" id="wbNote"></div>
+  <div id="wbRows"></div>
+  <div class="ctlrow" style="margin-top:16px;flex-wrap:nowrap">
+    <button id="wbReset" style="flex:1;padding:12px">Reset</button>
+    <button id="wbClose" class="primary" style="flex:1;padding:12px">Done</button>
+  </div>
+  <div class="mini">A master for each colour of this port. 255 = full. Kept in the controller.</div>
+</div></div>
+
+<!-- PWM library: the three custom entries (carrier + curve), controller-wide. -->
+<div id="pwOv" class="hidden"><div class="box">
+  <b>PWM library · custom entries</b>
+  <div class="mini" id="pwLimTxt" style="margin-top:4px"></div>
+  <div id="pwRows"></div>
+  <div class="wbnote dmx">Custom entries are outside the tested set: check the result on the strip and on camera before a show.</div>
+  <div class="ctlrow" style="margin-top:14px"><button id="pwClose" class="primary" style="flex:1;padding:12px">Done</button></div>
+</div></div>
+
+<!-- Support: feedback + a status report, sent by the user from their own mail app. -->
+<div id="supOv" class="hidden"><div class="box">
+  <b>Support</b>
+  <div class="mini" style="margin-top:4px">Say what happened. A status report goes with it to
+    support@jmblighting.co.uk, from your own mail app, only when you send it.</div>
+  <textarea id="supText" rows="5" maxlength="1500" placeholder="What were you doing, and what went wrong?"></textarea>
+  <label class="suprow"><input type="checkbox" id="supNames"> Include controller name, ID and port labels</label>
+  <details id="supDet"><summary>What the report contains</summary><pre id="supPre"></pre></details>
+  <div class="ctlrow" style="margin-top:12px;flex-wrap:nowrap">
+    <button id="supMail" class="primary" style="flex:1;padding:12px">Email support</button>
+    <button id="supFile" style="flex:1;padding:12px">Share report file</button>
+  </div>
+  <button id="supClose" style="width:100%;margin-top:8px;padding:12px">Close</button>
+  <div class="mini" id="supMsg"></div>
 </div></div>
 
 <div id="overlay" class="hidden">
@@ -1093,10 +1169,50 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-24b.limits";
+const APP_VER="2026-09-29a.wb";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
+// ---------- support diagnostics (2026-09-29) ----------
+// What Setup → Support puts in its report: script errors, link events and the
+// last commands sent. Held in memory (errors also in local storage, so one
+// that ended the last session is still here) and sent nowhere unless the user
+// sends the report. Secrets never enter it: PIN, NEWPIN and the Wi-Fi name and
+// password are masked as they are logged; names and labels as a length only.
+const DIAG_MAX=60, diag={err:[],ev:[],cmd:[]};
+let diagLastKey="", diagRep=0, diagLastT=0;
+try{ const e=JSON.parse(localStorage.getItem("jmbDiagErr")||"[]");
+     if(Array.isArray(e)) diag.err=e.slice(-20).map(x=>String(x).slice(0,240)); }catch(_){}
+function diagStamp(full){ const d=new Date(), p=(n,w=2)=>String(n).padStart(w,"0");
+  return (full?`${p(d.getMonth()+1)}-${p(d.getDate())} `:"")+
+         `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(),3)}`; }
+function diagPush(list,txt){
+  try{ const a=diag[list]; a.push(diagStamp(list==="err")+" "+String(txt).slice(0,220));
+       while(a.length>DIAG_MAX) a.shift();
+       if(list==="err") localStorage.setItem("jmbDiagErr",JSON.stringify(a.slice(-20)));
+  }catch(_){}
+}
+function diagMask(s){
+  s=String(s);
+  let m=s.match(/^(PIN|NEWPIN|WSSID|WPASS)=/);
+  if(m) return m[1]+"=***";
+  m=s.match(/^((?:P\d+\.LABEL|CNAME|BTNAME)=)(.*)$/);
+  if(m) return m[1]+(m[2]==="0"?"0":"<"+Math.ceil(m[2].length/2)+" chars>");
+  return s;
+}
+function diagCmd(s){
+  try{
+    const t=diagMask(s), key=t.split("=")[0];
+    // A drag sends the same command dozens of times a second: keep the last
+    // and count them. Only a rapid run is folded — the same command seconds
+    // apart (a keep-alive, an on then an off) stays as separate lines.
+    const now=Date.now(), run=(key===diagLastKey && now-diagLastT<1200 && diag.cmd.length);
+    diagLastT=now;
+    if(run){ diagRep++;
+      diag.cmd[diag.cmd.length-1]=diagStamp()+" "+t.slice(0,200)+" (×"+(diagRep+1)+")"; return; }
+    diagLastKey=key; diagRep=0; diagPush("cmd",t);
+  }catch(_){}
+}
 // On-device error surfacing (2026-09-13): browsers without a console (Bluefy
 // on iOS) hide script errors completely — a failed handler just "does
 // nothing". Any uncaught error or rejected promise is printed into a strip at
@@ -1116,8 +1232,10 @@ function showJsErr(m){
     clearTimeout(d._t); d._t=setTimeout(()=>{ d.style.opacity="0"; setTimeout(()=>{ d.textContent=""; },700); },12000);
   }catch(_){}
 }
-window.addEventListener("error",e=>showJsErr((e.message||"error")+" @"+String(e.filename||"").split("/").pop()+":"+(e.lineno||"?")));
-window.addEventListener("unhandledrejection",e=>showJsErr("promise: "+((e.reason&&e.reason.message)||e.reason)));
+window.addEventListener("error",e=>{ const m=(e.message||"error")+" @"+String(e.filename||"").split("/").pop()+":"+(e.lineno||"?");
+  diagPush("err",m); showJsErr(m); });
+window.addEventListener("unhandledrejection",e=>{ const m="promise: "+((e.reason&&e.reason.message)||e.reason);
+  diagPush("err",m); showJsErr(m); });
 // Firmware loop-stall sections (jmb_loopstat.h LP_SEC_*), by index. Append only.
 const LOOP_SECS=["mcp","ble","dmx","net","misc","out","bus","recon","ind","nvs","ui","ota"];
 // Register the service worker so the app works offline once installed to the
@@ -1276,8 +1394,9 @@ async function connect(){
         filters:[{services:[SVC]}], optionalServices:[SVC]});
     }catch(e){ return; }                    // user cancelled the chooser
     hello("<b>Connecting…</b>"+jbarsHTML("connBars")); jbarsSet($("connBars"), null);
-    try{ await gattSetup(); }
+    try{ await gattSetup(); diagPush("ev","link up"); }
     catch(e){
+      diagPush("ev","connect failed: "+(e&&e.message||e));
       hello("<b>Couldn't reach the controller.</b>"+
         "<div class='mini'>("+(e&&e.message||e)+")<br>Android may hold a stale "+
         "Bluetooth cache after a firmware update — toggle the phone's Bluetooth "+
@@ -1307,6 +1426,8 @@ async function connect(){
   }
 }
 async function onDisconnected(){
+  diagPush("ev","link dropped"+(busy?" (while connecting)":"")+(kv.UP?` · controller up ${kv.UP} s`:""));
+  if(typeof wbPort!=="undefined" && wbPort){ clearInterval(wbKeep); wbKeep=null; wbPort=0; $("wbOv").classList.add("hidden"); }
   otaNoteDrop();                            // capture WHERE an update died
   dismissConfirm();                         // never leave a dead prompt on screen
   if(busy){ cmdChar=null; return; }         // a connect/reconnect owns the link
@@ -1322,6 +1443,7 @@ async function onDisconnected(){
       try{
         await sleep(800);
         await gattSetup();
+        diagPush("ev","reconnected");
         hello("<b>Reconnected.</b><div class='mini'>Unlocking…</div>");   // stays for the intro
         askPin();
         autoPin();
@@ -1339,6 +1461,7 @@ async function onDisconnected(){
 // promise chain with a retry; ordering is guaranteed.
 let wq=Promise.resolve();
 function send(s){
+  diagCmd(s);
   if(demoOn && !cmdChar && !NBLE()){ demoCmd(s); return wq; }
   if(NBLE()){
     if(!NBLE().connected) return wq;
@@ -1512,6 +1635,7 @@ function onState(str){
   if(!str.startsWith("JMB;") && !cont) return;
   if(!authed){
     authed=true;
+    diagPush("ev","unlocked");
     clearTimeout(authTimer);
     if(pinPending){ savePin(pinPending); pinPending=""; }
     hideOverlay(); showApp();
@@ -1574,6 +1698,7 @@ function onState(str){
   if(n && n!==colPortsN){ renderColourTargets(n); colPortsN=n; }
   renderControl(); renderPortInfo(); renderDiag(); renderSetup();
   renderProductMark(); renderOta();
+  wbPaintAll(); wbRefresh(); pwPaint();
 }
 // (hexEnc lives later in the file — the printable-filtering version; a plain
 // duplicate here used to shadow-fight it.)
@@ -1723,6 +1848,7 @@ function renderControl(){
     { const fxOn=(m.X||0)>0;
       for(const id of ["rowR","rowG","rowB"]){ const r=$(id+p); if(r) r.classList.toggle("fxtrim",fxOn); }
       for(const id of ["r","g","b"]){ const s=$(id+p); if(s) s.disabled=fxOn; } }
+    pwPaintCard(p,m);                       // options first, then the value
     setIf(p,"PWM", el=>el.value=m.PW??0);
     setIf(p,"OCP", el=>el.value=((m.OC??ocpCapA()*1000)/1000).toFixed(2));
     // Ceiling follows the fitted shunt (SH): 6.5 A on 10 mΩ, 6.75 A on 5 mΩ.
@@ -1774,6 +1900,7 @@ function buildCard(p){
       <div class="swatch" id="sw${p}"></div>
       <h2>Port ${p}</h2>
       <span class="badge fault hidden" id="flt${p}"></span>
+      <span class="badge wb hidden" id="wbg${p}">WB</span>
       <span class="badge off" id="on${p}">—</span>
     </div>
     <div class="rows">
@@ -1803,13 +1930,22 @@ function buildCard(p){
         <div class="row"><label>Dimmer curve</label>
           <select id="crv${p}" style="width:130px">
             <option value="0">Linear</option><option value="1">Soft 1.6</option>
-            <option value="2">Theatre 2.2</option></select></div>
+            <option value="2">Theatre 2.2</option></select>
+          <span class="mini" id="crvn${p}" style="margin:0 0 0 8px"></span></div>
         <div class="row"><label>PWM</label>
-          <select id="pwm${p}">
+          <select id="pwm${p}" style="width:170px">
             <option value="0">Smooth 8 kHz</option>
             <option value="1">Silent 20 kHz</option>
             <option value="2">Camera 15.6 kHz</option>
-          </select></div>
+            <option value="3" hidden>Custom 1</option>
+            <option value="4" hidden>Custom 2</option>
+            <option value="5" hidden>Custom 3</option>
+          </select>
+          <button class="hidden" id="pwe${p}" style="margin-left:8px;padding:6px 10px">Custom…</button></div>
+        <div class="mini hidden" id="pwn${p}" style="margin:0;color:var(--warn)"></div>
+        <div class="row hidden" id="wbr${p}"><label>White bal.</label>
+          <button id="wbb${p}" style="padding:6px 12px">Adjust…</button>
+          <span class="mini" id="wbv${p}" style="margin:0 0 0 8px"></span></div>
         <div class="row"><label>Current</label>
           <input type="number" id="ocp${p}" min="0.25" max="6.5" step="0.25">
           <span class="unit">A</span>
@@ -1832,8 +1968,13 @@ function buildCard(p){
     send(`P${p}.LABEL=${v?hexEnc(v):"0"}`);
   });
   d.querySelector("#pwm"+p).addEventListener("change",e=>{
-    touch("PWM"); send(`P${p}.PWM=${+e.target.value}`);
+    touch("PWM"); if(ports[p-1]) ports[p-1].PW=+e.target.value;
+    send(`P${p}.PWM=${+e.target.value}`);
+    if(ports[p-1]) pwPaintCard(p,ports[p-1]);
   });
+  d.querySelector("#pwe"+p).addEventListener("click",pwOpen);
+  d.querySelector("#wbb"+p).addEventListener("click",()=>wbOpen(p));
+  d.querySelector("#wbg"+p).addEventListener("click",()=>wbOpen(p));
   d.querySelector("#ocp"+p).addEventListener("change",e=>{
     let a=Math.max(0.25,Math.min(ocpCapA(),+e.target.value||ocpCapA()));
     a=Math.round(a/0.25)*0.25; e.target.value=a;
@@ -3804,6 +3945,11 @@ function portQueue(list){
       q.push(`P${p}.LABEL=${lv?hexEnc(lv):"0"}`);
     }
     if(t.pw!==undefined) q.push(`P${p}.PWM=${t.pw}`);
+    if(Array.isArray(t.wb) && t.wb.length===3 && wbOf(p)){
+      const c=v=>Math.max(0,Math.min(255,Math.round(+v||0)));
+      q.push(`P${p}.WBR=${c(t.wb[0])}`,`P${p}.WBG=${c(t.wb[1])}`,`P${p}.WBB=${c(t.wb[2])}`);
+      hot[p+".WB"]=Date.now()+4000;
+    }
     if(t.oc!==undefined) q.push(`P${p}.OCP=${t.oc}`);
     if(t.ot!==undefined) q.push(`P${p}.OT=${t.ot}`);
     if(t.cv!==undefined) q.push(`P${p}.CURVE=${t.cv}`);
@@ -3847,6 +3993,9 @@ $("btnExport").onclick=()=>{
                          x:m.X??0,s:m.S??128,l:m.L||"",
                          pw:m.PW??0,oc:m.OC??6500,ot:m.OT??80,cv:m.CV??0})),
     scenes:loadScenes() };
+  // White balance and the PWM library's custom entries, when the firmware has them
+  data.ports.forEach((t,i)=>{ const w=wbOf(i+1); if(w) t.wb=[w.R,w.G,w.B]; });
+  if(pwLim()) data.pwc=[0,1,2].map(k=>{ const c=pwCustom(k); return c?{hz:c.hz,g:c.g}:null; });
   // octet-stream (not application/json) so the browser keeps the .jmb name as-is
   // instead of appending ".json" → the file was saving as "...jmb.json".
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/octet-stream"});
@@ -3878,8 +4027,13 @@ $("impFile").addEventListener("change",async ev=>{
               ` — overwrites current settings.`,
               {title:`Apply "${f.name}"?`,ok:"Apply",danger:true})) return;
   const nm=String(data.name||"").replace(/[^\x20-\x7E]/g,"").trim().slice(0,16);
+  // Custom entries go in BEFORE the ports, so a port that uses one can take it.
+  const lib=[];
+  if(Array.isArray(data.pwc) && pwLim()) data.pwc.slice(0,3).forEach((c,k)=>{
+    const hz=Math.round(+(c&&c.hz)||0), g=Math.round(+(c&&c.g)||22);
+    lib.push(hz>0 ? `PWC${k+1}=${hz},${g}` : `PWC${k+1}=0,0`); });
   const q=["CID="+(data.cid||0),"CNAME="+(nm?hexEnc(nm):"0"),
-           "AMODE="+(data.amode||0)].concat(portQueue(data.ports));
+           "AMODE="+(data.amode||0)].concat(lib,portQueue(data.ports));
   await applyQueue(q,"Applying");
   if(nsc){ saveScenes(data.scenes.slice(0,100)); renderScenes(); }
 });
@@ -4401,6 +4555,349 @@ $("btSwitch").onclick=()=>{
   $("btnDisc").click();
   setTimeout(()=>connect(),400);
 };
+// ---------- white balance + PWM library (2026-09-29) ----------
+// State keys (firmware ≥ this feature): W<n>=R,G,B,preview · PWLIM=fmin,fmax,
+// gmin,gmax · PWC<k>=carrier,curve×10,real carrier. An older firmware sends
+// none of them, and everything below stays hidden.
+const wbOf=p=>{ const a=String(kv["W"+p]??"").split(",").map(Number);
+  return (a.length>=3 && a.slice(0,3).every(n=>n>=0&&n<=255)) ? {R:a[0],G:a[1],B:a[2],pv:a[3]|0} : null; };
+const pwLim=()=>{ const a=String(kv.PWLIM??"").split(",").map(Number);
+  return (a.length===4 && a.every(n=>n>0)) ? {fmin:a[0],fmax:a[1],gmin:a[2],gmax:a[3]} : null; };
+const pwCustom=k=>{ const a=String(kv["PWC"+(k+1)]??"").split(",").map(Number);
+  return (a.length>=2 && a[0]>0) ? {hz:a[0],g:a[1],act:a[2]||a[0]} : null; };
+const fmtKhz=hz=>(hz/1000).toFixed(hz%1000?1:0)+" kHz";
+// The carrier the port's timer really produces (whole 62.5 ns counts) — the
+// same integer sum as the firmware, so the figure shown is the figure run.
+const pwActual=hz=>{ const span=Math.floor((16000000+Math.floor(hz/2))/hz);
+  return Math.floor((16000000+Math.floor(span/2))/span); };
+const PORT_FW_CUSTOM=0x0207;                     // port firmware 2.7
+const portsOn=entry=>ports.map((m,i)=>(m.PW===entry?i+1:0)).filter(Boolean);
+
+// ----- white balance widget -----
+let wbPort=0, wbKeep=null, wbVals={R:255,G:255,B:255};
+const WB_ROWS={ rgb:[["R","Red","r"],["G","Green","g"],["B","Blue","b"]],
+                cct:[["G","Cool white","cw"],["R","Warm white","ww"]],
+                dim:[["ALL","Level","uv"]] };
+const wbKind=pe=>(pe===2||pe===3)?"cct":(pe===5||pe===6)?"dim":"rgb";
+function wbSend(ch,v){
+  const p=wbPort; if(!p) return;
+  hot[p+".WB"]=Date.now();
+  const chs = ch==="ALL" ? ["R","G","B"] : [ch];
+  for(const c of chs){ wbVals[c]=v; sendThrottled(`wb${p}${c}`,`P${p}.WB${c}=${v}`); }
+  const cur=(kv["W"+p]||"255,255,255,0").split(",");
+  kv["W"+p]=[wbVals.R,wbVals.G,wbVals.B,cur[3]||0].join(",");   // optimistic
+  wbPaintCard(p);
+}
+function wbSet(ch,v){
+  v=Math.max(0,Math.min(255,Math.round(+v||0)));
+  const s=$("wbS"+ch), n=$("wbN"+ch);
+  if(s) s.value=v;
+  if(n) n.innerHTML=`${v} <span style="color:var(--dim);font-weight:400;font-size:12px">${Math.round(v/2.55)}%</span>`;
+  return v;
+}
+function wbPreview(on){
+  if(!wbPort) return;
+  // Never under live DMX: the desk has the port, and a preview left armed
+  // would jump the port to full the moment the desk went away.
+  if(on && kv.DMX==="1" && !demoOn) return;
+  send(`P${wbPort}.WBP=${on?1:0}`);
+}
+function wbNote(){
+  const n=$("wbNote"); if(!n||!wbPort) return;
+  const dmx=kv.DMX==="1" && !demoOn;
+  n.className="wbnote "+(dmx?"dmx":"live");
+  n.textContent = dmx
+    ? "Live DMX has this port, so the preview is off. Bring its channels to full at the desk to judge the balance."
+    : "The port is at full on every colour while this is open.";
+}
+function wbOpen(p){
+  const w=wbOf(p); if(!w) return;
+  wbPort=p; wbVals={R:w.R,G:w.G,B:w.B};
+  const m=ports[p-1]||{}, kind=wbKind(m.PE??0);
+  $("wbTitle").textContent=`White balance · Port ${p}`+(m.L?` · ${m.L}`:"");
+  $("wbRows").innerHTML=WB_ROWS[kind].map(([ch,name,cls])=>`
+    <div class="wbrow ${cls}">
+      <div class="wbhead"><span>${name}</span><b id="wbN${ch}"></b></div>
+      <input type="range" id="wbS${ch}" min="0" max="255" step="1">
+      <div class="wbsteps">
+        <button data-ch="${ch}" data-d="-10">−10</button><button data-ch="${ch}" data-d="-1">−1</button>
+        <button data-ch="${ch}" data-d="1">+1</button><button data-ch="${ch}" data-d="10">+10</button>
+      </div>
+    </div>`).join("");
+  for(const [ch] of WB_ROWS[kind]){
+    // Level (one slider for a single-colour port) follows the highest trim
+    const v0 = ch==="ALL" ? Math.max(w.R,w.G,w.B) : w[ch];
+    wbSet(ch,v0);
+    $("wbS"+ch).addEventListener("input",e=>wbSend(ch,wbSet(ch,e.target.value)));
+  }
+  $("wbRows").querySelectorAll(".wbsteps button").forEach(b=>b.onclick=()=>{
+    const ch=b.dataset.ch, cur=+$("wbS"+ch).value;
+    wbSend(ch,wbSet(ch,cur+ +b.dataset.d));
+  });
+  wbNote();
+  $("wbOv").classList.remove("hidden");
+  wbPreview(true);
+  clearInterval(wbKeep);
+  wbKeep=setInterval(()=>{ wbPreview(true); wbNote(); },3000);   // keep-alive: the port lets go 8 s after the last one
+}
+function wbClose(){
+  clearInterval(wbKeep); wbKeep=null;
+  if(wbPort) send(`P${wbPort}.WBP=0`);
+  wbPort=0;
+  $("wbOv").classList.add("hidden");
+}
+// State arrived: keep an open widget honest (a trim changed from a desk over
+// RDM), unless a finger is on it.
+function wbRefresh(){
+  if(!wbPort) return;
+  if(!wbOf(wbPort) || wbPort>ports.length){ wbClose(); return; }
+  wbNote();
+  if(Date.now()-(hot[wbPort+".WB"]||0) < HOT_MS) return;
+  const w=wbOf(wbPort), kind=wbKind((ports[wbPort-1]||{}).PE??0);
+  wbVals={R:w.R,G:w.G,B:w.B};
+  for(const [ch] of WB_ROWS[kind]){
+    const s=$("wbS"+ch); if(!s||document.activeElement===s) continue;
+    wbSet(ch, ch==="ALL" ? Math.max(w.R,w.G,w.B) : w[ch]);
+  }
+}
+// Port card: the Adjust row, its read-out and the orange WB badge.
+function wbPaintCard(p){
+  const w=wbOf(p), row=$("wbr"+p), bd=$("wbg"+p), tx=$("wbv"+p);
+  if(row) row.classList.toggle("hidden",!w);
+  const on=!!w && (w.R<255||w.G<255||w.B<255);
+  if(bd) bd.classList.toggle("hidden",!on);
+  if(tx && w){
+    const kind=wbKind((ports[p-1]||{}).PE??0);
+    tx.textContent = !on ? "no trim"
+      : kind==="cct" ? `cool ${w.G} · warm ${w.R}`
+      : kind==="dim" ? `level ${Math.max(w.R,w.G,w.B)}`
+      : `${w.R} · ${w.G} · ${w.B}`;
+  }
+}
+function wbPaintAll(){
+  for(let p=1;p<=ports.length;p++) wbPaintCard(p);
+  const b=$("btnWbReset"); if(!b) return;
+  const have=ports.length>0 && !!wbOf(1);
+  b.classList.toggle("hidden",!have);
+  const any=ports.some((_,i)=>{ const w=wbOf(i+1); return w && (w.R<255||w.G<255||w.B<255); });
+  b.classList.toggle("glow",any); b.disabled=!any; b.style.opacity=any?"":".45";
+}
+$("wbClose").onclick=wbClose;
+$("wbOv").addEventListener("click",e=>{ if(e.target===$("wbOv")) wbClose(); });
+$("wbReset").onclick=()=>{
+  const p=wbPort; if(!p) return;
+  hot[p+".WB"]=Date.now();
+  send(`P${p}.WBX=1`);
+  wbVals={R:255,G:255,B:255};
+  kv["W"+p]="255,255,255,"+((kv["W"+p]||"").split(",")[3]||0);
+  for(const ch of ["R","G","B","ALL"]) if($("wbS"+ch)) wbSet(ch,255);
+  wbPaintAll();
+};
+$("btnWbReset").onclick=async()=>{
+  if(!await askConfirm("Every port's white balance goes back to full on every colour.",
+        {title:"Reset white balance?",ok:"Reset",danger:true})) return;
+  send("ALL.WBX=1");
+  ports.forEach((_,i)=>{ const p=i+1; hot[p+".WB"]=Date.now();
+    kv["W"+p]="255,255,255,"+((kv["W"+p]||"").split(",")[3]||0); });
+  wbPaintAll();
+  setTimeout(()=>send("GET"),600);
+};
+// The port must never be left at full by a widget nobody is looking at.
+addEventListener("pagehide",()=>{ if(wbPort) wbClose(); });
+document.addEventListener("visibilitychange",()=>{ if(document.hidden && wbPort) wbClose(); });
+
+// ----- PWM library: the three custom entries -----
+function pwCaveat(hz){
+  const lim=pwLim(); if(!lim||!hz) return "";
+  if(hz<lim.fmin||hz>lim.fmax) return `Allowed: ${lim.fmin}–${lim.fmax} Hz.`;
+  if(hz<3000)  return "Below 3 kHz: can show on camera and as strobing on fast movement.";
+  if(hz>20000) return "Above 20 kHz: the port runs warmer, low levels step more coarsely.";
+  if(hz<20000) return "In the audible range: some strips and supplies may sing.";
+  return "";
+}
+function pwOpen(){
+  const lim=pwLim(); if(!lim) return;
+  $("pwRows").innerHTML=[0,1,2].map(k=>`
+    <div class="pwrow">
+      <div class="wbhead"><span>Custom ${k+1}</span><b id="pwU${k}" style="font-size:12px;font-weight:400"></b></div>
+      <div class="row" style="margin-top:6px">
+        <input type="number" id="pwF${k}" min="${lim.fmin}" max="${lim.fmax}" step="1" inputmode="numeric" placeholder="carrier" style="width:96px">
+        <span class="unit">Hz</span>
+        <label style="width:auto;margin-left:10px">Curve</label>
+        <input type="number" id="pwG${k}" min="${(lim.gmin/10).toFixed(1)}" max="${(lim.gmax/10).toFixed(1)}" step="0.1" inputmode="decimal" style="width:64px">
+      </div>
+      <div class="mini" id="pwA${k}" style="margin-top:4px;min-height:16px"></div>
+      <div class="ctlrow" style="margin-top:6px">
+        <button id="pwS${k}" style="flex:1">Save</button>
+        <button id="pwC${k}" class="danger" style="flex:1">Clear</button>
+      </div>
+    </div>`).join("");
+  $("pwLimTxt").textContent=`Carrier ${lim.fmin}–${lim.fmax} Hz · curve ${(lim.gmin/10).toFixed(1)}–${(lim.gmax/10).toFixed(1)} (1.0 = linear, 2.2 = theatre).`;
+  [0,1,2].forEach(k=>{
+    const f=$("pwF"+k), g=$("pwG"+k);
+    const note=()=>{ const hz=Math.round(+f.value||0), a=$("pwA"+k);
+      const ok=hz>=lim.fmin&&hz<=lim.fmax;
+      a.textContent = !hz ? "" : (ok?`Runs at ${pwActual(hz).toLocaleString("en-GB")} Hz. `:"")+pwCaveat(hz);
+      a.style.color = (hz && !ok) ? "var(--bad)" : ""; };
+    f.addEventListener("input",note); f._note=note;
+    $("pwS"+k).onclick=()=>{
+      let hz=Math.round(+f.value||0), gv=Math.round((+g.value||2.2)*10);
+      if(!hz){ $("pwA"+k).textContent="Enter a carrier in Hz."; return; }
+      hz=Math.max(lim.fmin,Math.min(lim.fmax,hz)); gv=Math.max(lim.gmin,Math.min(lim.gmax,gv));
+      f.value=hz; g.value=(gv/10).toFixed(1); note();
+      hot["PWC"+k]=Date.now();
+      kv["PWC"+(k+1)]=`${hz},${gv},${pwActual(hz)}`;          // optimistic
+      send(`PWC${k+1}=${hz},${gv}`);
+      pwPaint(); renderControl();
+    };
+    $("pwC"+k).onclick=async()=>{
+      const used=portsOn(3+k);
+      if(used.length && !await askConfirm(`Port${used.length>1?"s":""} ${used.join(", ")} `+
+            `${used.length>1?"go":"goes"} back to Camera 15.6 kHz.`,
+            {title:`Clear Custom ${k+1}?`,ok:"Clear",danger:true})) return;
+      hot["PWC"+k]=Date.now();
+      kv["PWC"+(k+1)]="0,0,0";
+      used.forEach(p=>{ if(ports[p-1]) ports[p-1].PW=2; });
+      f.value=""; g.value="2.2"; note();
+      send(`PWC${k+1}=0,0`);
+      pwPaint(); renderControl();
+    };
+  });
+  pwPaint(true);
+  $("pwOv").classList.remove("hidden");
+}
+// fill=true: (re)load the fields from the controller; otherwise only the
+// status lines move, so typing is never overwritten by a state echo.
+function pwPaint(fill){
+  if($("pwOv").classList.contains("hidden") && !fill) return;
+  [0,1,2].forEach(k=>{
+    const c=pwCustom(k), f=$("pwF"+k), g=$("pwG"+k), u=$("pwU"+k);
+    if(!f) return;
+    if(fill){ f.value=c?c.hz:""; g.value=c?(c.g/10).toFixed(1):"2.2"; if(f._note) f._note(); }
+    const used=portsOn(3+k);
+    if(u) u.textContent = !c ? "not set" : used.length ? `in use: port${used.length>1?"s":""} ${used.join(", ")}` : "not in use";
+    const cb=$("pwC"+k); if(cb) cb.disabled=!c;
+  });
+}
+$("pwClose").onclick=()=>$("pwOv").classList.add("hidden");
+$("pwOv").addEventListener("click",e=>{ if(e.target===$("pwOv")) $("pwOv").classList.add("hidden"); });
+
+// Port card, Advanced: library picker, curve lock and the Custom… button.
+function pwPaintCard(p,m){
+  const lib=!!pwLim(), sel=$("pwm"+p), pf=+(m.PF||0);
+  if(sel) for(const o of sel.options){
+    const v=+o.value; if(v<3) continue;
+    const c=pwCustom(v-3);
+    o.hidden=!lib;
+    o.disabled=!c || pf<PORT_FW_CUSTOM;
+    o.textContent = !c ? `Custom ${v-2} (not set)`
+      : `Custom ${v-2} · ${fmtKhz(c.act)} · γ${(c.g/10).toFixed(1)}`+(pf<PORT_FW_CUSTOM?" — port firmware 2.7":"");
+  }
+  const pe=$("pwe"+p); if(pe) pe.classList.toggle("hidden",!lib);
+  const slot=(m.PW??0)-3, c=slot>=0?pwCustom(slot):null;
+  const cs=$("crv"+p), cn=$("crvn"+p);
+  if(cs) cs.disabled=!!c;
+  if(cn) cn.textContent = c ? `Custom ${slot+1}: γ${(c.g/10).toFixed(1)}` : "";
+  // A port that cannot run the entry it holds is on the stock Camera carrier.
+  const pn=$("pwn"+p);
+  if(pn){ const bad=!!c && pf<PORT_FW_CUSTOM && m.O===1;
+    pn.classList.toggle("hidden",!bad);
+    if(bad) pn.textContent="This port's firmware is older than 2.7: it is running Camera 15.6 kHz."; }
+}
+
+// ---------- support report (Setup → Support) ----------
+// The app still sends nothing by itself. The report is built on the phone,
+// shown to the user, and leaves only in an email THEY send from their own mail
+// app (or a file they share). See app/privacy.html.
+const SUP_TO="support@jmblighting.co.uk";
+// Controller status that goes in. A WHITELIST: a key the firmware gains later
+// stays out until it is added here on purpose. Never listed: NIP (network
+// address). Names (CN, BTN), the ID and port labels go in only with the tick.
+const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD",
+  "RDM","ANS","RB","RBOK","STM","SPC","CHL","TSEQ","TXA","TXN","LPX","LPS","LPN","LPA","LPG","BSY","BRT","BSM","BRM",
+  "NET","NW","NRS","TF","PB","CL","CLM","CLK","CF","FC","FT","OL","SH","SHM","TCR","CX","CA","CXR","CXL","CXS","CXF",
+  "SQ","SQN","BPM","SPR","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
+function supReport(){
+  const names=$("supNames").checked;
+  const red=t=>{ t=String(t||""); return names ? t : (t ? `<${t.length} chars>` : ""); };
+  const ctl={};
+  for(const k of SUP_KEYS) if(kv[k]!==undefined) ctl[k]=kv[k];
+  for(let i=1;i<=8;i++) for(const k of ["W"+i,"WC"+i]) if(kv[k]!==undefined) ctl[k]=kv[k];
+  ctl.name=red(hexDec(kv.CN)); ctl.bt_name=red(hexDec(kv.BTN));
+  if(names) ctl.CID=kv.CID;
+  const tryIt=(fn,d)=>{ try{ return fn(); }catch(_){ return d; } };
+  return {
+    report:"jmb-support", v:1, made:new Date().toISOString(),
+    feedback:$("supText").value.trim().slice(0,1500),
+    app:{ ver:APP_VER, shell:NBLE()?"native":"web",
+          installed:tryIt(()=>matchMedia("(display-mode: standalone)").matches,false),
+          demo:!!demoOn, connected:bleConnected(), unlocked:!!authed, tab:activeTabName(),
+          online:navigator.onLine, lang:navigator.language||"",
+          screen:`${screen.width}x${screen.height}@${Math.round((window.devicePixelRatio||1)*100)/100}`,
+          browser:navigator.userAgent, bluetooth:!!navigator.bluetooth, share:!!navigator.share,
+          developer:document.body.classList.contains("dev"),
+          scenes:tryIt(()=>loadScenes().length,null),
+          update_drop:tryIt(()=>localStorage.getItem("jmbOtaDrop")||"","") },
+    controller: kv.FW ? ctl : null,
+    ports: ports.map((m,i)=>{ const o={n:i+1}; for(const k in m) if(k!=="L") o[k]=m[k]; o.label=red(m.L); return o; }),
+    errors:diag.err.slice(), events:diag.ev.slice(), commands:diag.cmd.slice()
+  };
+}
+function supAsText(r){
+  const L=[], a=r.app;
+  L.push(`App ${a.ver} (${a.shell}${a.installed?", installed":""}${a.demo?", demo":""}) · `+
+         `${a.connected?(a.unlocked?"connected":"connected, locked"):"not connected"} · tab ${a.tab} · ${a.screen}`);
+  L.push(a.browser);
+  if(r.controller){ const c=r.controller, top=["FW","FWB","PORTS","UP","RR","CRS"];
+    const v=k=>c[k]===undefined?"—":c[k];
+    L.push(`Controller fw ${v("FW")} build ${v("FWB")} · ${v("PORTS")}-port · up ${v("UP")} s · reset ${v("RR")} · crash ${v("CRS")}`);
+    L.push(Object.keys(c).filter(k=>!top.includes(k) && c[k]!=="").map(k=>`${k}=${c[k]}`).join(";"));
+  }else L.push("Controller: no status received this session");
+  for(const p of r.ports) L.push(`P${p.n}: `+Object.keys(p).filter(k=>k!=="n" && p[k]!=="").map(k=>k+"="+p[k]).join(","));
+  L.push(`-- errors (${r.errors.length})`);      L.push(...r.errors.slice(-12));
+  L.push(`-- link events (${r.events.length})`); L.push(...r.events.slice(-12));
+  L.push(`-- last commands (${r.commands.length})`); L.push(...r.commands.slice(-20));
+  return L.join("\n");
+}
+const supStamp=()=>{ const d=new Date(), p2=x=>String(x).padStart(2,"0");
+  return `${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}`; };
+function supPreview(){ $("supPre").textContent=supAsText(supReport()); }
+function supMsg(t,bad){ const m=$("supMsg"); m.textContent=t; m.style.color=bad?"var(--bad)":""; }
+const SUP_NEVER="Never included: PIN, Wi-Fi details, network address, location.";
+$("btnSupport").onclick=()=>{ supPreview(); supMsg(SUP_NEVER); $("supOv").classList.remove("hidden"); };
+$("supClose").onclick=()=>$("supOv").classList.add("hidden");
+$("supNames").onchange=supPreview;
+$("supDet").addEventListener("toggle",supPreview);
+$("supMail").onclick=()=>{
+  const r=supReport();
+  let rep=supAsText(r);
+  // Mail apps cut long links short: keep the report part to what they all take.
+  if(rep.length>4200) rep=rep.slice(0,4200)+"\n… (cut here — Share report file has the rest)";
+  const body=(r.feedback||"(no message)")+"\n\n---- status report, please leave in place ----\n"+rep;
+  const sub=`JMB Lighting app support · app ${APP_VER}`+(kv.FW?` · fw ${kv.FW}`:"");
+  try{
+    location.href=`mailto:${SUP_TO}?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`;
+    supMsg(`Your mail app should open with the report ready to send. Nothing opened? Use Share report file and send it to ${SUP_TO}.`);
+  }catch(e){ supMsg(`Couldn't open a mail app — use Share report file and send it to ${SUP_TO}.`,true); }
+};
+$("supFile").onclick=async()=>{
+  const r=supReport(), name=`jmb-support-${supStamp()}.txt`;
+  // .txt on purpose: phones will share a text file but refuse a .json one.
+  const blob=new Blob([JSON.stringify(r,null,2)],{type:"text/plain"});
+  let file=null; try{ file=new File([blob],name,{type:"text/plain"}); }catch(_){}
+  if(file && navigator.canShare && navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({files:[file], title:"JMB Lighting support report",
+                             text:`For ${SUP_TO}`+(r.feedback?"\n\n"+r.feedback:"")});
+      supMsg(`Shared — send it to ${SUP_TO}.`); return;
+    }catch(e){ if(e && e.name==="AbortError") return; }     // else fall back to a saved file
+  }
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  supMsg(`Saved ${name} — attach it to an email to ${SUP_TO}.`);
+};
+
 // ---------- DEMO MODE ----------
 // Browse the whole app with example data and no hardware: store reviewers and
 // prospective users can explore every tab. send() already no-ops while
@@ -4419,7 +4916,8 @@ const demoP=[{a:1,pe:0,r:100,g:85,b:60,x:0,s:128},{a:4,pe:0,r:100,g:100,b:100,x:
              {a:20,pe:0,r:100,g:100,b:100,x:2,s:128},{a:23,pe:0,r:100,g:0,b:60,x:0,s:128},
              {a:26,pe:0,r:100,g:100,b:100,x:14,s:128},{a:29,pe:4,r:100,g:100,b:100,x:4,s:128}];
 const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1,bpm:128,btn:'44656D6F20526967',txa:0,
-             var:4, varm:0, cl:0, clk:0, cf:1, tf:1};   // cl 0 = product max (0.1 A units)
+             var:4, varm:0, cl:0, clk:0, cf:1, tf:1,    // cl 0 = product max (0.1 A units)
+             pwc:[{hz:12300,g:24},null,null]};           // PWM library: Custom 1 set, 2 and 3 empty
 // Demo mirror of the firmware's limit maths: max = 6.75 A × ports; the fold
 // scale is what would hold the summed demo port currents under the limit.
 function demoLimits(){
@@ -4437,7 +4935,9 @@ function demoTxState(){
 }
 function demoState(){
   const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S${d.s??128},H${n},`+
-    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW2,OC6500,OT80,TX${1000*n},TO0,EC0,PH1,PF517,KA1000,KB1000,L0;`;
+    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW${d.pw??2},OC6500,OT80,CV${d.cv??0},TX${1000*n},TO0,EC0,PH1,PF519,KA1000,KB1000,L0;`;
+  const W=(n,d)=>{ const w=d.wb||[255,255,255]; return `W${n}=${w[0]},${w[1]},${w[2]},${d.wbp?1:0};`; };
+  const PWC=demoF.pwc.map((c,k)=>`PWC${k+1}=${c?`${c.hz},${c.g},${pwActual(c.hz)}`:"0,0,0"};`).join("");
   onState(
     `JMB;FW=demo;PORTS=${demoF.var};CID=7;DMX=1;FPS=44;DI=0;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=3;ERR=0;`+
     "RDM=42;ANS=42;AGE=23;"+
@@ -4447,6 +4947,7 @@ function demoState(){
     `NET=${demoF.net};NW=${demoF.net};NUN=${demoF.nun};SRC=${demoF.net?1:0};`+
     `NIP=192.168.1.42;NRS=-52;TF=${demoF.tf};PB=${demoF.cl};`+demoLimits()+"CX=3;CA=1;"+
     `SH=${demoF.sh||(demoF.var===1?5:10)};SHM=${demoF.sh?1:0};`+
+    "PWLIM=2000,25000,10,30;"+PWC+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)).join("")+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
     `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+demoTxState()+
     "LPX=9;LPS=5;LPN=0;LPA=31;LPG=22;RR=1;BSY=0;BRT=3;"+
@@ -4513,6 +5014,22 @@ function demoCmd(s){
   if(m=s.match(/^P(\d)\.(R|G|B)=(\d+)/)){ demoP[+m[1]-1][m[2].toLowerCase()]=+m[3]; return; }
   if(m=s.match(/^ALL\.RGB=(\d+),(\d+),(\d+)/)){ demoP.forEach(d=>{d.r=+m[1];d.g=+m[2];d.b=+m[3];}); return; }
   if(m=s.match(/^P(\d)\.FX=(\d+)/)){ demoP[+m[1]-1].x=+m[2]; demoState(); return; }
+  // White balance + PWM library
+  if(m=s.match(/^P(\d)\.WB(R|G|B)=(\d+)/)){ const d=demoP[+m[1]-1]; d.wb=d.wb||[255,255,255];
+    d.wb["RGB".indexOf(m[2])]=Math.max(0,Math.min(255,+m[3])); return; }
+  if(m=s.match(/^P(\d)\.WBX=/)){ demoP[+m[1]-1].wb=[255,255,255]; demoState(); return; }
+  if(m=s.match(/^P(\d)\.WBP=(\d)/)){ demoP[+m[1]-1].wbp=+m[2]; return; }
+  if(s.startsWith("ALL.WBX=")){ demoP.forEach(d=>{ d.wb=[255,255,255]; }); demoState(); return; }
+  if(m=s.match(/^PWC(\d)=(\d+),(\d+)/)){ const k=+m[1]-1, hz=+m[2];
+    if(k>=0&&k<3){
+      if(!hz){ demoF.pwc[k]=null; demoP.forEach(d=>{ if(d.pw===3+k) d.pw=2; }); }
+      else demoF.pwc[k]={hz:Math.max(2000,Math.min(25000,hz)),g:Math.max(10,Math.min(30,+m[3]))};
+      demoState(); }
+    return; }
+  if(m=s.match(/^P(\d)\.PWM=(\d+)/)){ const v=+m[2], d=demoP[+m[1]-1];
+    if(v<3 || (v<6 && demoF.pwc[v-3])) d.pw=v;
+    demoState(); return; }
+  if(m=s.match(/^P(\d)\.CURVE=(\d+)/)){ demoP[+m[1]-1].cv=Math.min(2,+m[2]); return; }
   // Model switch: the demo becomes a Zone / 4our / 8ight on the spot (a real
   // controller restarts here). The header mark and every tab follow.
   if(m=s.match(/^VARIANT=(\d)/)){ const v=+m[1]; if(v===1||v===4||v===8){ demoF.var=v; demoF.varm=1; demoState(); } return; }

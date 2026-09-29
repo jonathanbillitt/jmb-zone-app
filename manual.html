@@ -84,9 +84,9 @@ never masquerade as a live source.</p>
 <p>DMX Address and Head Number open the digit editor (turn = digit, click =
 next, SAVE commits; hold cancels; the footprint hint shows the span).
 Personality cycles RGB / RGB16 / CCT / CCT16 / <strong>FX10</strong> / <strong>Dim1 / Dim16</strong> (see DMX chart).
-Effect opens the effect picker. PWM Mode cycles <strong>Smooth 8 kHz / Silent
-20 kHz / Camera 62.5 kHz</strong> — Camera is the power-up default and is flicker-free
-for slow-motion capture (see §8). Current and Temp limits step their trip points
+Effect opens the effect picker. PWM Mode cycles the PWM library: <strong>Smooth 8 kHz /
+Silent 20 kHz / Camera 15.6 kHz</strong>, then any custom entry that has been set in the
+app (shown as <strong>C1 12.3k</strong>; see §8). Current and Temp limits step their trip points
 and push to the port hardware immediately. Clear Fault re-arms a latched port.
 <strong>Presets</strong> opens the presets sub-menu (below).</p>
 <p><strong>All Ports adds two rows:</strong>
@@ -259,7 +259,11 @@ renumber — they only change the output.)</p>
 ports and strobes the main screen <strong>HERE</strong>), device info, start address,
 personality — the root device carries the rack view (a SET fans out per the
 Apply mode) and each port is addressable individually as a sub-device.
-E1.37-1 dimmer curve and PWM frequency are settable from the desk. The
+E1.37-1 dimmer curve and PWM frequency are settable from the desk, on the root
+for the whole rack and on each port. <strong>White balance</strong> (three parameters per
+port, raw 0–255), its <strong>preview</strong>, and the PWM library's <strong>custom entries</strong> are
+manufacturer parameters that a console can list and edit; the table is in the DMX
+chart. The
 controller also publishes <strong>per-port temperature and current as E1.20 sensors</strong>
 on the root device ("Port 1 Temp", "Port 1 Current", …), so any RDM console
 reads fixture health live. The main screen also flashes the moment discovery
@@ -336,8 +340,20 @@ settings: <strong>PWM mode</strong> (the dimming carrier frequency — see §8),
 limit</strong> (0.25 A up to the unit's ceiling — <strong>6.75 A</strong> on units with the 5 mΩ
 current sense, which is every Zone, <strong>6.5 A</strong> on earlier 4our/8ight modules;
 the field's range shows which), <strong>temperature trip</strong>, <strong>dimmer curve</strong>
-(<strong>Linear / Soft / Theatre</strong> — how fader travel maps to brightness), and a
-<strong>Clear fault &amp; re-enable</strong> button that appears only while the port is latched.</p>
+(<strong>Linear / Soft / Theatre</strong> — how fader travel maps to brightness), <strong>white
+balance</strong>, and a <strong>Clear fault &amp; re-enable</strong> button that appears only while the
+port is latched.</p>
+<p><strong>White balance.</strong> <em>Adjust…</em> opens a master for each colour of that port: Red,
+Green and Blue on a colour port, Cool and Warm on a tuneable-white port, one Level
+on a dimmer port. Drag, or step with <strong>−10 −1 +1 +10</strong>; 255 is full. The trim is
+applied after the dimmer curve, so the balance holds from full to the bottom of a
+fade and does not move if you change the curve. While the widget is open the port
+fades to full on every colour so you can judge it — but never over live DMX: with
+a desk connected, bring the channels up at the desk. The port returns to its look
+when you close the widget, leave the app or lose the link. A port with a trim in
+force shows an orange <strong>WB</strong> badge. <strong>Reset</strong> clears that port; <strong>Reset white
+balance</strong>, beside <em>Clear all</em>, clears every port. The trims live in the
+controller and apply to every source.</p>
 <h3>Colour — dial a look, don't push channels</h3>
 <p>A console-style picker for the selected ports (choose <strong>All</strong> or one port at the
 top). Its five columns — <strong>Dim, Hue, Sat, Kelvin</strong> and <strong>ΔUV</strong> — are all views of
@@ -490,6 +506,12 @@ live.</p>
 offers the effects that read on a white strip (Candle, Fire, Lightning, TV Sim,
 Strobe, Pulse, Fluoro, Paparazzi, Explosion); the colour-only effects are hidden
 so you can't pick one that would do nothing.</p>
+<p><strong>Support.</strong> <em>Setup → App → Support</em> lets you tell us about a problem. Type what
+happened; the app adds a status report (versions, controller status, recent errors
+and commands) and hands it to your own mail app addressed to
+support@jmblighting.co.uk. Nothing is sent unless you send it, and <em>What the report
+contains</em> shows every line first. It never holds the PIN, Wi-Fi details, network
+address or location; names and labels are included only if you tick the box.</p>
 <p><strong>Demo mode.</strong> <em>Demo mode</em> on the connect screen walks the entire app
 — every tab, the analyser, even an RDM scan that discovers example fixtures —
 with no controller present. Nothing a demo user touches goes anywhere; it is for
@@ -518,6 +540,15 @@ fixture legitimately has an unused output.</p>
 its over-temp trip, it eases the output down over the last 10 °C (to a 30 %
 floor) so a hot fixture <em>rides through</em> instead of hard-latching mid-show. The
 latch stays as the real-fault backstop.</p>
+<p><strong>Ratings and hot environments.</strong> Every port is rated for its full 6.75 A with
+all ports loaded at once, at 25 °C ambient, with the air filter clean and the
+vents clear. In a hot rack, a sealed flight case or a sunlit truss, the
+controller protects itself: thermal fold eases the outputs before anything
+trips, and the power supply derates above its rated temperature. If the <em>Fold</em>
+chip appears on the header in normal use, give the unit air. Keep the intake
+filter clean and never block the side slots. (The ambient at which fold first
+engages at full load is recorded on the bench per product and printed here once
+measured.)</p>
 <p><strong>Controller current limit</strong> (Setup → Current Limit; app → Setup, under the
 controller's name): the most current the whole controller may draw, in 0.5 A
 steps up to the product maximum — <strong>6.75 A</strong> on the Zone, <strong>27 A</strong> on the 4our,
@@ -537,48 +568,65 @@ and the live percentage under the limit field. Tap a chip for its detail box
 (the green <em>DMX live</em> chip works the same way).</p>
 <hr />
 <h2>8. Camera &amp; slow-motion work</h2>
-<p>Each port dims with a high-frequency PWM carrier, set per port under <strong>Port
-Settings → PWM Mode</strong> (also in the app, and over RDM via MODULATION_FREQUENCY):</p>
+<p>Each port dims with a high-frequency PWM carrier, picked per port from the <strong>PWM
+library</strong> under <strong>Port Settings → PWM Mode</strong> (also in the app, and over RDM via
+MODULATION_FREQUENCY):</p>
 <table>
 <thead>
 <tr>
-<th>Mode</th>
+<th>Entry</th>
 <th>Carrier</th>
 <th>Use it for</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Camera</strong> <em>(default)</em></td>
-<td><strong>62.5 kHz</strong></td>
-<td>Any shoot — flicker-free on high-speed cameras</td>
+<td>Smooth <em>(default)</em></td>
+<td>8 kHz</td>
+<td>Smoothest low-end dimming</td>
+</tr>
+<tr>
+<td>Camera</td>
+<td>15.6 kHz</td>
+<td>General camera work</td>
 </tr>
 <tr>
 <td>Silent</td>
 <td>20 kHz</td>
-<td>Quietest drive (no coil whine) when no camera is present</td>
+<td>Above hearing: quietest drive</td>
 </tr>
 <tr>
-<td>Smooth</td>
-<td>8 kHz</td>
-<td>Maximum low-end dimming smoothness, eye-only / theatre</td>
+<td>Custom 1–3</td>
+<td>2–25 kHz, your choice</td>
+<td>Matching a camera or another fixture</td>
 </tr>
 </tbody>
 </table>
-<p>All three carry the full ~16-bit dimming resolution (temporal dithering makes up
-the difference at the higher carriers), so the picture is identically smooth —
-only the flicker frequency changes.</p>
+<p>All carry the full ~16-bit dimming resolution (temporal dithering makes up the
+difference at the higher carriers).</p>
+<p><strong>Custom entries.</strong> In the app, <em>Advanced → PWM → Custom…</em> sets up to three entries.
+Each holds a carrier and its own dimmer curve (1.0 = linear, 2.2 = theatre, up to
+3.0), and any port can select it. The app shows the carrier the hardware will
+really produce. Custom entries are outside the tested set, so check the result on
+the strip and on camera before a show:</p>
+<ul>
+<li>below 3 kHz can show on camera and as strobing on fast movement;</li>
+<li>anything below 20 kHz is in the audible range, and some strips and supplies sing;</li>
+<li>above 20 kHz the port runs warmer and low levels step more coarsely.</li>
+</ul>
+<p>A port needs port firmware 2.7 to run a custom entry; on an older port the entries
+are greyed out.</p>
 <p><strong>Setting up for slow-motion / high-speed capture:</strong></p>
 <ul>
-<li><strong>Leave every port on Camera (62.5 kHz)</strong> — it's the power-up default. At
-  62.5 kHz the output is flat through exposures short enough for normal
-  high-speed work (comfortably to ~1000 fps at sensible shutter angles).</li>
+<li><strong>Put every port on Camera (15.6 kHz) or Silent (20 kHz)</strong>, and shoot a short
+  test at your frame rate and shutter angle before the take.</li>
 <li><strong>Keep all ports on the same mode</strong> so multiple fixtures match on camera. Use
   All Ports → PWM Mode, or set it once over RDM, to change the whole rig together.</li>
 <li><strong>Extreme frame rates</strong> (multi-thousand fps) with very short exposures: shoot a
   quick test first. <em>Any</em> PWM dimmer can show faint banding when the exposure
   catches only a few carrier cycles — if you see it, widen the shutter angle or
-  drop the frame rate slightly. Higher isn't selectable beyond 62.5 kHz.</li>
+  drop the frame rate slightly, or try a custom carrier. 25 kHz is the highest
+  carrier the hardware offers.</li>
 <li><strong>Turn strobe looks off for clean capture.</strong> The Strobe / Police effects and
   the FX personality's shutter channel (CH10) <em>deliberately</em> chop the output —
   that's the effect, not carrier flicker. Set the shutter open / effect Off.</li>

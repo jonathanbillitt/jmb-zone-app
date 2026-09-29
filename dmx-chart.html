@@ -265,9 +265,59 @@ line noise rather than treated as a new look.</p>
 <p>Root device (sub 0): rack footprint, start address = port 1; SET fans out
 per the Apply mode (JMB parameter 0x8001: 1=Same 2=Seq 3=Offset). Each port
 is a sub-device (1–N) with its own start address, personality and identify.
-E1.37-1 CURVE (dimmer curve) and MODULATION_FREQUENCY (PWM 1=Smooth 8 kHz,
-2=Silent 20 kHz, 3=Camera 62.5 kHz — the flicker-free default) are
-supported on the root. The root also
+E1.37-1 CURVE (dimmer curve) and MODULATION_FREQUENCY (PWM library: 1=Smooth
+8 kHz, 2=Silent 20 kHz, 3=Camera 15.6 kHz, 4–6=Custom 1–3) are supported on
+the root and on each port. On the root a read returns port 1 and a write goes
+to every port.</p>
+<table>
+<thead>
+<tr>
+<th>JMB parameter</th>
+<th>ID</th>
+<th>On</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>White balance red / warm</td>
+<td>0x8010</td>
+<td>root, ports</td>
+<td>0–255, 255 = full</td>
+</tr>
+<tr>
+<td>White balance green / cool</td>
+<td>0x8011</td>
+<td>root, ports</td>
+<td>0–255</td>
+</tr>
+<tr>
+<td>White balance blue</td>
+<td>0x8012</td>
+<td>root, ports</td>
+<td>0–255</td>
+</tr>
+<tr>
+<td>White balance preview</td>
+<td>0x8013</td>
+<td>root, ports</td>
+<td>0 / 1 — acts only with no DMX present; off after 5 min</td>
+</tr>
+<tr>
+<td>Custom 1 / 2 / 3 carrier</td>
+<td>0x8020 / 0x8022 / 0x8024</td>
+<td>root</td>
+<td>Hz, 2000–25000; 0 empties the entry</td>
+</tr>
+<tr>
+<td>Custom 1 / 2 / 3 curve</td>
+<td>0x8021 / 0x8023 / 0x8025</td>
+<td>root</td>
+<td>curve × 10, 10–30 (22 = 2.2)</td>
+</tr>
+</tbody>
+</table>
+<p>A value outside its range is refused, never altered. The root also
 exposes each port's temperature and output current as E1.20 sensors, and
 personality is settable at the root for sub-0-only consoles.</p>
 <script>
