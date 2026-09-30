@@ -99,15 +99,19 @@
   .port-head h2 { font-size:15px; margin:0; }
   .port-head h2 { flex:1; }
   .pilabel { font-weight:400; color:var(--dim); font-size:13px; }
-  /* Port card value chips (2026-10-01): the set-once settings — patch, curve,
-     PWM, white balance, protection — each as a chip that shows its value and
-     opens a sheet. Replaces the "Advanced & protection" fold-out. */
-  .pchips { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; padding-top:12px;
-            border-top:1px solid var(--line); }
-  .pchips .chip { background:var(--card2); padding:7px 12px; font-size:12.5px; line-height:1.2;
-                  display:inline-flex; gap:5px; align-items:baseline; white-space:nowrap; }
-  .pchips .chip.warn { background:#3d2f14; }
-  .pchips .chip.bad { background:#3a1518; border-color:var(--bad); }
+  /* Port card settings (2026-10-01): three equal columns — Patch / Output /
+     Protection — a button on top and every set value printed beneath it, so
+     nothing is hidden; the button opens that group's sheet. Replaces the
+     "Advanced & protection" fold-out (a first cut with value chips was
+     rejected as messy: the layout matters as much as the function). */
+  .pset { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px;
+          padding-top:12px; border-top:1px solid var(--line); }
+  .pcol { min-width:0; }
+  .pcol button { width:100%; padding:8px 4px; font-size:13px; white-space:nowrap; margin-bottom:7px; }
+  .pv { font-size:clamp(10.5px,3.1vw,12px); color:var(--dim); line-height:1.55; text-align:center;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .pv span { color:var(--text); }
+  .pv.ok { color:var(--ok); }  .pv.warn { color:var(--warn); }  .pv.bad { color:var(--bad); font-weight:600; }
   /* The sheets: rows sit in #pcBody while open. Give the rows real vertical
      space and let a focused control paint above its neighbours. */
   #pcBody .rows { display:flex; flex-direction:column; gap:14px; margin-top:14px; }
@@ -1192,7 +1196,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-01b.portcard";
+const APP_VER="2026-10-01c.three";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1875,7 +1879,7 @@ function renderControl(){
       for(const id of ["rowR","rowG","rowB"]){ const r=$(id+p); if(r) r.classList.toggle("fxtrim",fxOn); }
       for(const id of ["r","g","b"]){ const s=$(id+p); if(s) s.disabled=fxOn; } }
     pwPaintCard(p,m);                       // options first, then the value
-    pcPaintChips(p,m);
+    pcPaintSet(p,m);
     setIf(p,"PWM", el=>el.value=m.PW??0);
     setIf(p,"OCP", el=>el.value=((m.OC??ocpCapA()*1000)/1000).toFixed(2));
     // Ceiling follows the fitted shunt (SH): 6.5 A on 10 mΩ, 6.75 A on 5 mΩ.
@@ -1941,15 +1945,29 @@ function buildCard(p){
         <div class="wheelbox" id="wd${p}"></div>
         <div class="wheelbox" id="ws${p}"></div>
       </div>
-      <!-- Set-once settings live behind value chips (user, 2026-10-01: "features
-           condensed into buttons that pop up as widgets"). Each chip shows the
-           current value; tapping opens that port's sheet. -->
-      <div class="pchips" id="pch${p}">
-        <button class="chip tap" id="chPatch${p}">Patch <b>—</b></button>
-        <button class="chip tap" id="chCrv${p}">Curve <b>—</b></button>
-        <button class="chip tap" id="chPwm${p}">PWM <b>—</b></button>
-        <button class="chip tap hidden" id="wbr${p}">White balance <b id="wbv${p}">—</b></button>
-        <button class="chip tap" id="chProt${p}">Protection <b>—</b></button>
+      <!-- Three sheets — Patch / Output / Protection — a button each, with
+           every set value printed beneath it so nothing is hidden (user,
+           2026-10-01: "all set information needs to be shown … each port just
+           has 3 buttons"). The values read the port state, never the fields. -->
+      <div class="pset" id="pset${p}">
+        <div class="pcol">
+          <button id="chPatch${p}">Patch</button>
+          <div class="pv" id="pvMode${p}">—</div>
+          <div class="pv" id="pvAddr${p}">—</div>
+          <div class="pv" id="pvHead${p}">—</div>
+        </div>
+        <div class="pcol">
+          <button id="chOut${p}">Output</button>
+          <div class="pv" id="pvCrv${p}">—</div>
+          <div class="pv" id="pvPwm${p}">—</div>
+          <div class="pv hidden" id="wbr${p}">WB <span id="wbv${p}">—</span></div>
+        </div>
+        <div class="pcol">
+          <button id="chProt${p}">Protection</button>
+          <div class="pv" id="pvOcp${p}">—</div>
+          <div class="pv" id="pvOt${p}">—</div>
+          <div class="pv" id="pvFlt${p}">—</div>
+        </div>
       </div>
     </div>
     <!-- The sheets. Their rows keep the ids and listeners the rest of the app
@@ -1970,15 +1988,12 @@ function buildCard(p){
         </div>
         <div class="mini">Address, head and mode are the desk patch. The label names the port across the app.</div>
       </div>
-      <div class="psheet rows" id="psCrv${p}" data-title="Port ${p} · dimmer curve">
+      <div class="psheet rows" id="psOut${p}" data-title="Port ${p} · output">
         <div class="row"><label>Curve</label>
           <select id="crv${p}" style="width:130px">
             <option value="0">Linear</option><option value="1">Soft 1.6</option>
             <option value="2">Theatre 2.2</option></select>
           <span class="mini" id="crvn${p}" style="margin:0 0 0 8px"></span></div>
-        <div class="mini">How the dimmer maps to light. A custom PWM entry brings its own curve and locks this one.</div>
-      </div>
-      <div class="psheet rows" id="psPwm${p}" data-title="Port ${p} · PWM">
         <div class="row"><label>PWM</label>
           <select id="pwm${p}" style="width:170px">
             <option value="0">Smooth 8 kHz</option>
@@ -1990,7 +2005,10 @@ function buildCard(p){
           </select>
           <button class="hidden" id="pwe${p}" style="margin-left:8px;padding:6px 10px">Custom…</button></div>
         <div class="mini hidden" id="pwn${p}" style="margin:0;color:var(--warn)"></div>
-        <div class="mini">Smooth for the eye, Silent above hearing, Camera for 25 and 50 fps shutters. Custom… edits the three library entries.</div>
+        <div class="row hidden" id="wbrow${p}"><label>White bal.</label>
+          <button id="wbb${p}" style="padding:6px 12px">Adjust…</button>
+          <span class="mini" id="wbv2${p}" style="margin:0 0 0 8px"></span></div>
+        <div class="mini">Smooth for the eye, Silent above hearing, Camera for 25 and 50 fps shutters. A custom PWM entry brings its own curve.</div>
       </div>
       <div class="psheet rows" id="psProt${p}" data-title="Port ${p} · protection">
         <div class="row"><label>Current</label>
@@ -2022,11 +2040,10 @@ function buildCard(p){
     if(ports[p-1]) pwPaintCard(p,ports[p-1]);
   });
   d.querySelector("#pwe"+p).addEventListener("click",pwOpen);
-  d.querySelector("#wbr"+p).addEventListener("click",()=>wbOpen(p));
+  d.querySelector("#wbb"+p).addEventListener("click",()=>wbOpen(p));
   d.querySelector("#wbg"+p).addEventListener("click",()=>wbOpen(p));
   d.querySelector("#chPatch"+p).addEventListener("click",()=>pcOpen(p,"Patch"));
-  d.querySelector("#chCrv"+p).addEventListener("click",()=>pcOpen(p,"Crv"));
-  d.querySelector("#chPwm"+p).addEventListener("click",()=>pcOpen(p,"Pwm"));
+  d.querySelector("#chOut"+p).addEventListener("click",()=>pcOpen(p,"Out"));
   d.querySelector("#chProt"+p).addEventListener("click",()=>pcOpen(p,"Prot"));
   d.querySelector("#flt"+p).addEventListener("click",()=>pcOpen(p,"Prot"));   // the fault badge leads to the clear button
   d.querySelector("#ocp"+p).addEventListener("change",e=>{
@@ -4717,16 +4734,22 @@ function wbRefresh(){
 }
 // Port card: the Adjust row, its read-out and the orange WB badge.
 function wbPaintCard(p){
-  const w=wbOf(p), row=$("wbr"+p), bd=$("wbg"+p), tx=$("wbv"+p);
+  // Card line (wbr/wbv, compact) and the Output sheet's row (wbrow/wbv2, full).
+  const w=wbOf(p), row=$("wbr"+p), row2=$("wbrow"+p), bd=$("wbg"+p), tx=$("wbv"+p), tx2=$("wbv2"+p);
   if(row) row.classList.toggle("hidden",!w);
+  if(row2) row2.classList.toggle("hidden",!w);
   const on=!!w && (w.R<255||w.G<255||w.B<255);
   if(bd) bd.classList.toggle("hidden",!on);
-  if(tx && w){
-    const kind=wbKind((ports[p-1]||{}).PE??0);
-    tx.textContent = !on ? "no trim"
+  if(w){
+    const kind=wbKind((ports[p-1]||{}).PE??0), lv=Math.max(w.R,w.G,w.B);
+    if(tx2) tx2.textContent = !on ? "no trim"
       : kind==="cct" ? `cool ${w.G} · warm ${w.R}`
-      : kind==="dim" ? `level ${Math.max(w.R,w.G,w.B)}`
+      : kind==="dim" ? `level ${lv}`
       : `${w.R} · ${w.G} · ${w.B}`;
+    if(tx) tx.textContent = !on ? "full"
+      : kind==="cct" ? `${w.G} / ${w.R}`
+      : kind==="dim" ? `${lv}`
+      : `${w.R}·${w.G}·${w.B}`;
   }
 }
 function wbPaintAll(){
@@ -4763,7 +4786,7 @@ $("btnWbReset").onclick=async()=>{
 addEventListener("pagehide",()=>{ if(wbPort) wbClose(); });
 document.addEventListener("visibilitychange",()=>{ if(document.hidden && wbPort) wbClose(); });
 
-// ----- Port card sheets: Patch / Curve / PWM / Protection (2026-10-01) -----
+// ----- Port card sheets: Patch / Output / Protection (2026-10-01) -----
 // The sheet rows keep their ids and listeners; opening MOVES the node into
 // the overlay box, closing moves it back into the card's hidden holder, so
 // paintControl() keeps painting them by id wherever they are.
@@ -4787,20 +4810,24 @@ const CRV_NAMES=["Linear","Soft 1.6","Theatre 2.2"];
 const PWM_STOCK=["Smooth 8 kHz","Silent 20 kHz","Camera 15.6 kHz"];
 function pwName(m){
   const pw=m.PW??0; if(pw<3) return PWM_STOCK[pw]||"—";
-  const c=pwCustom(pw-3); return c ? `Custom ${pw-2} · ${fmtKhz(c.act)}` : `Custom ${pw-2}`;
+  const c=pwCustom(pw-3); return c ? `C${pw-2} · ${fmtKhz(c.act)}` : `Custom ${pw-2}`;
 }
-// The chips read the state, never the fields, so a field mid-edit is not echoed.
-function pcPaintChips(p,m){
-  const set=(id,val,cls)=>{ const el=$(id); if(!el) return;
-    el.querySelector("b").textContent=val; el.className="chip tap"+(cls?" "+cls:""); };
-  const pe=m.PE??0;
-  set("chPatch"+p, `${PERS_NAMES[pe]??"?"} @ ${m.A??1}`+((+(m.H||0))?` · head ${m.H}`:""));
+// The printed values read the state, never the fields, so a field mid-edit is
+// not echoed back onto the card.
+function pcPaintSet(p,m){
+  const put=(id,val,cls)=>{ const el=$(id); if(!el) return;
+    el.textContent=val; el.className="pv"+(cls?" "+cls:""); };
+  put("pvMode"+p, PERS_NAMES[m.PE??0]??"?");
+  put("pvAddr"+p, `DMX ${m.A??1}`);
+  put("pvHead"+p, `head ${m.H??0}`);
   const slot=(m.PW??0)-3, c=slot>=0?pwCustom(slot):null;
-  set("chCrv"+p, c ? `γ${(c.g/10).toFixed(1)} · custom` : (CRV_NAMES[m.CV??0]||"Linear"));
+  put("pvCrv"+p, c ? `γ${(c.g/10).toFixed(1)} custom` : (CRV_NAMES[m.CV??0]||"Linear"));
   const pf=+(m.PF||0), old=!!c && pf<PORT_FW_CUSTOM && m.O===1;
-  set("chPwm"+p, old ? "Camera 15.6 kHz · fw 2.7 needed" : pwName(m), old?"warn":"");
+  put("pvPwm"+p, old ? "Camera 15.6 kHz ·fw" : pwName(m), old?"warn":"");
+  put("pvOcp"+p, `${((m.OC??ocpCapA()*1000)/1000).toFixed(2)} A limit`);
+  put("pvOt"+p, `${m.OT??80} °C trip`);
   const flt=(m.F||0)!==0;
-  set("chProt"+p, `${((m.OC??ocpCapA()*1000)/1000).toFixed(2)} A · ${m.OT??80} °C`+(flt?" · fault":""), flt?"bad":"");
+  put("pvFlt"+p, flt ? "⚠ "+(faultWords(m.F)||"fault") : "✓ no faults", flt?"bad":"ok");
 }
 
 // ----- PWM library: the three custom entries -----
