@@ -1185,7 +1185,13 @@ const OTAC  = "a1b20004-5c6d-4e8f-9a0b-1c2d3e4f5a6b";   // OTA control (write)
 const OTAD  = "a1b20005-5c6d-4e8f-9a0b-1c2d3e4f5a6b";   // OTA data (write)
 const OTAS  = "a1b20006-5c6d-4e8f-9a0b-1c2d3e4f5a6b";   // OTA status (notify)
 let otacChar=null, otadChar=null, otasChar=null;         // null until connected to OTA-capable fw
-const PERS_NAMES = ["RGB 8-bit","RGB 16-bit","CW/WW 8-bit","CW/WW 16-bit","FX 10ch","Dim 1ch","Dim 2ch (16-bit)"];
+// Personality codes 0-6 are the firmware's today. 7-16 are the PLANNED five-
+// channel set and the four custom presets (docs/CUSTOM_PATCH_DESIGN.md): listed
+// so the order and names can be checked on a phone (user, 2026-10-01), greyed
+// until a firmware reports five channels (NCH=5) or the presets (CPD<k>).
+const PERS_NAMES = ["RGB 8-bit","RGB 16-bit","CW/WW 8-bit","CW/WW 16-bit","RGB FX","Dim 1ch","Dim 2ch (16-bit)",
+                    "RGBW 8-bit","RGBW 16-bit","RGBWA 8-bit","RGBWA 16-bit","RGBW FX","RGBWA FX",
+                    "Custom 1","Custom 2","Custom 3","Custom 4"];
 // Swatch colour for a port: RGB ports show the mix; CW/WW ports blend warm
 // (2700K-ish) and cool (6500K-ish) white tones (WW rides the R value, CW the G).
 function swatchRGB(pe, r, g, b){          // r,g,b in 0-100
@@ -1200,11 +1206,26 @@ function swatchRGB(pe, r, g, b){          // r,g,b in 0-100
 }
 // Channels per personality (index = PE). The whole footprint must fit the
 // universe, so the last legal start address is 513 - footprint (10ch → 503).
-const PERS_CH = [3,6,2,4,10,1,2];
-// Display order for the personality picker (values stay firmware-matched):
-// FX 10ch first — the working personality — then colour, white, dimmers.
-const PERS_ORDER = [4,0,1,2,3,5,6];
+const PERS_CH = [3,6,2,4,10,1,2, 4,8,5,10,12,14, 5,5,5,5];   // customs: five until a preset says otherwise
+// Display order for the Mode list: by channel count, ties dimmer / white /
+// RGB / RGBW / RGBWA / FX, customs last — the numbers in the list are the
+// planned personality numbers (they become the RDM numbers with the
+// five-channel firmware; today's firmware still counts the first seven 1-7).
+const PERS_ORDER = [5,6,2,0,3,7,9,1,8,4,10,11,12,13,14,15,16];
+// Can the connected firmware run this personality? Today's codes always;
+// the five-channel set once the state carries NCH=5; a custom preset once its
+// CPD<k> record says it is set. Demo mode is a three-channel unit.
+const persAvail = c => c<=6 || (c<=12 && +(kv.NCH||3)>=5) || (c>=13 && /^[1-9]/.test(String(kv["CPD"+(c-12)]||"")));
 const maxAddr = pe => 513 - (PERS_CH[pe] ?? 1);
+function persOptionText(c){
+  const n=PERS_ORDER.indexOf(c)+1;
+  return `${n}. ${PERS_NAMES[c]} · ${PERS_CH[c]} ch`+(persAvail(c)?"":c>=13?" (preset not set)":" (five-channel firmware)");
+}
+function persPaintOptions(p){
+  const sel=$("pers"+p); if(!sel) return;
+  for(const o of sel.options){ const c=+o.value, ok=persAvail(c);
+    o.disabled=!ok; const t=persOptionText(c); if(o.textContent!==t) o.textContent=t; }
+}
 const FX_NAMES = ["Off","Candle","Fire","Fireworks","Water","Siren","Laser","Club",
                   "Lightning","Rainbow","Aurora","Sunset","TV Sim","Strobe","Police",
                   "Pulse","Party","Traffic","Fluoro","Paparazzi","Explosion","Clouds"];
@@ -1218,7 +1239,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-01g.label";
+const APP_VER="2026-10-01h.modes";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2006,7 +2027,7 @@ function buildCard(p){
           <input type="number" id="head${p}" min="0" max="9999">
         </div>
         <div class="row"><label>Mode</label>
-          <select id="pers${p}">${PERS_ORDER.map(i=>`<option value="${i}">${PERS_NAMES[i]}</option>`).join("")}</select>
+          <select id="pers${p}">${PERS_ORDER.map(i=>`<option value="${i}">${persOptionText(i)}</option>`).join("")}</select>
         </div>
         <div class="mini">Address, head and mode are the desk patch. The label names the port across the app.</div>
       </div>
@@ -3254,7 +3275,7 @@ function paintUniv(){
   }
   updateUnivInfo();
 }
-const PERS_FOOT=[3,6,2,4,10,1,2];
+const PERS_FOOT=PERS_CH;                       // one footprint table (was a copy)
 function updateUnivInfo(){
   if(!univSelCh){ return; }
   const ch=univSelCh, v=univ[ch];
@@ -4885,6 +4906,7 @@ function pcPaintSet(p,m){
     el.textContent=val; el.className="pv"+(cls?" "+cls:""); };
   // Same words as the sheet's field labels: Mode / Address / Head, Curve / PWM /
   // WB, Limit / Trip / faults — so a value on the card names the field it came from.
+  persPaintOptions(p);                    // grey what this firmware cannot run
   put("pvMode"+p, PERS_NAMES[m.PE??0]??"?");
   put("pvAddr"+p, `Address ${m.A??1}`);
   put("pvHead"+p, `Head ${m.H??0}`);
@@ -5104,7 +5126,7 @@ const demoP=[{a:1,pe:0,r:100,g:85,b:60,x:0,s:128},{a:4,pe:0,r:100,g:100,b:100,x:
              {a:20,pe:0,r:100,g:100,b:100,x:2,s:128},{a:23,pe:0,r:100,g:0,b:60,x:0,s:128},
              {a:26,pe:0,r:100,g:100,b:100,x:14,s:128},{a:29,pe:4,r:100,g:100,b:100,x:4,s:128}];
 const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1,bpm:128,btn:'44656D6F20526967',txa:0,
-             var:4, varm:0, cl:0, clk:0, cf:1, tf:1,    // cl 0 = product max (0.1 A units)
+             var:4, varm:0, cl:0, clk:1, cf:1, tf:1,    // cl 0 = product max (0.1 A units); limit LOCKED by default (user, 2026-10-01)
              pwc:[{hz:12300},null,null]};                // PWM library: Custom 1 set, 2 and 3 empty
 // Demo mirror of the firmware's limit maths: max = 6.75 A × ports; the fold
 // scale is what would hold the summed demo port currents under the limit.
