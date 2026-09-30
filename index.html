@@ -242,6 +242,16 @@
   .wbnote.dmx  { border-color:var(--warn); color:var(--warn); }
   .badge.wb { background:#3d2f14; color:var(--warn); cursor:pointer; }
   #btnWbReset.glow { border-color:var(--warn); color:var(--warn); }
+  /* Clear all + Reset white balance: two equal columns, buttons on the first
+     row, their captions on the second, so the long label wraps inside its own
+     button instead of pushing the pair onto two lines. .solo = white balance
+     not available (older firmware): Clear all alone across the row. */
+  .prepgrid { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; margin-top:22px; }
+  .prepgrid.solo { grid-template-columns:1fr; }
+  .prepgrid button { min-width:0; padding:14px 8px; font-size:1.05em; line-height:1.2; white-space:normal; }
+  .prepgrid #btnPrep { grid-area:1/1; }  .prepgrid #btnWbReset { grid-area:1/2; }
+  .prepgrid #prepCap { grid-area:2/1; }  .prepgrid #wbResetCap { grid-area:2/2; }
+  .prepgrid .mini { text-align:center; margin-top:6px; }
   .pwrow input[type=number] { background:var(--card2); color:var(--text);
             border:1px solid var(--line); border-radius:8px; padding:8px; font-size:15px; }
   #supOv textarea { width:100%; box-sizing:border-box; margin-top:12px; padding:10px;
@@ -593,12 +603,15 @@
       <button id="btnTestStop">Stop test</button>
     </div>
     <div class="card">
-      <!-- Full-width so a thumb from either side of the phone lands on it. -->
-      <div class="ctlrow" style="margin-top:22px;align-items:stretch;flex-wrap:nowrap">
-        <button id="btnPrep" style="flex:2;padding:14px 12px;font-size:1.05em">Clear all</button>
-        <button id="btnWbReset" class="hidden" style="flex:1;padding:14px 8px">Reset white balance</button>
+      <!-- Two equal buttons, each with its own caption underneath, so neither
+           label wraps and each reads as one action (user, 2026-10-01). The
+           white-balance pair is hidden on firmware without white balance. -->
+      <div class="prepgrid" id="prepGrid">
+        <button id="btnPrep">Clear all</button>
+        <button id="btnWbReset" class="hidden">Reset white balance</button>
+        <div class="mini" id="prepCap">RGB 100% · FX speed 50% · dimmer 0%</div>
+        <div class="mini hidden" id="wbResetCap">every colour of every port to full</div>
       </div>
-      <div class="mini" style="text-align:center;margin-top:6px">RGB 100% · FX speed 50% · dimmer 0%</div>
     </div>
     <div id="ports"></div>
   </div>
@@ -1169,7 +1182,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-09-29b.contact";
+const APP_VER="2026-10-01a.tidy";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1947,9 +1960,9 @@ function buildCard(p){
           <button id="wbb${p}" style="padding:6px 12px">Adjust…</button>
           <span class="mini" id="wbv${p}" style="margin:0 0 0 8px"></span></div>
         <div class="row"><label>Current</label>
-          <input type="number" id="ocp${p}" min="0.25" max="6.5" step="0.25">
+          <input type="number" id="ocp${p}" min="0.25" max="6.75" step="0.25">
           <span class="unit">A</span>
-          <span class="mini" id="ocpr${p}" style="margin:0 0 0 8px;color:var(--dim)">0.25&nbsp;&ndash;&nbsp;6.5&nbsp;A</span></div>
+          <span class="mini" id="ocpr${p}" style="margin:0 0 0 8px;color:var(--dim)">0.25&nbsp;&ndash;&nbsp;6.75&nbsp;A</span></div>
         <div class="row"><label>Temp trip</label>
           <input type="number" id="ot${p}" min="40" max="110" step="5">
           <span class="unit">°C</span>
@@ -4679,6 +4692,8 @@ function wbPaintAll(){
   const b=$("btnWbReset"); if(!b) return;
   const have=ports.length>0 && !!wbOf(1);
   b.classList.toggle("hidden",!have);
+  $("wbResetCap").classList.toggle("hidden",!have);
+  $("prepGrid").classList.toggle("solo",!have);
   const any=ports.some((_,i)=>{ const w=wbOf(i+1); return w && (w.R<255||w.G<255||w.B<255); });
   b.classList.toggle("glow",any); b.disabled=!any; b.style.opacity=any?"":".45";
 }
@@ -4935,7 +4950,7 @@ function demoTxState(){
 }
 function demoState(){
   const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S${d.s??128},H${n},`+
-    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW${d.pw??2},OC6500,OT80,CV${d.cv??0},TX${1000*n},TO0,EC0,PH1,PF519,KA1000,KB1000,L0;`;
+    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW${d.pw??2},OC6750,OT80,CV${d.cv??0},TX${1000*n},TO0,EC0,PH1,PF519,KA1000,KB1000,L0;`;
   const W=(n,d)=>{ const w=d.wb||[255,255,255]; return `W${n}=${w[0]},${w[1]},${w[2]},${d.wbp?1:0};`; };
   const PWC=demoF.pwc.map((c,k)=>`PWC${k+1}=${c?`${c.hz},${c.g},${pwActual(c.hz)}`:"0,0,0"};`).join("");
   onState(
@@ -4946,7 +4961,7 @@ function demoState(){
     `FLKON=${demoF.flkon};FLKL=0;`+
     `NET=${demoF.net};NW=${demoF.net};NUN=${demoF.nun};SRC=${demoF.net?1:0};`+
     `NIP=192.168.1.42;NRS=-52;TF=${demoF.tf};PB=${demoF.cl};`+demoLimits()+"CX=3;CA=1;"+
-    `SH=${demoF.sh||(demoF.var===1?5:10)};SHM=${demoF.sh?1:0};`+
+    `SH=${demoF.sh||5};SHM=${demoF.sh?1:0};`+     // 5 mΩ on every product since 2026-09-23: the ceiling reads 6.75 A
     "PWLIM=2000,25000,10,30;"+PWC+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)).join("")+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
     `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+demoTxState()+
