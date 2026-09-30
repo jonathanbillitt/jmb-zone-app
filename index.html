@@ -97,7 +97,9 @@
           padding:14px 16px; margin-top:12px; }
   .port-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
   .port-head h2 { font-size:15px; margin:0; }
-  .port-head h2 { flex:1; }
+  /* The head carries "Port n · label" beside up to three badges: a long label
+     truncates with an ellipsis instead of wrapping the head (user, chore 5). */
+  .port-head h2 { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .pilabel { font-weight:400; color:var(--dim); font-size:13px; }
   /* Port card settings (2026-10-01): three equal columns — Patch / Output /
      Protection — a button on top and every set value printed beneath it, so
@@ -1216,7 +1218,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-01f.wbsend";
+const APP_VER="2026-10-01g.label";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1757,8 +1759,8 @@ function hexDec(hx){
   return s.replace(/[^\x20-\x7E]/g,"").slice(0,16);
 }
 function paintLabel(p,v){
-  const el=$("lbl"+p);
-  if(el && document.activeElement!==el) el.value=v||"";
+  const el=$("lbl"+p), n=$("lblN"+p);
+  if(el && document.activeElement!==el){ el.value=v||""; if(n) n.textContent=(v||"").length+"/16"; }
   const h=$("ph"+p);                          // card head: "Port 3 · Stage left"
   if(h) h.innerHTML=`Port ${p}${v?` <span class="pilabel">· ${esc(v)}</span>`:""}`;
 }
@@ -1996,7 +1998,8 @@ function buildCard(p){
       <div class="psheet rows" id="psPatch${p}" data-title="Port ${p} · Patch">
         <div class="row"><label>Label</label>
           <input type="text" id="lbl${p}" maxlength="16" placeholder="name this port"
-                 style="flex:1" autocomplete="off"></div>
+                 style="flex:1" autocomplete="off">
+          <span class="mini" id="lblN${p}" style="margin:0;color:var(--dim);font-variant-numeric:tabular-nums">0/16</span></div>
         <div class="row"><label>Address</label>
           <input type="number" id="addr${p}" min="1" max="512">
           <label style="width:auto">Head</label>
@@ -2043,6 +2046,8 @@ function buildCard(p){
       </div>
     </div>`;
   const touch=k=>{ hot[p+"."+k]=Date.now(); };
+  // 16 is what the firmware stores and what the port's own screen can show.
+  d.querySelector("#lbl"+p).addEventListener("input",e=>{ $("lblN"+p).textContent=e.target.value.length+"/16"; });
   d.querySelector("#lbl"+p).addEventListener("change",e=>{
     const v=e.target.value.replace(/[^\x20-\x7E]/g,"").trim().slice(0,16);
     e.target.value=v; touch("L");
@@ -5117,7 +5122,7 @@ function demoTxState(){
   return `TXA=${demoF.txa};TXN=${chs.length};TXL=${shown.join(",")};`;
 }
 function demoState(){
-  const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S${d.s??128},H${d.h??n},`+
+  const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M${d.m??1},R${d.r},G${d.g},B${d.b},D${d.d??80},O1,F00,X${d.x},S${d.s??128},H${d.h??n},`+
     `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW${d.pw??2},OC${d.oc??6750},OT${d.ot??80},CV${d.cv??0},TX${1000*n},TO0,EC0,PH1,PF519,KA1000,KB1000,L${d.l||0};`;
   const W=(n,d)=>{ const w=d.wb||[255,255,255]; return `W${n}=${w[0]},${w[1]},${w[2]},${d.wbp||0};`; };
   const PWC=demoF.pwc.map((c,k)=>`PWC${k+1}=${c?`${c.hz},${pwActual(c.hz)}`:"0,0"};`).join("");
@@ -5197,6 +5202,15 @@ function demoCmd(s){
   if(m=s.match(/^P(\d)\.(R|G|B)=(\d+)/)){ demoP[+m[1]-1][m[2].toLowerCase()]=+m[3]; return; }
   if(m=s.match(/^ALL\.RGB=(\d+),(\d+),(\d+)/)){ demoP.forEach(d=>{d.r=+m[1];d.g=+m[2];d.b=+m[3];}); return; }
   if(m=s.match(/^P(\d)\.FX=(\d+)/)){ demoP[+m[1]-1].x=+m[2]; demoState(); return; }
+  // Clear all / Reset all ports send these too (user, chore 6: the demo used to
+  // put the defaults straight back). Demo defaults return only when Demo mode
+  // is entered afresh (Exit demo reloads the app).
+  if(m=s.match(/^P(\d)\.DIM=(\d+)/)){ demoP[+m[1]-1].d=Math.min(100,+m[2]); return; }
+  if(m=s.match(/^P(\d)\.MAN=(\d)/)){ demoP[+m[1]-1].m=+m[2]; return; }
+  if(m=s.match(/^ALL\.FX=(\d+)/)){ demoP.forEach(d=>{ d.x=+m[1]; }); demoState(); return; }
+  if(m=s.match(/^ALL\.DIM=(\d+)/)){ demoP.forEach(d=>{ d.d=Math.min(100,+m[1]); }); return; }
+  if(m=s.match(/^ALL\.MAN=(\d)/)){ demoP.forEach(d=>{ d.m=+m[1]; }); return; }
+  if(m=s.match(/^ALL\.FXS=(\d+)/)){ demoP.forEach(d=>{ d.s=+m[1]; }); return; }
   // Patch + protection sheets (2026-10-01): the demo keeps what a tester types,
   // so the chips and the card head answer at once.
   if(m=s.match(/^P(\d)\.LABEL=(.*)/)){ demoP[+m[1]-1].l=(m[2]==="0")?"":m[2].replace(/[^0-9A-Fa-f]/g,"").toUpperCase(); demoState(); return; }
