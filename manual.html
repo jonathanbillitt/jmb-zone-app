@@ -321,10 +321,13 @@ port's set colour, ideal for single-colour and IR strips), an <strong>effect</st
 level controls: <strong>R / G / B sliders</strong> — which become <strong>Cool / Warm</strong> on a
 tuneable-white port (ice-blue and amber tracks, the unused Blue row hidden) —
 plus two <strong>encoders</strong> for <strong>Dim</strong> and <strong>FX speed</strong> that are easy to ride
-by feel during a take. Tap the <strong>label</strong> slot in a card's header to name the
-port (up to 16 characters; the name also appears on that port's own screen when
-the panel is locked). <strong>Clear all</strong> returns every port to a clean base — full
-white, effects off, dimmer down — after a confirmation.</p>
+by feel during a take. Everything set once lives in a row of <strong>chips</strong> under
+the encoders — <strong>Patch</strong>, <strong>Curve</strong>, <strong>PWM</strong>, <strong>White balance</strong>, <strong>Protection</strong> —
+each showing its current value; tap one to open that port's sheet. <em>Patch</em> holds
+the label (up to 16 characters; the name shows in the card header and on that
+port's own screen when the panel is locked), the DMX address, head and mode.
+<strong>Clear all</strong> returns every port to a clean base — full white, effects off,
+dimmer down — after a confirmation.</p>
 <p>An <strong>orange outline on a DMX address box</strong> means that port's channels overlap
 another port's: its start address plus footprint runs into a different start
 address on the same controller. It is a nudge, not a block — overlapping can be
@@ -335,15 +338,17 @@ stops a running effect on that port, so a fader never feels dead. When a live
 <strong>DMX, sACN or Art-Net</strong> signal is driving the rig, a <strong>"Live DMX in control"</strong>
 banner appears — your manual moves here are overridden until that signal stops,
 which is <em>why</em> the faders would otherwise seem to do nothing.</p>
-<p>Open <strong>Advanced &amp; protection</strong> on a card for that port's safety and quality
-settings: <strong>PWM mode</strong> (the dimming carrier frequency — see §8), <strong>current
+<p>The other chips are that port's quality and safety settings: <strong>PWM</strong> (the
+dimming carrier frequency — see §8), <strong>Curve</strong> (<strong>Linear / Soft / Theatre</strong> —
+how fader travel maps to brightness; a custom PWM entry brings its own and
+locks this one), <strong>White balance</strong> (below), and <strong>Protection</strong> — the <strong>current
 limit</strong> (0.25 A up to the unit's ceiling — <strong>6.75 A</strong> on units with the 5 mΩ
 current sense, which is every Zone, <strong>6.5 A</strong> on earlier 4our/8ight modules;
-the field's range shows which), <strong>temperature trip</strong>, <strong>dimmer curve</strong>
-(<strong>Linear / Soft / Theatre</strong> — how fader travel maps to brightness), <strong>white
-balance</strong>, and a <strong>Clear fault &amp; re-enable</strong> button that appears only while the
-port is latched.</p>
-<p><strong>White balance.</strong> <em>Adjust…</em> opens a master for each colour of that port: Red,
+the field's range shows which), the <strong>temperature trip</strong>, and a <strong>Clear fault &amp;
+re-enable</strong> button that appears only while the port is latched. A latched port
+shows its fault on the chip and on the red badge in the header; tapping either
+opens the sheet.</p>
+<p><strong>White balance.</strong> Its chip opens a master for each colour of that port: Red,
 Green and Blue on a colour port, Cool and Warm on a tuneable-white port, one Level
 on a dimmer port. Drag, or step with <strong>−10 −1 +1 +10</strong>; 255 is full. The trim is
 applied after the dimmer curve, so the balance holds from full to the bottom of a
@@ -604,7 +609,7 @@ MODULATION_FREQUENCY):</p>
 </table>
 <p>All carry the full ~16-bit dimming resolution (temporal dithering makes up the
 difference at the higher carriers).</p>
-<p><strong>Custom entries.</strong> In the app, <em>Advanced → PWM → Custom…</em> sets up to three entries.
+<p><strong>Custom entries.</strong> In the app, the port's <em>PWM</em> chip → <em>Custom…</em> sets up to three entries.
 Each holds a carrier and its own dimmer curve (1.0 = linear, 2.2 = theatre, up to
 3.0), and any port can select it. The app shows the carrier the hardware will
 really produce. Custom entries are outside the tested set, so check the result on
