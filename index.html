@@ -1171,7 +1171,7 @@
      firmware is on it. -->
 <div id="cpOv" class="hidden"><div class="box" id="cpForm">
   <b>Custom personalities</b>
-  <div class="mini" style="margin-top:4px">Four presets, held by the controller; any port can select one by name. Offsets count from the port's address.</div>
+  <div class="mini" style="margin-top:4px">Four presets, held by the controller; any port can select one by name. Every channel has its own DMX address, in any order; only a 16-bit channel takes the next address too.</div>
   <div class="ctlrow across" style="margin-top:10px">
     <button id="cpTab1">1</button><button id="cpTab2">2</button><button id="cpTab3">3</button><button id="cpTab4">4</button>
   </div>
@@ -1179,11 +1179,15 @@
     <div class="row"><label>Name</label>
       <input type="text" id="cpName" maxlength="16" placeholder="name this preset" style="flex:1" autocomplete="off">
       <span class="mini" id="cpUse" style="margin:0"></span></div>
-    <div class="cphead"><span></span><span>Colour</span><span>Offset</span><span>Bits</span></div>
+    <div class="cphead"><span></span><span>Function</span><span>DMX</span><span>Bits</span></div>
     <div class="row"><label>Dimmer</label>
-      <select id="cpDimOn"><option value="0">Off</option><option value="1">Master</option></select>
-      <input type="number" id="cpDimOff" min="0" max="511" placeholder="offset">
+      <select id="cpDimOn"><option value="0">Off</option><option value="1">On</option></select>
+      <input type="number" id="cpDimOff" min="1" max="512" placeholder="ch">
       <select id="cpDimBits" class="bits"><option value="8">8</option><option value="16">16</option></select></div>
+    <div class="row"><label>FX</label>
+      <select id="cpFxOn"><option value="0">Off</option><option value="1">On</option></select>
+      <input type="number" id="cpFxAddr" min="1" max="512" placeholder="ch">
+      <span class="mini" style="margin:0;width:62px;text-align:center">8</span></div>
     <div id="cpOuts"></div>
   </div>
   <div class="mini" id="cpFoot" style="margin-top:8px"></div>
@@ -1294,7 +1298,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-01i.builder";
+const APP_VER="2026-10-01j.offpiste";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2005,20 +2009,32 @@ function renderControl(){
   // port's (at a DIFFERENT start) gets an amber outline on its field — a
   // nudge, never a block, since overlap can be deliberate. Identical starts
   // = mirroring, no mark. Both sides of a clash get marked.
+  // A custom preset patches channel by channel (any order, any address), so
+  // the test is on the channel sets: a shared channel marks both ports unless
+  // the two sets are identical (mirroring). Standard ports keep the old rule.
   for(let i=0;i<ports.length;i++){
     const el=$("addr"+(i+1)); if(!el) continue;
-    const a=+(ports[i].A||0), f=PERS_FOOT[ports[i].PE||0]||3;
+    const pi=ports[i].PE||0, a=+(ports[i].A||0), f=PERS_FOOT[pi]||3, A=portChans(ports[i]);
     let clash=false;
-    if(a) for(let j=0;j<ports.length;j++){
+    for(let j=0;j<ports.length && !clash;j++){
       if(j===i) continue;
-      const b=+(ports[j].A||0);
-      if(!b || b===a) continue;
-      const g=PERS_FOOT[ports[j].PE||0]||3;
-      if(a<b+g && b<a+f){ clash=true; break; }
+      const pj=ports[j].PE||0, b=+(ports[j].A||0), g=PERS_FOOT[pj]||3;
+      if(pi<13 && pj<13){ if(a && b && b!==a && a<b+g && b<a+f) clash=true; continue; }
+      const B=portChans(ports[j]);
+      const same=A.length===B.length && A.every((v,x)=>v===B[x]);
+      if(!same && A.some(v=>B.includes(v))) clash=true;
     }
     el.classList.toggle("clash",clash);
     el.title=clash?"Overlaps another port's channels":"";
   }
+}
+// Every DMX channel a port listens on, sorted: a standard personality from its
+// start address, a custom preset from its own address list.
+function portChans(m){
+  const pe=m.PE||0;
+  if(pe>=13){ const c=cpdOf(pe-12); return c?cpdChannels(c):[]; }
+  const a=+(m.A||0), f=PERS_FOOT[pe]||3; if(!a) return [];
+  return Array.from({length:f},(_,k)=>a+k);
 }
 function buildCard(p){
   const d=document.createElement("div");
@@ -3337,9 +3353,9 @@ function updateUnivInfo(){
   if(!univSelCh){ return; }
   const ch=univSelCh, v=univ[ch];
   let patch="";
-  ports.forEach((m,i)=>{
-    const a=+(m.A||0), f=PERS_FOOT[m.PE||0]||3;
-    if(ch>=a && ch<a+f) patch=` · P${i+1} ch${ch-a+1}`;
+  ports.forEach((m,i)=>{                  // a preset's channels can sit anywhere
+    const k=portChans(m).indexOf(ch);
+    if(k>=0) patch=` · P${i+1} ch${k+1}`;
   });
   const mm=(univMax[ch]||univMin[ch])?` · min ${univMin[ch]} max ${univMax[ch]}`:"";
   const act=actCnt[ch]?` · ${actCnt[ch]} changes`:"";
@@ -4213,7 +4229,7 @@ $("impFile").addEventListener("change",async ev=>{
     const hz=Math.round(+(c&&c.hz)||0);                   // older files also carry a curve: ignored
     lib.push(hz>0 ? `PWC${k+1}=${hz}` : `PWC${k+1}=0`); });
   if(Array.isArray(data.cpd) && "CPD1" in kv) data.cpd.slice(0,4).forEach((c,k)=>{
-    const s=(typeof c==="string" && /^[0-9A-F]+,[01],\d+,(8|16)(,\d+,\d+,(8|16)){5}$/.test(c)) ? c : "0";
+    const s=(typeof c==="string" && /^[0-9A-F]+,[01],\d+,(8|16),[01],\d+(,\d+,\d+,(8|16)){5}$/.test(c)) ? c : "0";
     lib.push(`CPD${k+1}=${s}`); });
   const q=["CID="+(data.cid||0),"CNAME="+(nm?hexEnc(nm):"0"),
            "AMODE="+(data.amode||0)].concat(lib,portQueue(data.ports));
@@ -4979,8 +4995,11 @@ function pcPaintSet(p,m){
   // WB, Limit / Trip / faults — so a value on the card names the field it came from.
   persPaintOptions(p);                    // grey what this firmware cannot run
   { const pe=m.PE??0, cp=pe>=13?cpdOf(pe-12):null;
-    put("pvMode"+p, cp ? cp.name : (PERS_NAMES[pe]??"?")); }
-  put("pvAddr"+p, `Address ${m.A??1}`);
+    put("pvMode"+p, cp ? cp.name : (PERS_NAMES[pe]??"?"));
+    // On a preset the port listens on the preset's own addresses: the card
+    // shows their range and the Address field steps aside.
+    put("pvAddr"+p, cp ? `Address ${cpdRange(cp)}` : `Address ${m.A??1}`);
+    const af=$("addr"+p); if(af){ af.disabled=!!cp; af.title=cp?"Set in the preset":""; } }
   put("pvHead"+p, `Head ${m.H??0}`);
   const slot=(m.PW??0)-3, c=slot>=0?pwCustom(slot):null;
   put("pvCrv"+p, CRV_NAMES[m.CV??0]||"Linear");
@@ -5088,47 +5107,80 @@ function pwPaintCard(p,m){
 }
 
 // ---------- custom personalities: four controller-held presets (preview, 2026-10-01) ----------
-// State: CPD<k>=<name hex>,<dim on>,<dim offset>,<dim bits>,<colour,offset,bits> x5
+// Every channel carries its OWN DMX address, in any order ("we're going off
+// piste"); only a 16-bit channel takes the next address as its fine byte.
+// State: CPD<k>=<name hex>,<dim on>,<dim addr>,<dim bits>,<fx on>,<fx addr>,<colour,addr,bits> x5
 // ("0" = not set). Command: the same to set, CPD<k>=0 to clear. Today's firmware
 // ignores both (FW-52 will keep them); the demo keeps them, and a port can
-// select a set preset (personality codes 13-16).
+// select a set preset (personality codes 13-16). A port on a preset listens
+// on the preset's addresses; its own Address field is not used.
 const ROLE_NAMES=["Off","Red","Green","Blue","Cool White","Warm White","Amber","Lime","Magenta","UV","IR"];
 function cpdOf(k){
   const s=String(kv["CPD"+k]??""); if(!s||s==="0") return null;
-  const a=s.split(","); if(a.length<19) return null;
+  const a=s.split(","); if(a.length<21) return null;
   const n=a.map(Number);
-  return {name:hexDec(a[0])||("Custom "+k), dim:{on:n[1]===1, off:n[2]|0, bits:n[3]===16?16:8},
-          out:[0,1,2,3,4].map(i=>({role:n[4+i*3]|0, off:n[5+i*3]|0, bits:n[6+i*3]===16?16:8}))};
+  return {name:hexDec(a[0])||("Custom "+k), dim:{on:n[1]===1, addr:n[2]|0, bits:n[3]===16?16:8},
+          fx:{on:n[4]===1, addr:n[5]|0},
+          out:[0,1,2,3,4].map(i=>({role:n[6+i*3]|0, addr:n[7+i*3]|0, bits:n[8+i*3]===16?16:8}))};
 }
-function cpdFoot(c){                     // channels the preset occupies from the port's address
-  if(!c) return 1; let hi=0;
-  if(c.dim.on) hi=Math.max(hi,c.dim.off+(c.dim.bits===16?2:1));
-  c.out.forEach(o=>{ if(o.role) hi=Math.max(hi,o.off+(o.bits===16?2:1)); });
-  return Math.max(1,hi);
+// The channels a preset listens on, sorted and unique.
+function cpdChannels(c){
+  if(!c) return [];
+  const s=new Set();
+  const add=(a,bits)=>{ if(a>=1&&a<=512){ s.add(a); if(bits===16&&a<512) s.add(a+1); } };
+  if(c.dim.on) add(c.dim.addr,c.dim.bits);
+  if(c.fx.on) add(c.fx.addr,8);
+  c.out.forEach(o=>{ if(o.role) add(o.addr,o.bits); });
+  return [...s].sort((x,y)=>x-y);
 }
-function cpdLine(c){ return `${hexEnc(c.name)},${c.dim.on?1:0},${c.dim.off},${c.dim.bits},`+c.out.map(o=>`${o.role},${o.off},${o.bits}`).join(","); }
+const cpdFoot=c=>Math.max(1,cpdChannels(c).length);   // shown as "· n ch"
+function cpdLine(c){ return `${hexEnc(c.name)},${c.dim.on?1:0},${c.dim.addr},${c.dim.bits},${c.fx.on?1:0},${c.fx.addr},`+c.out.map(o=>`${o.role},${o.addr},${o.bits}`).join(","); }
 function cpdSync(){ for(let k=1;k<=4;k++) PERS_CH[12+k]=cpdFoot(cpdOf(k)); }
+// Address range of a port on a preset, for the card ("Address 101–120").
+function cpdRange(c){ const ch=cpdChannels(c); return ch.length ? (ch[0]===ch[ch.length-1] ? String(ch[0]) : `${ch[0]}–${ch[ch.length-1]}`) : "—"; }
 let cpSel=1, cpPort=0;
 $("cpOuts").innerHTML=[0,1,2,3,4].map(i=>`
     <div class="row"><label>Out ${i+1}</label>
       <select id="cpRole${i}">${ROLE_NAMES.map((n,r)=>`<option value="${r}">${n}</option>`).join("")}</select>
-      <input type="number" id="cpOff${i}" min="0" max="511" placeholder="offset">
+      <input type="number" id="cpOff${i}" min="1" max="512" placeholder="ch">
       <select id="cpBits${i}" class="bits"><option value="8">8</option><option value="16">16</option></select></div>`).join("");
+const cpAddr=id=>Math.max(0,Math.min(512,Math.round(+$(id).value||0)));
 function cpForm(){
   return { name:$("cpName").value.replace(/[^\x20-\x7E]/g,"").trim().slice(0,16),
-           dim:{on:$("cpDimOn").value==="1", off:Math.max(0,Math.min(511,+$("cpDimOff").value||0)), bits:+$("cpDimBits").value===16?16:8},
-           out:[0,1,2,3,4].map(i=>({role:+$("cpRole"+i).value|0, off:Math.max(0,Math.min(511,+$("cpOff"+i).value||0)), bits:+$("cpBits"+i).value===16?16:8})) };
+           dim:{on:$("cpDimOn").value==="1", addr:cpAddr("cpDimOff"), bits:+$("cpDimBits").value===16?16:8},
+           fx:{on:$("cpFxOn").value==="1", addr:cpAddr("cpFxAddr")},
+           out:[0,1,2,3,4].map(i=>({role:+$("cpRole"+i).value|0, addr:cpAddr("cpOff"+i), bits:+$("cpBits"+i).value===16?16:8})) };
 }
 const cpUsers=k=>ports.map((m,i)=>(m.PE===12+k?i+1:0)).filter(Boolean);
-function cpFootLine(){ $("cpFoot").textContent=`Footprint ${cpdFoot(cpForm())} ch from the port's address.`; }
+// What is wrong with the form, or "" when it can be saved.
+function cpProblem(c){
+  const used=[];   // [addr, what]
+  const take=(on,a,bits,what)=>{ if(!on) return null;
+    if(a<1||a>512) return `${what} needs a DMX address 1–512.`;
+    if(bits===16&&a>511) return `${what} is 16-bit: its address must be 511 or less.`;
+    for(const ch of (bits===16?[a,a+1]:[a])){ const hit=used.find(u=>u[0]===ch); if(hit) return `${what} and ${hit[1]} both use DMX ${ch}.`; used.push([ch,what]); }
+    return null; };
+  let e=take(c.dim.on,c.dim.addr,c.dim.bits,"Dimmer"); if(e) return e;
+  e=take(c.fx.on,c.fx.addr,8,"FX"); if(e) return e;
+  for(let i=0;i<5;i++){ const o=c.out[i]; e=take(!!o.role,o.addr,o.bits,`Out ${i+1} (${ROLE_NAMES[o.role]})`); if(e) return e; }
+  if(!used.length) return "Give at least one channel an address.";
+  return "";
+}
+function cpFootLine(){
+  const c=cpForm(), bad=cpProblem(c), ch=cpdChannels(c);
+  $("cpFoot").textContent = bad || `Listens on ${ch.length} channel${ch.length===1?"":"s"}: ${ch.join(", ")}.`;
+  $("cpFoot").style.color = bad ? "var(--warn)" : "";
+}
 function cpPaint(fill){
   if($("cpOv").classList.contains("hidden") && !fill) return;
   for(let k=1;k<=4;k++){ const b=$("cpTab"+k), c=cpdOf(k); b.className=k===cpSel?"primary":""; b.textContent=c?`${k} · ${c.name}`:`${k} · —`; }
   const c=cpdOf(cpSel);
   if(fill){
-    const d=c||{name:"",dim:{on:false,off:0,bits:8},out:[0,1,2,3,4].map(i=>({role:i+1,off:i,bits:8}))};   // a fresh preset starts as R G B CW WW at 0-4
-    $("cpName").value=d.name; $("cpDimOn").value=d.dim.on?"1":"0"; $("cpDimOff").value=d.dim.off; $("cpDimBits").value=d.dim.bits;
-    d.out.forEach((o,i)=>{ $("cpRole"+i).value=o.role; $("cpOff"+i).value=o.off; $("cpBits"+i).value=o.bits; });
+    // a fresh preset starts as R G B CW WW on 1-5, dimmer and FX off
+    const d=c||{name:"",dim:{on:false,addr:0,bits:8},fx:{on:false,addr:0},out:[0,1,2,3,4].map(i=>({role:i+1,addr:i+1,bits:8}))};
+    $("cpName").value=d.name; $("cpDimOn").value=d.dim.on?"1":"0"; $("cpDimOff").value=d.dim.addr||""; $("cpDimBits").value=d.dim.bits;
+    $("cpFxOn").value=d.fx.on?"1":"0"; $("cpFxAddr").value=d.fx.addr||"";
+    d.out.forEach((o,i)=>{ $("cpRole"+i).value=o.role; $("cpOff"+i).value=o.addr||""; $("cpBits"+i).value=o.bits; });
   }
   const used=cpUsers(cpSel);
   $("cpUse").textContent = !c ? "not set" : used.length ? `port${used.length>1?"s":""} ${used.join(", ")}` : "not in use";
@@ -5145,7 +5197,7 @@ $("cpForm").addEventListener("input",cpFootLine);
 for(let k=1;k<=4;k++) $("cpTab"+k).onclick=()=>{ cpSel=k; cpPaint(true); };
 $("cpSave").onclick=()=>{
   const c=cpForm(); if(!c.name) c.name="Custom "+cpSel;
-  if(!c.dim.on && !c.out.some(o=>o.role)){ $("cpFoot").textContent="Give at least one output a colour."; return; }
+  const bad=cpProblem(c); if(bad){ cpFootLine(); return; }
   hot["CPD"+cpSel]=Date.now(); kv["CPD"+cpSel]=cpdLine(c);                 // optimistic
   send(`CPD${cpSel}=${cpdLine(c)}`);
   cpdSync(); cpPaint(true); renderControl();
