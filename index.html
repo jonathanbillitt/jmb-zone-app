@@ -1094,21 +1094,21 @@
   <button id="btClose">Close</button>
 </div></div>
 
-<!-- White balance: a master per colour of ONE port, applied after the dimmer
-     curve. Opening it fades the port to full (never under live DMX). -->
-<!-- Port card sheet: holds one port's Patch / Curve / PWM / Protection rows while open -->
+<!-- Port card sheet: holds one port's Patch / Output / Protection rows while open -->
 <div id="pcOv" class="hidden"><div class="box">
   <div class="wbhead"><b id="pcTitle">Port</b><button id="pcClose" style="padding:6px 14px">Done</button></div>
   <div id="pcBody"></div>
 </div></div>
-<div id="wbOv" class="hidden"><div class="box">
-  <b id="wbTitle">White balance</b>
+<!-- White balance block: a master per colour of ONE port, applied after the
+     dimmer curve. It sits inside that port's Output sheet while the sheet is
+     open (wbMount) and is parked here otherwise (user, 2026-10-01: one pop-up,
+     curve and PWM above the white balance). The port goes to full for a
+     preview on the first touch of a slider — never under live DMX. -->
+<div id="wbHold" class="hidden"><div id="wbBlock">
+  <div class="wbhead" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px">
+    <b>White balance</b><button id="wbReset" style="padding:6px 14px">Reset</button></div>
   <div class="wbnote" id="wbNote"></div>
   <div id="wbRows"></div>
-  <div class="ctlrow" style="margin-top:16px;flex-wrap:nowrap">
-    <button id="wbReset" style="flex:1;padding:12px">Reset</button>
-    <button id="wbClose" class="primary" style="flex:1;padding:12px">Done</button>
-  </div>
   <div class="mini">A master for each colour of this port. 255 = full. Kept in the controller.</div>
 </div></div>
 
@@ -1196,7 +1196,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-01c.three";
+const APP_VER="2026-10-01d.output";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1454,8 +1454,7 @@ async function connect(){
 }
 async function onDisconnected(){
   diagPush("ev","link dropped"+(busy?" (while connecting)":"")+(kv.UP?` · controller up ${kv.UP} s`:""));
-  if(typeof wbPort!=="undefined" && wbPort){ clearInterval(wbKeep); wbKeep=null; wbPort=0; $("wbOv").classList.add("hidden"); }
-  if(typeof pcClose==="function") pcClose();  // a port sheet must not outlive its controller
+  if(typeof pcClose==="function") pcClose();  // a port sheet (and the WB preview in it) must not outlive its controller
   otaNoteDrop();                            // capture WHERE an update died
   dismissConfirm();                         // never leave a dead prompt on screen
   if(busy){ cmdChar=null; return; }         // a connect/reconnect owns the link
@@ -1992,8 +1991,7 @@ function buildCard(p){
         <div class="row"><label>Curve</label>
           <select id="crv${p}" style="width:130px">
             <option value="0">Linear</option><option value="1">Soft 1.6</option>
-            <option value="2">Theatre 2.2</option></select>
-          <span class="mini" id="crvn${p}" style="margin:0 0 0 8px"></span></div>
+            <option value="2">Theatre 2.2</option></select></div>
         <div class="row"><label>PWM</label>
           <select id="pwm${p}" style="width:170px">
             <option value="0">Smooth 8 kHz</option>
@@ -2005,10 +2003,8 @@ function buildCard(p){
           </select>
           <button class="hidden" id="pwe${p}" style="margin-left:8px;padding:6px 10px">Custom…</button></div>
         <div class="mini hidden" id="pwn${p}" style="margin:0;color:var(--warn)"></div>
-        <div class="row hidden" id="wbrow${p}"><label>White bal.</label>
-          <button id="wbb${p}" style="padding:6px 12px">Adjust…</button>
-          <span class="mini" id="wbv2${p}" style="margin:0 0 0 8px"></span></div>
-        <div class="mini">Smooth for the eye, Silent above hearing, Camera for 25 and 50 fps shutters. A custom PWM entry brings its own curve.</div>
+        <div class="mini">Smooth for the eye, Silent above hearing, Camera for 25 and 50 fps shutters.</div>
+        <div id="wbHost${p}"></div>   <!-- the white balance block mounts here while the sheet is open -->
       </div>
       <div class="psheet rows" id="psProt${p}" data-title="Port ${p} · protection">
         <div class="row"><label>Current</label>
@@ -2040,8 +2036,7 @@ function buildCard(p){
     if(ports[p-1]) pwPaintCard(p,ports[p-1]);
   });
   d.querySelector("#pwe"+p).addEventListener("click",pwOpen);
-  d.querySelector("#wbb"+p).addEventListener("click",()=>wbOpen(p));
-  d.querySelector("#wbg"+p).addEventListener("click",()=>wbOpen(p));
+  d.querySelector("#wbg"+p).addEventListener("click",()=>pcOpen(p,"Out"));   // WB badge → the Output sheet, WB inside
   d.querySelector("#chPatch"+p).addEventListener("click",()=>pcOpen(p,"Patch"));
   d.querySelector("#chOut"+p).addEventListener("click",()=>pcOpen(p,"Out"));
   d.querySelector("#chProt"+p).addEventListener("click",()=>pcOpen(p,"Prot"));
@@ -4067,7 +4062,7 @@ $("btnExport").onclick=()=>{
     scenes:loadScenes() };
   // White balance and the PWM library's custom entries, when the firmware has them
   data.ports.forEach((t,i)=>{ const w=wbOf(i+1); if(w) t.wb=[w.R,w.G,w.B]; });
-  if(pwLim()) data.pwc=[0,1,2].map(k=>{ const c=pwCustom(k); return c?{hz:c.hz,g:c.g}:null; });
+  if(pwLim()) data.pwc=[0,1,2].map(k=>{ const c=pwCustom(k); return c?{hz:c.hz}:null; });
   // octet-stream (not application/json) so the browser keeps the .jmb name as-is
   // instead of appending ".json" → the file was saving as "...jmb.json".
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/octet-stream"});
@@ -4102,8 +4097,8 @@ $("impFile").addEventListener("change",async ev=>{
   // Custom entries go in BEFORE the ports, so a port that uses one can take it.
   const lib=[];
   if(Array.isArray(data.pwc) && pwLim()) data.pwc.slice(0,3).forEach((c,k)=>{
-    const hz=Math.round(+(c&&c.hz)||0), g=Math.round(+(c&&c.g)||22);
-    lib.push(hz>0 ? `PWC${k+1}=${hz},${g}` : `PWC${k+1}=0,0`); });
+    const hz=Math.round(+(c&&c.hz)||0);                   // older files also carry a curve: ignored
+    lib.push(hz>0 ? `PWC${k+1}=${hz}` : `PWC${k+1}=0`); });
   const q=["CID="+(data.cid||0),"CNAME="+(nm?hexEnc(nm):"0"),
            "AMODE="+(data.amode||0)].concat(lib,portQueue(data.ports));
   await applyQueue(q,"Applying");
@@ -4628,15 +4623,18 @@ $("btSwitch").onclick=()=>{
   setTimeout(()=>connect(),400);
 };
 // ---------- white balance + PWM library (2026-09-29) ----------
-// State keys (firmware ≥ this feature): W<n>=R,G,B,preview · PWLIM=fmin,fmax,
-// gmin,gmax · PWC<k>=carrier,curve×10,real carrier. An older firmware sends
-// none of them, and everything below stays hidden.
+// State keys (firmware ≥ this feature): W<n>=R,G,B,preview · PWLIM=fmin,fmax ·
+// PWC<k>=carrier,real carrier. An older firmware sends none of them, and
+// everything below stays hidden. (Until 2026-10-01 a custom entry also carried
+// a curve — PWLIM had four numbers and PWC<k> three; both forms are read, the
+// curve is ignored: the port keeps its own preset curve, user's decision.)
 const wbOf=p=>{ const a=String(kv["W"+p]??"").split(",").map(Number);
   return (a.length>=3 && a.slice(0,3).every(n=>n>=0&&n<=255)) ? {R:a[0],G:a[1],B:a[2],pv:a[3]|0} : null; };
 const pwLim=()=>{ const a=String(kv.PWLIM??"").split(",").map(Number);
-  return (a.length===4 && a.every(n=>n>0)) ? {fmin:a[0],fmax:a[1],gmin:a[2],gmax:a[3]} : null; };
+  return (a.length>=2 && a[0]>0 && a[1]>a[0]) ? {fmin:a[0],fmax:a[1]} : null; };
 const pwCustom=k=>{ const a=String(kv["PWC"+(k+1)]??"").split(",").map(Number);
-  return (a.length>=2 && a[0]>0) ? {hz:a[0],g:a[1],act:a[2]||a[0]} : null; };
+  if(!(a.length>=2 && a[0]>0)) return null;
+  return {hz:a[0], act:(a.length>=3 ? a[2] : a[1])||a[0]}; };
 const fmtKhz=hz=>(hz/1000).toFixed(hz%1000?1:0)+" kHz";
 // The carrier the port's timer really produces (whole 62.5 ns counts) — the
 // same integer sum as the firmware, so the figure shown is the figure run.
@@ -4645,14 +4643,15 @@ const pwActual=hz=>{ const span=Math.floor((16000000+Math.floor(hz/2))/hz);
 const PORT_FW_CUSTOM=0x0207;                     // port firmware 2.7
 const portsOn=entry=>ports.map((m,i)=>(m.PW===entry?i+1:0)).filter(Boolean);
 
-// ----- white balance widget -----
-let wbPort=0, wbKeep=null, wbVals={R:255,G:255,B:255};
+// ----- white balance block (inside the Output sheet) -----
+let wbPort=0, wbKeep=null, wbArmed=false, wbVals={R:255,G:255,B:255};
 const WB_ROWS={ rgb:[["R","Red","r"],["G","Green","g"],["B","Blue","b"]],
                 cct:[["G","Cool white","cw"],["R","Warm white","ww"]],
                 dim:[["ALL","Level","uv"]] };
 const wbKind=pe=>(pe===2||pe===3)?"cct":(pe===5||pe===6)?"dim":"rgb";
 function wbSend(ch,v){
   const p=wbPort; if(!p) return;
+  if(!wbArmed) wbArm();                   // first touch: the port goes to full for judging
   hot[p+".WB"]=Date.now();
   const chs = ch==="ALL" ? ["R","G","B"] : [ch];
   for(const c of chs){ wbVals[c]=v; sendThrottled(`wb${p}${c}`,`P${p}.WB${c}=${v}`); }
@@ -4677,16 +4676,24 @@ function wbPreview(on){
 function wbNote(){
   const n=$("wbNote"); if(!n||!wbPort) return;
   const dmx=kv.DMX==="1" && !demoOn;
-  n.className="wbnote "+(dmx?"dmx":"live");
+  n.className="wbnote "+(dmx?"dmx":wbArmed?"live":"");
   n.textContent = dmx
     ? "Live DMX has this port, so the preview is off. Bring its channels to full at the desk to judge the balance."
-    : "The port is at full on every colour while this is open.";
+    : wbArmed ? "The port is at full on every colour while this sheet is open."
+    : "Move a slider to judge it: the port shows full on every colour until you close this sheet.";
+}
+// The preview is armed by the first touch, not by opening the sheet — the
+// sheet also holds the curve and PWM, and changing those must not blast the
+// strip to full.
+function wbArm(){
+  wbArmed=true; wbPreview(true); wbNote();
+  clearInterval(wbKeep);
+  wbKeep=setInterval(()=>{ wbPreview(true); wbNote(); },3000);   // keep-alive: the port lets go 8 s after the last one
 }
 function wbOpen(p){
   const w=wbOf(p); if(!w) return;
-  wbPort=p; wbVals={R:w.R,G:w.G,B:w.B};
-  const m=ports[p-1]||{}, kind=wbKind(m.PE??0);
-  $("wbTitle").textContent=`White balance · Port ${p}`+(m.L?` · ${m.L}`:"");
+  wbPort=p; wbArmed=false; wbVals={R:w.R,G:w.G,B:w.B};
+  const kind=wbKind((ports[p-1]||{}).PE??0);
   $("wbRows").innerHTML=WB_ROWS[kind].map(([ch,name,cls])=>`
     <div class="wbrow ${cls}">
       <div class="wbhead"><span>${name}</span><b id="wbN${ch}"></b></div>
@@ -4707,22 +4714,30 @@ function wbOpen(p){
     wbSend(ch,wbSet(ch,cur+ +b.dataset.d));
   });
   wbNote();
-  $("wbOv").classList.remove("hidden");
-  wbPreview(true);
-  clearInterval(wbKeep);
-  wbKeep=setInterval(()=>{ wbPreview(true); wbNote(); },3000);   // keep-alive: the port lets go 8 s after the last one
 }
 function wbClose(){
   clearInterval(wbKeep); wbKeep=null;
-  if(wbPort) send(`P${wbPort}.WBP=0`);
-  wbPort=0;
-  $("wbOv").classList.add("hidden");
+  if(wbPort && wbArmed) send(`P${wbPort}.WBP=0`);
+  wbPort=0; wbArmed=false;
 }
-// State arrived: keep an open widget honest (a trim changed from a desk over
+// Mount the block into port p's Output sheet (only when the firmware has white
+// balance); unmount parks it again and ends any preview.
+function wbMount(p){
+  const host=$("wbHost"+p), blk=$("wbBlock");
+  if(!blk) return;
+  if(!host || !wbOf(p)){ blk.classList.add("hidden"); return; }
+  host.appendChild(blk); blk.classList.remove("hidden"); wbOpen(p);
+}
+function wbUnmount(){
+  wbClose();
+  const blk=$("wbBlock"), hold=$("wbHold");
+  if(blk && hold && blk.parentNode!==hold){ hold.appendChild(blk); blk.classList.add("hidden"); }
+}
+// State arrived: keep an open block honest (a trim changed from a desk over
 // RDM), unless a finger is on it.
 function wbRefresh(){
   if(!wbPort) return;
-  if(!wbOf(wbPort) || wbPort>ports.length){ wbClose(); return; }
+  if(!wbOf(wbPort) || wbPort>ports.length){ pcClose(); return; }
   wbNote();
   if(Date.now()-(hot[wbPort+".WB"]||0) < HOT_MS) return;
   const w=wbOf(wbPort), kind=wbKind((ports[wbPort-1]||{}).PE??0);
@@ -4734,18 +4749,13 @@ function wbRefresh(){
 }
 // Port card: the Adjust row, its read-out and the orange WB badge.
 function wbPaintCard(p){
-  // Card line (wbr/wbv, compact) and the Output sheet's row (wbrow/wbv2, full).
-  const w=wbOf(p), row=$("wbr"+p), row2=$("wbrow"+p), bd=$("wbg"+p), tx=$("wbv"+p), tx2=$("wbv2"+p);
+  // The card's WB line (wbr/wbv) and the orange WB badge.
+  const w=wbOf(p), row=$("wbr"+p), bd=$("wbg"+p), tx=$("wbv"+p);
   if(row) row.classList.toggle("hidden",!w);
-  if(row2) row2.classList.toggle("hidden",!w);
   const on=!!w && (w.R<255||w.G<255||w.B<255);
   if(bd) bd.classList.toggle("hidden",!on);
   if(w){
     const kind=wbKind((ports[p-1]||{}).PE??0), lv=Math.max(w.R,w.G,w.B);
-    if(tx2) tx2.textContent = !on ? "no trim"
-      : kind==="cct" ? `cool ${w.G} · warm ${w.R}`
-      : kind==="dim" ? `level ${lv}`
-      : `${w.R} · ${w.G} · ${w.B}`;
     if(tx) tx.textContent = !on ? "full"
       : kind==="cct" ? `${w.G} / ${w.R}`
       : kind==="dim" ? `${lv}`
@@ -4762,8 +4772,6 @@ function wbPaintAll(){
   const any=ports.some((_,i)=>{ const w=wbOf(i+1); return w && (w.R<255||w.G<255||w.B<255); });
   b.classList.toggle("glow",any); b.disabled=!any; b.style.opacity=any?"":".45";
 }
-$("wbClose").onclick=wbClose;
-$("wbOv").addEventListener("click",e=>{ if(e.target===$("wbOv")) wbClose(); });
 $("wbReset").onclick=()=>{
   const p=wbPort; if(!p) return;
   hot[p+".WB"]=Date.now();
@@ -4782,9 +4790,9 @@ $("btnWbReset").onclick=async()=>{
   wbPaintAll();
   setTimeout(()=>send("GET"),600);
 };
-// The port must never be left at full by a widget nobody is looking at.
+// The port must never be left at full by a sheet nobody is looking at.
 addEventListener("pagehide",()=>{ if(wbPort) wbClose(); });
-document.addEventListener("visibilitychange",()=>{ if(document.hidden && wbPort) wbClose(); });
+document.addEventListener("visibilitychange",()=>{ if(document.hidden && wbPort) pcClose(); });
 
 // ----- Port card sheets: Patch / Output / Protection (2026-10-01) -----
 // The sheet rows keep their ids and listeners; opening MOVES the node into
@@ -4798,8 +4806,10 @@ function pcOpen(p,kind){
   $("pcTitle").textContent=node.dataset.title||`Port ${p}`;
   $("pcBody").appendChild(node);
   $("pcOv").classList.remove("hidden");
+  if(kind==="Out") wbMount(p);            // white balance lives under curve + PWM
 }
 function pcClose(){
+  wbUnmount();                            // ends a preview, parks the WB block
   if(pcOpenNode){ if(pcHome && pcHome.isConnected) pcHome.appendChild(pcOpenNode); else pcOpenNode.remove(); }
   pcOpenNode=null; pcHome=null;
   $("pcOv").classList.add("hidden");
@@ -4821,7 +4831,7 @@ function pcPaintSet(p,m){
   put("pvAddr"+p, `DMX ${m.A??1}`);
   put("pvHead"+p, `head ${m.H??0}`);
   const slot=(m.PW??0)-3, c=slot>=0?pwCustom(slot):null;
-  put("pvCrv"+p, c ? `γ${(c.g/10).toFixed(1)} custom` : (CRV_NAMES[m.CV??0]||"Linear"));
+  put("pvCrv"+p, CRV_NAMES[m.CV??0]||"Linear");
   const pf=+(m.PF||0), old=!!c && pf<PORT_FW_CUSTOM && m.O===1;
   put("pvPwm"+p, old ? "Camera 15.6 kHz ·fw" : pwName(m), old?"warn":"");
   put("pvOcp"+p, `${((m.OC??ocpCapA()*1000)/1000).toFixed(2)} A limit`);
@@ -4845,10 +4855,8 @@ function pwOpen(){
     <div class="pwrow">
       <div class="wbhead"><span>Custom ${k+1}</span><b id="pwU${k}" style="font-size:12px;font-weight:400"></b></div>
       <div class="row" style="margin-top:6px">
-        <input type="number" id="pwF${k}" min="${lim.fmin}" max="${lim.fmax}" step="1" inputmode="numeric" placeholder="carrier" style="width:96px">
+        <input type="number" id="pwF${k}" min="${lim.fmin}" max="${lim.fmax}" step="1" inputmode="numeric" placeholder="carrier" style="width:110px">
         <span class="unit">Hz</span>
-        <label style="width:auto;margin-left:10px">Curve</label>
-        <input type="number" id="pwG${k}" min="${(lim.gmin/10).toFixed(1)}" max="${(lim.gmax/10).toFixed(1)}" step="0.1" inputmode="decimal" style="width:64px">
       </div>
       <div class="mini" id="pwA${k}" style="margin-top:4px;min-height:16px"></div>
       <div class="ctlrow" style="margin-top:6px">
@@ -4856,22 +4864,22 @@ function pwOpen(){
         <button id="pwC${k}" class="danger" style="flex:1">Clear</button>
       </div>
     </div>`).join("");
-  $("pwLimTxt").textContent=`Carrier ${lim.fmin}–${lim.fmax} Hz · curve ${(lim.gmin/10).toFixed(1)}–${(lim.gmax/10).toFixed(1)} (1.0 = linear, 2.2 = theatre).`;
+  $("pwLimTxt").textContent=`Carrier ${lim.fmin}–${lim.fmax} Hz. A port on a custom entry keeps its own dimmer curve.`;
   [0,1,2].forEach(k=>{
-    const f=$("pwF"+k), g=$("pwG"+k);
+    const f=$("pwF"+k);
     const note=()=>{ const hz=Math.round(+f.value||0), a=$("pwA"+k);
       const ok=hz>=lim.fmin&&hz<=lim.fmax;
       a.textContent = !hz ? "" : (ok?`Runs at ${pwActual(hz).toLocaleString("en-GB")} Hz. `:"")+pwCaveat(hz);
       a.style.color = (hz && !ok) ? "var(--bad)" : ""; };
     f.addEventListener("input",note); f._note=note;
     $("pwS"+k).onclick=()=>{
-      let hz=Math.round(+f.value||0), gv=Math.round((+g.value||2.2)*10);
+      let hz=Math.round(+f.value||0);
       if(!hz){ $("pwA"+k).textContent="Enter a carrier in Hz."; return; }
-      hz=Math.max(lim.fmin,Math.min(lim.fmax,hz)); gv=Math.max(lim.gmin,Math.min(lim.gmax,gv));
-      f.value=hz; g.value=(gv/10).toFixed(1); note();
+      hz=Math.max(lim.fmin,Math.min(lim.fmax,hz));
+      f.value=hz; note();
       hot["PWC"+k]=Date.now();
-      kv["PWC"+(k+1)]=`${hz},${gv},${pwActual(hz)}`;          // optimistic
-      send(`PWC${k+1}=${hz},${gv}`);
+      kv["PWC"+(k+1)]=`${hz},${pwActual(hz)}`;                // optimistic
+      send(`PWC${k+1}=${hz}`);
       pwPaint(); renderControl();
     };
     $("pwC"+k).onclick=async()=>{
@@ -4880,10 +4888,10 @@ function pwOpen(){
             `${used.length>1?"go":"goes"} back to Camera 15.6 kHz.`,
             {title:`Clear Custom ${k+1}?`,ok:"Clear",danger:true})) return;
       hot["PWC"+k]=Date.now();
-      kv["PWC"+(k+1)]="0,0,0";
+      kv["PWC"+(k+1)]="0,0";
       used.forEach(p=>{ if(ports[p-1]) ports[p-1].PW=2; });
-      f.value=""; g.value="2.2"; note();
-      send(`PWC${k+1}=0,0`);
+      f.value=""; note();
+      send(`PWC${k+1}=0`);
       pwPaint(); renderControl();
     };
   });
@@ -4895,9 +4903,9 @@ function pwOpen(){
 function pwPaint(fill){
   if($("pwOv").classList.contains("hidden") && !fill) return;
   [0,1,2].forEach(k=>{
-    const c=pwCustom(k), f=$("pwF"+k), g=$("pwG"+k), u=$("pwU"+k);
+    const c=pwCustom(k), f=$("pwF"+k), u=$("pwU"+k);
     if(!f) return;
-    if(fill){ f.value=c?c.hz:""; g.value=c?(c.g/10).toFixed(1):"2.2"; if(f._note) f._note(); }
+    if(fill){ f.value=c?c.hz:""; if(f._note) f._note(); }
     const used=portsOn(3+k);
     if(u) u.textContent = !c ? "not set" : used.length ? `in use: port${used.length>1?"s":""} ${used.join(", ")}` : "not in use";
     const cb=$("pwC"+k); if(cb) cb.disabled=!c;
@@ -4906,7 +4914,8 @@ function pwPaint(fill){
 $("pwClose").onclick=()=>$("pwOv").classList.add("hidden");
 $("pwOv").addEventListener("click",e=>{ if(e.target===$("pwOv")) $("pwOv").classList.add("hidden"); });
 
-// Port card, Advanced: library picker, curve lock and the Custom… button.
+// Port card, Output sheet: the library picker and the Custom… button. The
+// port's curve stays its own whatever entry it runs (user, 2026-10-01).
 function pwPaintCard(p,m){
   const lib=!!pwLim(), sel=$("pwm"+p), pf=+(m.PF||0);
   if(sel) for(const o of sel.options){
@@ -4915,13 +4924,10 @@ function pwPaintCard(p,m){
     o.hidden=!lib;
     o.disabled=!c || pf<PORT_FW_CUSTOM;
     o.textContent = !c ? `Custom ${v-2} (not set)`
-      : `Custom ${v-2} · ${fmtKhz(c.act)} · γ${(c.g/10).toFixed(1)}`+(pf<PORT_FW_CUSTOM?" — port firmware 2.7":"");
+      : `Custom ${v-2} · ${fmtKhz(c.act)}`+(pf<PORT_FW_CUSTOM?" — port firmware 2.7":"");
   }
   const pe=$("pwe"+p); if(pe) pe.classList.toggle("hidden",!lib);
   const slot=(m.PW??0)-3, c=slot>=0?pwCustom(slot):null;
-  const cs=$("crv"+p), cn=$("crvn"+p);
-  if(cs) cs.disabled=!!c;
-  if(cn) cn.textContent = c ? `Custom ${slot+1}: γ${(c.g/10).toFixed(1)}` : "";
   // A port that cannot run the entry it holds is on the stock Camera carrier.
   const pn=$("pwn"+p);
   if(pn){ const bad=!!c && pf<PORT_FW_CUSTOM && m.O===1;
@@ -5041,7 +5047,7 @@ const demoP=[{a:1,pe:0,r:100,g:85,b:60,x:0,s:128},{a:4,pe:0,r:100,g:100,b:100,x:
              {a:26,pe:0,r:100,g:100,b:100,x:14,s:128},{a:29,pe:4,r:100,g:100,b:100,x:4,s:128}];
 const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1,bpm:128,btn:'44656D6F20526967',txa:0,
              var:4, varm:0, cl:0, clk:0, cf:1, tf:1,    // cl 0 = product max (0.1 A units)
-             pwc:[{hz:12300,g:24},null,null]};           // PWM library: Custom 1 set, 2 and 3 empty
+             pwc:[{hz:12300},null,null]};                // PWM library: Custom 1 set, 2 and 3 empty
 // Demo mirror of the firmware's limit maths: max = 6.75 A × ports; the fold
 // scale is what would hold the summed demo port currents under the limit.
 function demoLimits(){
@@ -5061,7 +5067,7 @@ function demoState(){
   const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S${d.s??128},H${d.h??n},`+
     `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW${d.pw??2},OC${d.oc??6750},OT${d.ot??80},CV${d.cv??0},TX${1000*n},TO0,EC0,PH1,PF519,KA1000,KB1000,L${d.l||0};`;
   const W=(n,d)=>{ const w=d.wb||[255,255,255]; return `W${n}=${w[0]},${w[1]},${w[2]},${d.wbp?1:0};`; };
-  const PWC=demoF.pwc.map((c,k)=>`PWC${k+1}=${c?`${c.hz},${c.g},${pwActual(c.hz)}`:"0,0,0"};`).join("");
+  const PWC=demoF.pwc.map((c,k)=>`PWC${k+1}=${c?`${c.hz},${pwActual(c.hz)}`:"0,0"};`).join("");
   onState(
     `JMB;FW=demo;PORTS=${demoF.var};CID=7;DMX=1;FPS=44;DI=0;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=3;ERR=0;`+
     "RDM=42;ANS=42;AGE=23;"+
@@ -5071,7 +5077,7 @@ function demoState(){
     `NET=${demoF.net};NW=${demoF.net};NUN=${demoF.nun};SRC=${demoF.net?1:0};`+
     `NIP=192.168.1.42;NRS=-52;TF=${demoF.tf};PB=${demoF.cl};`+demoLimits()+"CX=3;CA=1;"+
     `SH=${demoF.sh||5};SHM=${demoF.sh?1:0};`+     // 5 mΩ on every product since 2026-09-23: the ceiling reads 6.75 A
-    "PWLIM=2000,25000,10,30;"+PWC+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)).join("")+
+    "PWLIM=2000,25000;"+PWC+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)).join("")+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
     `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+demoTxState()+
     "LPX=9;LPS=5;LPN=0;LPA=31;LPG=22;RR=1;BSY=0;BRT=3;"+
@@ -5151,10 +5157,10 @@ function demoCmd(s){
   if(m=s.match(/^P(\d)\.WBX=/)){ demoP[+m[1]-1].wb=[255,255,255]; demoState(); return; }
   if(m=s.match(/^P(\d)\.WBP=(\d)/)){ demoP[+m[1]-1].wbp=+m[2]; return; }
   if(s.startsWith("ALL.WBX=")){ demoP.forEach(d=>{ d.wb=[255,255,255]; }); demoState(); return; }
-  if(m=s.match(/^PWC(\d)=(\d+),(\d+)/)){ const k=+m[1]-1, hz=+m[2];
+  if(m=s.match(/^PWC(\d)=(\d+)/)){ const k=+m[1]-1, hz=+m[2];
     if(k>=0&&k<3){
       if(!hz){ demoF.pwc[k]=null; demoP.forEach(d=>{ if(d.pw===3+k) d.pw=2; }); }
-      else demoF.pwc[k]={hz:Math.max(2000,Math.min(25000,hz)),g:Math.max(10,Math.min(30,+m[3]))};
+      else demoF.pwc[k]={hz:Math.max(2000,Math.min(25000,hz))};
       demoState(); }
     return; }
   if(m=s.match(/^P(\d)\.PWM=(\d+)/)){ const v=+m[2], d=demoP[+m[1]-1];
