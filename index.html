@@ -243,8 +243,20 @@
   .wbrow.ww input[type=range] { accent-color:#ffb454; }
   .wbrow.cw input[type=range] { accent-color:#bfe3ff; }
   .wbrow.uv input[type=range] { accent-color:#b16aff; }
-  .wbsteps { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
-  .wbsteps button { padding:10px 0; font-variant-numeric:tabular-nums; }
+  /* Compact white balance (user, 2026-10-01: "bunched up", up to five colours
+     per port): one line per colour — label, slider, value box. The Preview
+     line sets how bright the port shows while adjusting. */
+  .wbline { display:flex; align-items:center; gap:10px; margin-top:8px; }
+  .wbline label { width:52px; flex-shrink:0; font-size:12.5px; color:var(--dim); }
+  .wbline input[type=range] { flex:1; min-width:0; height:26px; margin:0; accent-color:var(--acc); }
+  .wbline.r input[type=range] { accent-color:var(--r); }   .wbline.g input[type=range] { accent-color:var(--g); }
+  .wbline.b input[type=range] { accent-color:var(--b); }   .wbline.ww input[type=range] { accent-color:#ffb454; }
+  .wbline.cw input[type=range] { accent-color:#bfe3ff; }   .wbline.uv input[type=range] { accent-color:#b16aff; }
+  .wbline.pv input[type=range] { accent-color:#f5f5f5; }
+  .wbline .wbnum { width:60px; flex-shrink:0; text-align:right; font-size:14px; font-variant-numeric:tabular-nums;
+                   background:var(--card2); color:var(--text); border:1px solid var(--line); border-radius:7px;
+                   padding:5px 6px; box-sizing:border-box; }
+  .wbline span.wbnum { background:none; border-color:transparent; color:var(--dim); }
   .wbnote { border:1px solid var(--line); border-radius:9px; padding:8px 10px;
             font-size:12.5px; margin-top:12px; color:var(--dim); }
   .wbnote.live { border-color:var(--ok); color:var(--ok); }
@@ -1107,9 +1119,11 @@
 <div id="wbHold" class="hidden"><div id="wbBlock">
   <div class="wbhead" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px">
     <b>White balance</b><button id="wbReset" style="padding:6px 14px">Reset</button></div>
-  <div class="wbnote" id="wbNote"></div>
+  <div class="wbnote dmx hidden" id="wbNote">Live DMX has this port, so the preview is off. Bring its channels up at the desk to judge the balance.</div>
+  <div class="wbline pv"><label>Preview</label>
+    <input type="range" id="wbLvl" min="0" max="100" step="5"><span class="wbnum" id="wbLvlV">50 %</span></div>
   <div id="wbRows"></div>
-  <div class="mini">A master for each colour of this port. 255 = full. Kept in the controller.</div>
+  <div class="mini">Preview lights the port at that level while you adjust, never over live DMX. 255 = full. Trims are kept in the controller.</div>
 </div></div>
 
 <!-- PWM library: the three custom entries (carrier + curve), controller-wide. -->
@@ -1196,7 +1210,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-01d.output";
+const APP_VER="2026-10-01e.wb";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -4645,8 +4659,11 @@ const portsOn=entry=>ports.map((m,i)=>(m.PW===entry?i+1:0)).filter(Boolean);
 
 // ----- white balance block (inside the Output sheet) -----
 let wbPort=0, wbKeep=null, wbArmed=false, wbVals={R:255,G:255,B:255};
+// Rows per personality kind. Five-colour personalities (red, green, blue, two
+// whites on the .3 boards' fifth and fourth outputs) will add W and A rows here
+// once the firmware carries them (FW-16); the layout already fits five lines.
 const WB_ROWS={ rgb:[["R","Red","r"],["G","Green","g"],["B","Blue","b"]],
-                cct:[["G","Cool white","cw"],["R","Warm white","ww"]],
+                cct:[["G","Cool","cw"],["R","Warm","ww"]],
                 dim:[["ALL","Level","uv"]] };
 const wbKind=pe=>(pe===2||pe===3)?"cct":(pe===5||pe===6)?"dim":"rgb";
 function wbSend(ch,v){
@@ -4663,28 +4680,35 @@ function wbSet(ch,v){
   v=Math.max(0,Math.min(255,Math.round(+v||0)));
   const s=$("wbS"+ch), n=$("wbN"+ch);
   if(s) s.value=v;
-  if(n) n.innerHTML=`${v} <span style="color:var(--dim);font-weight:400;font-size:12px">${Math.round(v/2.55)}%</span>`;
+  if(n && document.activeElement!==n) n.value=v;
   return v;
+}
+// Preview brightness, % (0 = no preview). Remembered per phone.
+function wbLevel(){
+  let v=50; try{ const s=localStorage.getItem("jmbWbLvl"); if(s!=null && s!=="") v=+s; }catch(_){}
+  return Math.max(0,Math.min(100,Math.round((+v||0)/5)*5));
 }
 function wbPreview(on){
   if(!wbPort) return;
   // Never under live DMX: the desk has the port, and a preview left armed
-  // would jump the port to full the moment the desk went away.
+  // would jump the port to its preview level the moment the desk went away.
   if(on && kv.DMX==="1" && !demoOn) return;
-  send(`P${wbPort}.WBP=${on?1:0}`);
+  send(`P${wbPort}.WBP=${on?wbLevel():0}`);   // WBP=<0..100>: the level the port shows at
 }
-function wbNote(){
+function wbNote(){                            // the DMX notice only; otherwise nothing to say
   const n=$("wbNote"); if(!n||!wbPort) return;
-  const dmx=kv.DMX==="1" && !demoOn;
-  n.className="wbnote "+(dmx?"dmx":wbArmed?"live":"");
-  n.textContent = dmx
-    ? "Live DMX has this port, so the preview is off. Bring its channels to full at the desk to judge the balance."
-    : wbArmed ? "The port is at full on every colour while this sheet is open."
-    : "Move a slider to judge it: the port shows full on every colour until you close this sheet.";
+  n.classList.toggle("hidden", !(kv.DMX==="1" && !demoOn));
 }
-// The preview is armed by the first touch, not by opening the sheet — the
-// sheet also holds the curve and PWM, and changing those must not blast the
-// strip to full.
+$("wbLvl").addEventListener("input",e=>{ $("wbLvlV").textContent=(+e.target.value||0)+" %"; });
+$("wbLvl").addEventListener("change",e=>{       // on release: one command, not a stream
+  const v=Math.max(0,Math.min(100,+e.target.value||0));
+  try{ localStorage.setItem("jmbWbLvl",String(v)); }catch(_){}
+  if(!wbPort) return;
+  if(!wbArmed) wbArm(); else wbPreview(true);
+});
+// The preview is armed by the first touch of a trim or of the Preview slider,
+// not by opening the sheet — the sheet also holds the curve and PWM, and
+// changing those must not light the strip.
 function wbArm(){
   wbArmed=true; wbPreview(true); wbNote();
   clearInterval(wbKeep);
@@ -4695,24 +4719,17 @@ function wbOpen(p){
   wbPort=p; wbArmed=false; wbVals={R:w.R,G:w.G,B:w.B};
   const kind=wbKind((ports[p-1]||{}).PE??0);
   $("wbRows").innerHTML=WB_ROWS[kind].map(([ch,name,cls])=>`
-    <div class="wbrow ${cls}">
-      <div class="wbhead"><span>${name}</span><b id="wbN${ch}"></b></div>
+    <div class="wbline ${cls}"><label>${name}</label>
       <input type="range" id="wbS${ch}" min="0" max="255" step="1">
-      <div class="wbsteps">
-        <button data-ch="${ch}" data-d="-10">−10</button><button data-ch="${ch}" data-d="-1">−1</button>
-        <button data-ch="${ch}" data-d="1">+1</button><button data-ch="${ch}" data-d="10">+10</button>
-      </div>
-    </div>`).join("");
+      <input type="number" class="wbnum" id="wbN${ch}" min="0" max="255" step="1" inputmode="numeric"></div>`).join("");
   for(const [ch] of WB_ROWS[kind]){
     // Level (one slider for a single-colour port) follows the highest trim
     const v0 = ch==="ALL" ? Math.max(w.R,w.G,w.B) : w[ch];
     wbSet(ch,v0);
     $("wbS"+ch).addEventListener("input",e=>wbSend(ch,wbSet(ch,e.target.value)));
+    $("wbN"+ch).addEventListener("change",e=>wbSend(ch,wbSet(ch,e.target.value)));   // typed exact value
   }
-  $("wbRows").querySelectorAll(".wbsteps button").forEach(b=>b.onclick=()=>{
-    const ch=b.dataset.ch, cur=+$("wbS"+ch).value;
-    wbSend(ch,wbSet(ch,cur+ +b.dataset.d));
-  });
+  const lv=$("wbLvl"); lv.value=wbLevel(); $("wbLvlV").textContent=lv.value+" %";
   wbNote();
 }
 function wbClose(){
@@ -5066,7 +5083,7 @@ function demoTxState(){
 function demoState(){
   const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M1,R${d.r},G${d.g},B${d.b},D80,O1,F00,X${d.x},S${d.s??128},H${d.h??n},`+
     `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW${d.pw??2},OC${d.oc??6750},OT${d.ot??80},CV${d.cv??0},TX${1000*n},TO0,EC0,PH1,PF519,KA1000,KB1000,L${d.l||0};`;
-  const W=(n,d)=>{ const w=d.wb||[255,255,255]; return `W${n}=${w[0]},${w[1]},${w[2]},${d.wbp?1:0};`; };
+  const W=(n,d)=>{ const w=d.wb||[255,255,255]; return `W${n}=${w[0]},${w[1]},${w[2]},${d.wbp||0};`; };
   const PWC=demoF.pwc.map((c,k)=>`PWC${k+1}=${c?`${c.hz},${pwActual(c.hz)}`:"0,0"};`).join("");
   onState(
     `JMB;FW=demo;PORTS=${demoF.var};CID=7;DMX=1;FPS=44;DI=0;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=3;ERR=0;`+
@@ -5155,7 +5172,7 @@ function demoCmd(s){
   if(m=s.match(/^P(\d)\.WB(R|G|B)=(\d+)/)){ const d=demoP[+m[1]-1]; d.wb=d.wb||[255,255,255];
     d.wb["RGB".indexOf(m[2])]=Math.max(0,Math.min(255,+m[3])); return; }
   if(m=s.match(/^P(\d)\.WBX=/)){ demoP[+m[1]-1].wb=[255,255,255]; demoState(); return; }
-  if(m=s.match(/^P(\d)\.WBP=(\d)/)){ demoP[+m[1]-1].wbp=+m[2]; return; }
+  if(m=s.match(/^P(\d)\.WBP=(\d+)/)){ demoP[+m[1]-1].wbp=Math.min(100,+m[2]); return; }   // 0 = off, else the level %
   if(s.startsWith("ALL.WBX=")){ demoP.forEach(d=>{ d.wb=[255,255,255]; }); demoState(); return; }
   if(m=s.match(/^PWC(\d)=(\d+)/)){ const k=+m[1]-1, hz=+m[2];
     if(k>=0&&k<3){
