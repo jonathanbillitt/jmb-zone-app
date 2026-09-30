@@ -251,8 +251,9 @@ moves the dimmer.)</p>
 Colours</strong> → pick a colour/CCT and confirm <strong>DEPLOY LOOK?</strong> to set that look on
 every armed unit. Choosing <strong>Off</strong> blacks out the whole chain; <strong>White</strong> takes
 it to full. The app's <strong>Chain broadcast</strong> card has one-tap <strong>Blackout / Full /
-DMX In</strong> buttons for the same thing. (Dimmer and looks never re-address or
-renumber — they only change the output.)</p>
+DMX In</strong> buttons for the same thing, and a port's white balance sheet has
+<strong>Chain</strong> to send its trims down the line the same way. (Dimmer, looks and
+white balance never re-address or renumber — they only change the output.)</p>
 <hr />
 <h2>5. RDM</h2>
 <p>The controller is a full E1.20 responder: discovery, identify (flashes the
@@ -323,10 +324,10 @@ tuneable-white port (ice-blue and amber tracks, the unused Blue row hidden) —
 plus two <strong>encoders</strong> for <strong>Dim</strong> and <strong>FX speed</strong> that are easy to ride
 by feel during a take. Under the encoders every port prints its settings in
 three columns, each headed by a button that opens the sheet to change them:
-<strong>Patch</strong> (mode, DMX address, head — the sheet also holds the <strong>label</strong>, up to
+<strong>Patch</strong> (Mode, Address, Head — the sheet also holds the <strong>Label</strong>, up to
 16 characters, which shows in the card header and on that port's own screen
-when the panel is locked), <strong>Output</strong> (dimmer curve, PWM, white balance) and
-<strong>Protection</strong> (current limit, temperature trip, faults). <strong>Clear all</strong> returns
+when the panel is locked), <strong>Output</strong> (Curve, PWM, white balance) and
+<strong>Protection</strong> (Limit, Trip, faults). <strong>Clear all</strong> returns
 every port to a clean base — full white, effects off, dimmer down — after a
 confirmation.</p>
 <p>An <strong>orange outline on a DMX address box</strong> means that port's channels overlap
@@ -342,10 +343,11 @@ which is <em>why</em> the faders would otherwise seem to do nothing.</p>
 <p><strong>Output</strong> holds the <strong>PWM mode</strong> (the dimming carrier frequency — see §8), the
 <strong>dimmer curve</strong> (<strong>Linear / Soft / Theatre</strong> — how fader travel maps to
 brightness; a custom PWM entry brings its own and locks it) and <strong>white
-balance</strong> (below). <strong>Protection</strong> holds the <strong>current limit</strong> (0.25 A up to the
-unit's ceiling — <strong>6.75 A</strong> on units with the 5 mΩ current sense, which is every
-Zone, <strong>6.5 A</strong> on earlier 4our/8ight modules; the field's range shows which),
-the <strong>temperature trip</strong>, and a <strong>Clear fault &amp; re-enable</strong> button that appears
+balance</strong> (below). <strong>Protection</strong> holds <strong>Limit</strong>, the current the output may
+draw (0.25 A up to the unit's ceiling — <strong>6.75 A</strong> on units with the 5 mΩ
+current sense, which is every Zone, <strong>6.5 A</strong> on earlier 4our/8ight modules; the
+field's range shows which), <strong>Trip</strong>, the temperature it shuts down at, and a
+<strong>Clear fault &amp; re-enable</strong> button that appears
 only while the port is latched. A latched port shows its fault in red on the
 card and on the header badge; tapping the badge opens the sheet.</p>
 <p><strong>White balance.</strong> In the Output sheet, under the curve and PWM, is a master for
@@ -357,9 +359,11 @@ curve. The <strong>Preview</strong> slider sets how bright the port shows while 
 the preview starts the moment you touch a trim, never over live DMX (with a desk
 connected, bring the channels up at the desk), and the port returns to its look
 when you close the sheet, leave the app or lose the link. A port with a trim in
-force shows an orange <strong>WB</strong> badge. <strong>Reset</strong> clears that port; <strong>Reset white
-balance</strong>, beside <em>Clear all</em>, clears every port. The trims live in the
-controller and apply to every source.</p>
+force shows an orange <strong>WB</strong> badge. <strong>All ports</strong> copies this port's trims to
+every port on the controller; <strong>Chain</strong> sends them to this unit and every armed
+unit down the DMX line, arming each unit first as for the chain broadcast (§4);
+<strong>Reset</strong> clears this port, and <strong>Reset white balance</strong>, beside <em>Clear all</em>,
+clears every port. The trims live in the controller and apply to every source.</p>
 <h3>Colour — dial a look, don't push channels</h3>
 <p>A console-style picker for the selected ports (choose <strong>All</strong> or one port at the
 top). Its five columns — <strong>Dim, Hue, Sat, Kelvin</strong> and <strong>ΔUV</strong> — are all views of

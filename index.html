@@ -1117,13 +1117,19 @@
      curve and PWM above the white balance). The port goes to full for a
      preview on the first touch of a slider — never under live DMX. -->
 <div id="wbHold" class="hidden"><div id="wbBlock">
-  <div class="wbhead" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px">
-    <b>White balance</b><button id="wbReset" style="padding:6px 14px">Reset</button></div>
+  <div class="wbhead" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px"><b>White balance</b></div>
   <div class="wbnote dmx hidden" id="wbNote">Live DMX has this port, so the preview is off. Bring its channels up at the desk to judge the balance.</div>
   <div class="wbline pv"><label>Preview</label>
     <input type="range" id="wbLvl" min="0" max="100" step="5"><span class="wbnum" id="wbLvlV">50 %</span></div>
   <div id="wbRows"></div>
-  <div class="mini">Preview lights the port at that level while you adjust, never over live DMX. 255 = full. Trims are kept in the controller.</div>
+  <!-- Send this port's trims wider: every port on this controller, or every
+       armed unit down the DMX line (the chain baton). Reset clears this port. -->
+  <div class="ctlrow across" style="margin-top:12px">
+    <button id="wbAll">All ports</button>
+    <button id="wbChain">Chain</button>
+    <button id="wbReset">Reset</button>
+  </div>
+  <div class="mini">Preview lights the port at that level while you adjust, never over live DMX. 255 = full. All ports copies these trims to every port here; Chain sends them to every armed unit down the line as well.</div>
 </div></div>
 
 <!-- PWM library: the three custom entries (carrier + curve), controller-wide. -->
@@ -1210,7 +1216,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-01e.wb";
+const APP_VER="2026-10-01f.wbsend";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1987,7 +1993,7 @@ function buildCard(p){
          paints by; opening a sheet moves its node into #pcOv, closing moves it
          back here. -->
     <div class="pholder hidden">
-      <div class="psheet rows" id="psPatch${p}" data-title="Port ${p} · patch">
+      <div class="psheet rows" id="psPatch${p}" data-title="Port ${p} · Patch">
         <div class="row"><label>Label</label>
           <input type="text" id="lbl${p}" maxlength="16" placeholder="name this port"
                  style="flex:1" autocomplete="off"></div>
@@ -2001,7 +2007,7 @@ function buildCard(p){
         </div>
         <div class="mini">Address, head and mode are the desk patch. The label names the port across the app.</div>
       </div>
-      <div class="psheet rows" id="psOut${p}" data-title="Port ${p} · output">
+      <div class="psheet rows" id="psOut${p}" data-title="Port ${p} · Output">
         <div class="row"><label>Curve</label>
           <select id="crv${p}" style="width:130px">
             <option value="0">Linear</option><option value="1">Soft 1.6</option>
@@ -2020,12 +2026,12 @@ function buildCard(p){
         <div class="mini">Smooth for the eye, Silent above hearing, Camera for 25 and 50 fps shutters.</div>
         <div id="wbHost${p}"></div>   <!-- the white balance block mounts here while the sheet is open -->
       </div>
-      <div class="psheet rows" id="psProt${p}" data-title="Port ${p} · protection">
-        <div class="row"><label>Current</label>
+      <div class="psheet rows" id="psProt${p}" data-title="Port ${p} · Protection">
+        <div class="row"><label>Limit</label>
           <input type="number" id="ocp${p}" min="0.25" max="6.75" step="0.25">
           <span class="unit">A</span>
           <span class="mini" id="ocpr${p}" style="margin:0 0 0 8px;color:var(--dim)">0.25&nbsp;&ndash;&nbsp;6.75&nbsp;A</span></div>
-        <div class="row"><label>Temp trip</label>
+        <div class="row"><label>Trip</label>
           <input type="number" id="ot${p}" min="40" max="110" step="5">
           <span class="unit">°C</span>
           <span class="mini" style="margin:0 0 0 8px;color:var(--dim)">40&nbsp;&ndash;&nbsp;110&nbsp;&deg;C</span></div>
@@ -2033,7 +2039,7 @@ function buildCard(p){
           <button class="danger hidden" id="clrf${p}">Clear fault &amp; re-enable</button>
           <span class="mini" id="nof${p}" style="margin:0;color:var(--ok);font-weight:600">&#10003; No faults</span>
         </div>
-        <div class="mini">The output shuts down above either figure. A fault stays latched until it is cleared here.</div>
+        <div class="mini">Limit is the current the output may draw; Trip is the temperature it shuts down at. A fault stays latched until it is cleared here.</div>
       </div>
     </div>`;
   const touch=k=>{ hot[p+"."+k]=Date.now(); };
@@ -4798,6 +4804,34 @@ $("wbReset").onclick=()=>{
   for(const ch of ["R","G","B","ALL"]) if($("wbS"+ch)) wbSet(ch,255);
   wbPaintAll();
 };
+// This port's trims to every port on the controller (per-port commands, so
+// any firmware with white balance takes them), or down the chain (CHWB baton:
+// this unit's ports first, then every armed unit).
+const wbTrio=()=>`${wbVals.R} · ${wbVals.G} · ${wbVals.B}`;
+function wbStampAll(){
+  ports.forEach((_,i)=>{ const k=i+1; hot[k+".WB"]=Date.now();
+    kv["W"+k]=[wbVals.R,wbVals.G,wbVals.B,(kv["W"+k]||"").split(",")[3]||0].join(","); });
+  wbPaintAll();
+}
+$("wbAll").onclick=async()=>{
+  const p=wbPort; if(!p) return;
+  if(ports.length<2){ $("impStatus").textContent="Only one port here."; return; }
+  if(!await askConfirm(`Every port on this controller takes Port ${p}'s white balance (${wbTrio()}).`,
+        {title:"White balance to all ports?",ok:"Send"})) return;
+  const q=[];
+  ports.forEach((_,i)=>{ const k=i+1; if(k===p) return;
+    q.push(`P${k}.WBR=${wbVals.R}`,`P${k}.WBG=${wbVals.G}`,`P${k}.WBB=${wbVals.B}`); });
+  wbStampAll();
+  await applyQueue(q,"White balance");
+};
+$("wbChain").onclick=async()=>{
+  const p=wbPort; if(!p) return;
+  if(!await askConfirm(`This unit's ports and every armed unit down the DMX line take Port ${p}'s white balance (${wbTrio()}). Arm each downstream unit first: Setup → Chain broadcast → Listen.`,
+        {title:"White balance across the chain?",ok:"Send"})) return;
+  send(`CHWB=${wbVals.R},${wbVals.G},${wbVals.B}`);
+  wbStampAll();
+  setTimeout(()=>send("GET"),800);
+};
 $("btnWbReset").onclick=async()=>{
   if(!await askConfirm("Every port's white balance goes back to full on every colour.",
         {title:"Reset white balance?",ok:"Reset",danger:true})) return;
@@ -4844,17 +4878,19 @@ function pwName(m){
 function pcPaintSet(p,m){
   const put=(id,val,cls)=>{ const el=$(id); if(!el) return;
     el.textContent=val; el.className="pv"+(cls?" "+cls:""); };
+  // Same words as the sheet's field labels: Mode / Address / Head, Curve / PWM /
+  // WB, Limit / Trip / faults — so a value on the card names the field it came from.
   put("pvMode"+p, PERS_NAMES[m.PE??0]??"?");
-  put("pvAddr"+p, `DMX ${m.A??1}`);
-  put("pvHead"+p, `head ${m.H??0}`);
+  put("pvAddr"+p, `Address ${m.A??1}`);
+  put("pvHead"+p, `Head ${m.H??0}`);
   const slot=(m.PW??0)-3, c=slot>=0?pwCustom(slot):null;
   put("pvCrv"+p, CRV_NAMES[m.CV??0]||"Linear");
   const pf=+(m.PF||0), old=!!c && pf<PORT_FW_CUSTOM && m.O===1;
-  put("pvPwm"+p, old ? "Camera 15.6 kHz ·fw" : pwName(m), old?"warn":"");
-  put("pvOcp"+p, `${((m.OC??ocpCapA()*1000)/1000).toFixed(2)} A limit`);
-  put("pvOt"+p, `${m.OT??80} °C trip`);
+  put("pvPwm"+p, old ? "Camera 15.6 kHz" : pwName(m), old?"warn":"");
+  put("pvOcp"+p, `Limit ${((m.OC??ocpCapA()*1000)/1000).toFixed(2)} A`);
+  put("pvOt"+p, `Trip ${m.OT??80} °C`);
   const flt=(m.F||0)!==0;
-  put("pvFlt"+p, flt ? "⚠ "+(faultWords(m.F)||"fault") : "✓ no faults", flt?"bad":"ok");
+  put("pvFlt"+p, flt ? "⚠ "+(faultWords(m.F)||"Fault") : "✓ No faults", flt?"bad":"ok");
 }
 
 // ----- PWM library: the three custom entries -----
@@ -5174,6 +5210,8 @@ function demoCmd(s){
   if(m=s.match(/^P(\d)\.WBX=/)){ demoP[+m[1]-1].wb=[255,255,255]; demoState(); return; }
   if(m=s.match(/^P(\d)\.WBP=(\d+)/)){ demoP[+m[1]-1].wbp=Math.min(100,+m[2]); return; }   // 0 = off, else the level %
   if(s.startsWith("ALL.WBX=")){ demoP.forEach(d=>{ d.wb=[255,255,255]; }); demoState(); return; }
+  if(m=s.match(/^CHWB=(\d+),(\d+),(\d+)/)){ const w=[+m[1],+m[2],+m[3]].map(v=>Math.max(0,Math.min(255,v)));
+    demoP.forEach(d=>{ d.wb=w.slice(); }); demoState(); return; }
   if(m=s.match(/^PWC(\d)=(\d+)/)){ const k=+m[1]-1, hz=+m[2];
     if(k>=0&&k<3){
       if(!hz){ demoF.pwc[k]=null; demoP.forEach(d=>{ if(d.pw===3+k) d.pw=2; }); }
