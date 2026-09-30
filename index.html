@@ -215,14 +215,14 @@
   nav button .ico { display:block; font-size:17px; margin-bottom:1px; }
   /* PIN box sits in the TOP part of the screen, not centred — a centred box
      lands under the phone's number pad and needs a scroll to reach Unlock. */
-  #overlay, #cfOv, #btOv, #wbOv, #pwOv, #supOv, #pcOv { position:fixed; inset:0; background:rgba(5,8,12,.82); display:flex;
+  #overlay, #cfOv, #btOv, #wbOv, #pwOv, #supOv, #pcOv, #cpOv { position:fixed; inset:0; background:rgba(5,8,12,.82); display:flex;
              align-items:flex-start; justify-content:center; z-index:10;
              padding-top:max(24px,6vh); overflow-y:auto; }
   #cfOv { z-index:12; }
   #btOv { z-index:11; }
   #btOv .box button { width:100%; margin-top:8px; padding:12px; }
   .sig { cursor:pointer; }
-  #overlay .box, #cfOv .box, #btOv .box, #wbOv .box, #pwOv .box, #supOv .box, #pcOv .box { background:var(--card); border:1px solid var(--line);
+  #overlay .box, #cfOv .box, #btOv .box, #wbOv .box, #pwOv .box, #supOv .box, #pcOv .box, #cpOv .box { background:var(--card); border:1px solid var(--line);
                   border-radius:16px; padding:26px; width:min(340px,90vw);
                   text-align:center; }
   #overlay input { width:100%; margin:14px 0; padding:11px; font-size:18px;
@@ -230,9 +230,16 @@
                    color:var(--text); border:1px solid var(--line); border-radius:9px; }
   #overlay .err { color:var(--bad); font-size:13px; min-height:18px; margin-top:8px; }
   /* White balance widget, PWM library editor, support sheet (2026-09-29) */
-  #wbOv, #pwOv, #supOv { z-index:11; }
-  #pcOv { z-index:10; }                       /* the PWM editor (11) opens above a port sheet */
-  #wbOv .box, #pwOv .box, #supOv .box, #pcOv .box { text-align:left; width:min(400px,94vw); padding:20px; margin-bottom:24px; }
+  #wbOv, #pwOv, #supOv, #cpOv { z-index:11; }
+  #pcOv { z-index:10; }                       /* the PWM editor and the personality builder (11) open above a port sheet */
+  #wbOv .box, #pwOv .box, #supOv .box, #pcOv .box, #cpOv .box { text-align:left; width:min(400px,94vw); padding:20px; margin-bottom:24px; }
+  /* Personality builder rows: Out n · colour · offset · bits on one line at phone width */
+  #cpOv .row label { width:40px; }
+  #cpOv .row select { width:98px; }  #cpOv .row select.bits { width:62px; }
+  #cpOv .row input[type=number] { width:54px; }
+  #cpOv .cphead { display:flex; gap:10px; font-size:11px; color:var(--dim); margin-top:10px; }
+  #cpOv .cphead span:first-child { width:40px; }  #cpOv .cphead span:nth-child(2) { width:98px; }
+  #cpOv .cphead span:nth-child(3) { width:54px; }
   .wbrow, .pwrow { margin-top:14px; }
   .pwrow { border-top:1px solid var(--line); padding-top:12px; }
   .wbhead { display:flex; justify-content:space-between; align-items:baseline;
@@ -294,6 +301,15 @@
      header row gets right padding so a right-aligned button never sits
      under it. Purple = notes open (the app's UV/purple, #b16aff). */
   .card.hashelp { position:relative; }
+  /* A card whose first child is a .rows wrapper (Setup → Controller name):
+     its first row gets the same right padding, so the field stops short of
+     the hand (user, 2026-10-01: "hand-up dude is in the name field"). */
+  .card.hashelp > .rows:first-child > .row:first-child { padding-right:30px; }
+  /* Helper switch off (Setup → App): every hand goes; the notes stay hidden. */
+  body.nohelp .ib { display:none !important; }
+  /* Sheet header: the hand sits beside Done, in flow rather than pinned. */
+  #pcHelp { position:static; margin:0 10px 0 auto; }
+  .tg { display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
   .card.hashelp > .ctlrow:first-child, .card.hashelp > .row:first-child,
   .card.hashelp > .port-head:first-child { padding-right:30px; }
   .ib { position:absolute; top:12px; right:12px; display:inline-flex;
@@ -1068,8 +1084,14 @@
       <div class="ctlrow" style="align-items:center">
         <button id="appRefresh">Look for app update</button>
         <button id="btnSupport">Support</button>
-        <label class="toggle sm" title="Developer mode" style="margin-left:auto"><input type="checkbox" id="devMode"><span></span></label>
-        <span class="mini" style="margin:0">Developer</span>
+      </div>
+      <!-- Word then switch, kept on one line (user: the switch sat above the
+           word). Helper = the raised-hand icons that hide the notes; on by default. -->
+      <div class="ctlrow" style="align-items:center;margin-top:10px;gap:18px">
+        <span class="tg"><span class="mini" style="margin:0">Helper</span>
+          <label class="toggle sm" title="Help notes behind the hand"><input type="checkbox" id="helpMode" checked><span></span></label></span>
+        <span class="tg"><span class="mini" style="margin:0">Developer</span>
+          <label class="toggle sm" title="Developer mode"><input type="checkbox" id="devMode"><span></span></label></span>
       </div>
       <div class="mini" id="appUpdMsg" data-help>The app checks for its own update every
         time it opens. This forces a fresh check and reloads.</div>
@@ -1110,7 +1132,7 @@
 
 <!-- Port card sheet: holds one port's Patch / Output / Protection rows while open -->
 <div id="pcOv" class="hidden"><div class="box">
-  <div class="wbhead"><b id="pcTitle">Port</b><button id="pcClose" style="padding:6px 14px">Done</button></div>
+  <div class="wbhead"><b id="pcTitle">Port</b><button id="pcHelp" class="ib hidden" type="button"></button><button id="pcClose" style="padding:6px 14px">Done</button></div>
   <div id="pcBody"></div>
 </div></div>
 <!-- White balance block: a master per colour of ONE port, applied after the
@@ -1141,6 +1163,36 @@
   <div id="pwRows"></div>
   <div class="wbnote dmx">Custom entries are outside the tested set: check the result on the strip and on camera before a show.</div>
   <div class="ctlrow" style="margin-top:14px"><button id="pwClose" class="primary" style="flex:1;padding:12px">Done</button></div>
+</div></div>
+
+<!-- Custom personalities: four presets held by the controller, any port selects
+     one by name (docs/CUSTOM_PATCH_DESIGN.md). Preview 2026-10-01: the builder
+     works in Demo; on a unit the presets are kept and run once the five-channel
+     firmware is on it. -->
+<div id="cpOv" class="hidden"><div class="box" id="cpForm">
+  <b>Custom personalities</b>
+  <div class="mini" style="margin-top:4px">Four presets, held by the controller; any port can select one by name. Offsets count from the port's address.</div>
+  <div class="ctlrow across" style="margin-top:10px">
+    <button id="cpTab1">1</button><button id="cpTab2">2</button><button id="cpTab3">3</button><button id="cpTab4">4</button>
+  </div>
+  <div class="rows" style="margin-top:12px">
+    <div class="row"><label>Name</label>
+      <input type="text" id="cpName" maxlength="16" placeholder="name this preset" style="flex:1" autocomplete="off">
+      <span class="mini" id="cpUse" style="margin:0"></span></div>
+    <div class="cphead"><span></span><span>Colour</span><span>Offset</span><span>Bits</span></div>
+    <div class="row"><label>Dimmer</label>
+      <select id="cpDimOn"><option value="0">Off</option><option value="1">Master</option></select>
+      <input type="number" id="cpDimOff" min="0" max="511" placeholder="offset">
+      <select id="cpDimBits" class="bits"><option value="8">8</option><option value="16">16</option></select></div>
+    <div id="cpOuts"></div>
+  </div>
+  <div class="mini" id="cpFoot" style="margin-top:8px"></div>
+  <div class="wbnote dmx" id="cpNote" style="margin-top:10px">This unit's firmware cannot run a preset yet (five-channel firmware); it is kept for when it can.</div>
+  <div class="ctlrow" style="margin-top:14px">
+    <button id="cpSave" class="primary" style="flex:1;padding:12px">Save</button>
+    <button id="cpClear" class="danger" style="flex:1;padding:12px">Clear</button>
+    <button id="cpClose" style="flex:1;padding:12px">Done</button>
+  </div>
 </div></div>
 
 <!-- Support: feedback + a status report, sent by the user from their own mail app. -->
@@ -1215,13 +1267,16 @@ const PERS_ORDER = [5,6,2,0,3,7,9,1,8,4,10,11,12,13,14,15,16];
 // Can the connected firmware run this personality? Today's codes always;
 // the five-channel set once the state carries NCH=5; a custom preset once its
 // CPD<k> record says it is set. Demo mode is a three-channel unit.
-const persAvail = c => c<=6 || (c<=12 && +(kv.NCH||3)>=5) || (c>=13 && /^[1-9]/.test(String(kv["CPD"+(c-12)]||"")));
+const persAvail = c => c<=6 || (c<=12 && +(kv.NCH||3)>=5) || (c>=13 && !!cpdOf(c-12));
 const maxAddr = pe => 513 - (PERS_CH[pe] ?? 1);
 function persOptionText(c){
   const n=PERS_ORDER.indexOf(c)+1;
-  return `${n}. ${PERS_NAMES[c]} · ${PERS_CH[c]} ch`+(persAvail(c)?"":c>=13?" (preset not set)":" (five-channel firmware)");
+  if(c>=13){ const k=c-12, cp=cpdOf(k);
+    return `${n}. Custom ${k}${cp?` "${cp.name}"`:""} · ${cpdFoot(cp)} ch`+(cp?"":" (preset not set)"); }
+  return `${n}. ${PERS_NAMES[c]} · ${PERS_CH[c]} ch`+(persAvail(c)?"":" (five-channel firmware)");
 }
 function persPaintOptions(p){
+  cpdSync();                              // custom footprints follow their presets
   const sel=$("pers"+p); if(!sel) return;
   for(const o of sel.options){ const c=+o.value, ok=persAvail(c);
     o.disabled=!ok; const t=persOptionText(c); if(o.textContent!==t) o.textContent=t; }
@@ -1239,7 +1294,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-01h.modes";
+const APP_VER="2026-10-01i.builder";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2027,7 +2082,8 @@ function buildCard(p){
           <input type="number" id="head${p}" min="0" max="9999">
         </div>
         <div class="row"><label>Mode</label>
-          <select id="pers${p}">${PERS_ORDER.map(i=>`<option value="${i}">${persOptionText(i)}</option>`).join("")}</select>
+          <select id="pers${p}" style="flex:1;min-width:0">${PERS_ORDER.map(i=>`<option value="${i}">${persOptionText(i)}</option>`).join("")}</select>
+          <button id="cpe${p}" style="padding:6px 10px">Custom…</button>
         </div>
         <div class="mini">Address, head and mode are the desk patch. The label names the port across the app.</div>
       </div>
@@ -2082,6 +2138,7 @@ function buildCard(p){
     if(ports[p-1]) pwPaintCard(p,ports[p-1]);
   });
   d.querySelector("#pwe"+p).addEventListener("click",pwOpen);
+  d.querySelector("#cpe"+p).addEventListener("click",()=>cpOpen(p));   // personality builder (four presets)
   d.querySelector("#wbg"+p).addEventListener("click",()=>pcOpen(p,"Out"));   // WB badge → the Output sheet, WB inside
   d.querySelector("#chPatch"+p).addEventListener("click",()=>pcOpen(p,"Patch"));
   d.querySelector("#chOut"+p).addEventListener("click",()=>pcOpen(p,"Out"));
@@ -3738,6 +3795,15 @@ function setDev(on){
 }
 setDev((()=>{ try{ return localStorage.getItem("jmbDev")==="1"; }catch(_){ return false; } })());
 $("devMode").onchange=e=>setDev(e.target.checked);
+// Helper (Setup → App, beside Developer): the raised-hand icons that keep the
+// notes out of the way. Off = no hands at all, notes stay hidden. On by default.
+function setHelper(on){
+  document.body.classList.toggle("nohelp",!on);
+  $("helpMode").checked=!!on;
+  try{ localStorage.setItem("jmbHelper",on?"1":"0"); }catch(_){}
+}
+setHelper((()=>{ try{ return localStorage.getItem("jmbHelper")!=="0"; }catch(_){ return true; } })());
+$("helpMode").onchange=e=>setHelper(e.target.checked);
 $("setShunt").onchange=e=>{ setupTouched=Date.now(); send("SHUNT="+ +e.target.value); };
 $("calPort").onchange=()=>renderSetup();
 $("btnCal").onclick=()=>{
@@ -4109,6 +4175,7 @@ $("btnExport").onclick=()=>{
   // White balance and the PWM library's custom entries, when the firmware has them
   data.ports.forEach((t,i)=>{ const w=wbOf(i+1); if(w) t.wb=[w.R,w.G,w.B]; });
   if(pwLim()) data.pwc=[0,1,2].map(k=>{ const c=pwCustom(k); return c?{hz:c.hz}:null; });
+  if("CPD1" in kv) data.cpd=[1,2,3,4].map(k=>cpdOf(k)?kv["CPD"+k]:null);   // the four custom presets, as sent
   // octet-stream (not application/json) so the browser keeps the .jmb name as-is
   // instead of appending ".json" → the file was saving as "...jmb.json".
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/octet-stream"});
@@ -4145,6 +4212,9 @@ $("impFile").addEventListener("change",async ev=>{
   if(Array.isArray(data.pwc) && pwLim()) data.pwc.slice(0,3).forEach((c,k)=>{
     const hz=Math.round(+(c&&c.hz)||0);                   // older files also carry a curve: ignored
     lib.push(hz>0 ? `PWC${k+1}=${hz}` : `PWC${k+1}=0`); });
+  if(Array.isArray(data.cpd) && "CPD1" in kv) data.cpd.slice(0,4).forEach((c,k)=>{
+    const s=(typeof c==="string" && /^[0-9A-F]+,[01],\d+,(8|16)(,\d+,\d+,(8|16)){5}$/.test(c)) ? c : "0";
+    lib.push(`CPD${k+1}=${s}`); });
   const q=["CID="+(data.cid||0),"CNAME="+(nm?hexEnc(nm):"0"),
            "AMODE="+(data.amode||0)].concat(lib,portQueue(data.ports));
   await applyQueue(q,"Applying");
@@ -4884,6 +4954,7 @@ function pcOpen(p,kind){
   $("pcBody").appendChild(node);
   $("pcOv").classList.remove("hidden");
   if(kind==="Out") wbMount(p);            // white balance lives under curve + PWM
+  pcHelpArm(node);                        // the hand beside Done hides this sheet's notes
 }
 function pcClose(){
   wbUnmount();                            // ends a preview, parks the WB block
@@ -4907,7 +4978,8 @@ function pcPaintSet(p,m){
   // Same words as the sheet's field labels: Mode / Address / Head, Curve / PWM /
   // WB, Limit / Trip / faults — so a value on the card names the field it came from.
   persPaintOptions(p);                    // grey what this firmware cannot run
-  put("pvMode"+p, PERS_NAMES[m.PE??0]??"?");
+  { const pe=m.PE??0, cp=pe>=13?cpdOf(pe-12):null;
+    put("pvMode"+p, cp ? cp.name : (PERS_NAMES[pe]??"?")); }
   put("pvAddr"+p, `Address ${m.A??1}`);
   put("pvHead"+p, `Head ${m.H??0}`);
   const slot=(m.PW??0)-3, c=slot>=0?pwCustom(slot):null;
@@ -5014,6 +5086,81 @@ function pwPaintCard(p,m){
     pn.classList.toggle("hidden",!bad);
     if(bad) pn.textContent="This port's firmware is older than 2.7: it is running Camera 15.6 kHz."; }
 }
+
+// ---------- custom personalities: four controller-held presets (preview, 2026-10-01) ----------
+// State: CPD<k>=<name hex>,<dim on>,<dim offset>,<dim bits>,<colour,offset,bits> x5
+// ("0" = not set). Command: the same to set, CPD<k>=0 to clear. Today's firmware
+// ignores both (FW-52 will keep them); the demo keeps them, and a port can
+// select a set preset (personality codes 13-16).
+const ROLE_NAMES=["Off","Red","Green","Blue","Cool White","Warm White","Amber","Lime","Magenta","UV","IR"];
+function cpdOf(k){
+  const s=String(kv["CPD"+k]??""); if(!s||s==="0") return null;
+  const a=s.split(","); if(a.length<19) return null;
+  const n=a.map(Number);
+  return {name:hexDec(a[0])||("Custom "+k), dim:{on:n[1]===1, off:n[2]|0, bits:n[3]===16?16:8},
+          out:[0,1,2,3,4].map(i=>({role:n[4+i*3]|0, off:n[5+i*3]|0, bits:n[6+i*3]===16?16:8}))};
+}
+function cpdFoot(c){                     // channels the preset occupies from the port's address
+  if(!c) return 1; let hi=0;
+  if(c.dim.on) hi=Math.max(hi,c.dim.off+(c.dim.bits===16?2:1));
+  c.out.forEach(o=>{ if(o.role) hi=Math.max(hi,o.off+(o.bits===16?2:1)); });
+  return Math.max(1,hi);
+}
+function cpdLine(c){ return `${hexEnc(c.name)},${c.dim.on?1:0},${c.dim.off},${c.dim.bits},`+c.out.map(o=>`${o.role},${o.off},${o.bits}`).join(","); }
+function cpdSync(){ for(let k=1;k<=4;k++) PERS_CH[12+k]=cpdFoot(cpdOf(k)); }
+let cpSel=1, cpPort=0;
+$("cpOuts").innerHTML=[0,1,2,3,4].map(i=>`
+    <div class="row"><label>Out ${i+1}</label>
+      <select id="cpRole${i}">${ROLE_NAMES.map((n,r)=>`<option value="${r}">${n}</option>`).join("")}</select>
+      <input type="number" id="cpOff${i}" min="0" max="511" placeholder="offset">
+      <select id="cpBits${i}" class="bits"><option value="8">8</option><option value="16">16</option></select></div>`).join("");
+function cpForm(){
+  return { name:$("cpName").value.replace(/[^\x20-\x7E]/g,"").trim().slice(0,16),
+           dim:{on:$("cpDimOn").value==="1", off:Math.max(0,Math.min(511,+$("cpDimOff").value||0)), bits:+$("cpDimBits").value===16?16:8},
+           out:[0,1,2,3,4].map(i=>({role:+$("cpRole"+i).value|0, off:Math.max(0,Math.min(511,+$("cpOff"+i).value||0)), bits:+$("cpBits"+i).value===16?16:8})) };
+}
+const cpUsers=k=>ports.map((m,i)=>(m.PE===12+k?i+1:0)).filter(Boolean);
+function cpFootLine(){ $("cpFoot").textContent=`Footprint ${cpdFoot(cpForm())} ch from the port's address.`; }
+function cpPaint(fill){
+  if($("cpOv").classList.contains("hidden") && !fill) return;
+  for(let k=1;k<=4;k++){ const b=$("cpTab"+k), c=cpdOf(k); b.className=k===cpSel?"primary":""; b.textContent=c?`${k} · ${c.name}`:`${k} · —`; }
+  const c=cpdOf(cpSel);
+  if(fill){
+    const d=c||{name:"",dim:{on:false,off:0,bits:8},out:[0,1,2,3,4].map(i=>({role:i+1,off:i,bits:8}))};   // a fresh preset starts as R G B CW WW at 0-4
+    $("cpName").value=d.name; $("cpDimOn").value=d.dim.on?"1":"0"; $("cpDimOff").value=d.dim.off; $("cpDimBits").value=d.dim.bits;
+    d.out.forEach((o,i)=>{ $("cpRole"+i).value=o.role; $("cpOff"+i).value=o.off; $("cpBits"+i).value=o.bits; });
+  }
+  const used=cpUsers(cpSel);
+  $("cpUse").textContent = !c ? "not set" : used.length ? `port${used.length>1?"s":""} ${used.join(", ")}` : "not in use";
+  $("cpClear").disabled=!c;
+  $("cpNote").classList.toggle("hidden", +(kv.NCH||3)>=5);
+  cpFootLine();
+}
+function cpOpen(p){
+  cpPort=p||0;
+  const cur=(ports[cpPort-1]||{}).PE; cpSel=(cur>=13&&cur<=16)?cur-12:1;
+  cpPaint(true); $("cpOv").classList.remove("hidden");
+}
+$("cpForm").addEventListener("input",cpFootLine);
+for(let k=1;k<=4;k++) $("cpTab"+k).onclick=()=>{ cpSel=k; cpPaint(true); };
+$("cpSave").onclick=()=>{
+  const c=cpForm(); if(!c.name) c.name="Custom "+cpSel;
+  if(!c.dim.on && !c.out.some(o=>o.role)){ $("cpFoot").textContent="Give at least one output a colour."; return; }
+  hot["CPD"+cpSel]=Date.now(); kv["CPD"+cpSel]=cpdLine(c);                 // optimistic
+  send(`CPD${cpSel}=${cpdLine(c)}`);
+  cpdSync(); cpPaint(true); renderControl();
+};
+$("cpClear").onclick=async()=>{
+  const used=cpUsers(cpSel);
+  if(used.length && !await askConfirm(`Port${used.length>1?"s":""} ${used.join(", ")} go${used.length>1?"":"es"} back to RGB 8-bit.`,
+        {title:`Clear Custom ${cpSel}?`,ok:"Clear",danger:true})) return;
+  hot["CPD"+cpSel]=Date.now(); kv["CPD"+cpSel]="0";
+  used.forEach(p=>{ if(ports[p-1]) ports[p-1].PE=0; });
+  send(`CPD${cpSel}=0`);
+  cpdSync(); cpPaint(true); renderControl();
+};
+$("cpClose").onclick=()=>$("cpOv").classList.add("hidden");
+$("cpOv").addEventListener("click",e=>{ if(e.target===$("cpOv")) $("cpOv").classList.add("hidden"); });
 
 // ---------- support report (Setup → Support) ----------
 // The app still sends nothing by itself. The report is built on the phone,
@@ -5127,7 +5274,8 @@ const demoP=[{a:1,pe:0,r:100,g:85,b:60,x:0,s:128},{a:4,pe:0,r:100,g:100,b:100,x:
              {a:26,pe:0,r:100,g:100,b:100,x:14,s:128},{a:29,pe:4,r:100,g:100,b:100,x:4,s:128}];
 const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1,bpm:128,btn:'44656D6F20526967',txa:0,
              var:4, varm:0, cl:0, clk:1, cf:1, tf:1,    // cl 0 = product max (0.1 A units); limit LOCKED by default (user, 2026-10-01)
-             pwc:[{hz:12300},null,null]};                // PWM library: Custom 1 set, 2 and 3 empty
+             pwc:[{hz:12300},null,null],                 // PWM library: Custom 1 set, 2 and 3 empty
+             cpd:[null,null,null,null]};                 // custom personalities: none set until the builder saves one
 // Demo mirror of the firmware's limit maths: max = 6.75 A × ports; the fold
 // scale is what would hold the summed demo port currents under the limit.
 function demoLimits(){
@@ -5157,7 +5305,7 @@ function demoState(){
     `NET=${demoF.net};NW=${demoF.net};NUN=${demoF.nun};SRC=${demoF.net?1:0};`+
     `NIP=192.168.1.42;NRS=-52;TF=${demoF.tf};PB=${demoF.cl};`+demoLimits()+"CX=3;CA=1;"+
     `SH=${demoF.sh||5};SHM=${demoF.sh?1:0};`+     // 5 mΩ on every product since 2026-09-23: the ceiling reads 6.75 A
-    "PWLIM=2000,25000;"+PWC+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)).join("")+
+    "PWLIM=2000,25000;"+PWC+demoF.cpd.map((c,k)=>`CPD${k+1}=${c||"0"};`).join("")+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)).join("")+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
     `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+demoTxState()+
     "LPX=9;LPS=5;LPN=0;LPA=31;LPG=22;RR=1;BSY=0;BRT=3;"+
@@ -5252,6 +5400,11 @@ function demoCmd(s){
     if(k>=0&&k<3){
       if(!hz){ demoF.pwc[k]=null; demoP.forEach(d=>{ if(d.pw===3+k) d.pw=2; }); }
       else demoF.pwc[k]={hz:Math.max(2000,Math.min(25000,hz))};
+      demoState(); }
+    return; }
+  if(m=s.match(/^CPD(\d)=(.*)$/)){ const k=+m[1]-1, v=m[2];
+    if(k>=0&&k<4){ demoF.cpd[k]=(v==="0"||!v)?null:v;
+      if(!demoF.cpd[k]) demoP.forEach(d=>{ if(d.pe===13+k) d.pe=0; });   // its users go back to RGB
       demoState(); }
     return; }
   if(m=s.match(/^P(\d)\.PWM=(\d+)/)){ const v=+m[2], d=demoP[+m[1]-1];
@@ -5441,26 +5594,23 @@ $("appRefresh").onclick = async (e) => {
 // data-help whose default text is an explanation; those come back on their
 // own the moment they carry live status (reveal()).
 function reveal(id){ const e=$(id); if(e) e.classList.remove("hidden"); }
-document.querySelectorAll(".tab .card").forEach(card=>{
-  const notes=[...card.querySelectorAll("div.mini:not([id]), span.mini:not([id]), [data-help]")]
-    .filter(n=>n.closest(".card")===card && !n.closest(".devcard"))
+// Person with a raised hand (user's reference image, 2026-09-10): head,
+// shoulders, one arm up. Inline SVG in currentColor so it dims/lights with
+// the button state and stays crisp at any pixel density.
+const HAND_SVG='<svg viewBox="0 0 24 24" aria-hidden="true">'
+  +'<circle cx="9.5" cy="7" r="3.4" fill="currentColor"/>'
+  +'<path fill="currentColor" d="M3 22v-5.2A4.8 4.8 0 0 1 7.8 12h5.7a2.5 2.5 0 0 1 2.5 2.5V22z"/>'
+  +'<path fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" d="M15.8 14.2 20.2 3.6"/>'
+  +'</svg>';
+// The notes a hand hides inside `box` (scopeSel = the box's own selector, so a
+// note in a nested box is not claimed twice).
+function helpNotes(box,scopeSel){
+  return [...box.querySelectorAll("div.mini:not([id]), span.mini:not([id]), [data-help]")]
+    .filter(n=>n.closest(scopeSel)===box && !n.closest(".devcard"))
     .filter(n=>n.tagName!=="SPAN" || n.textContent.trim().length>=16);
-  if(!notes.length) return;
-  notes.forEach(n=>{ n.classList.add("help","hidden"); });
-  const btn=document.createElement("button");
-  btn.type="button"; btn.className="ib";
-  // Person with a raised hand (user's reference image, 2026-09-10): head,
-  // shoulders, one arm up. Inline SVG in currentColor so it dims/lights
-  // with the button state and stays crisp at any pixel density.
-  btn.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'
-    +'<circle cx="9.5" cy="7" r="3.4" fill="currentColor"/>'
-    +'<path fill="currentColor" d="M3 22v-5.2A4.8 4.8 0 0 1 7.8 12h5.7a2.5 2.5 0 0 1 2.5 2.5V22z"/>'
-    +'<path fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" d="M15.8 14.2 20.2 3.6"/>'
-    +'</svg>';
-  btn.title="Show notes"; btn.setAttribute("aria-label","Show notes");
-  // Always the card's top-right corner (absolute; see .ib in the CSS).
-  card.classList.add("hashelp");
-  card.appendChild(btn);
+}
+function helpBind(btn,notes){
+  btn.innerHTML=HAND_SVG; btn.title="Show notes"; btn.setAttribute("aria-label","Show notes");
   btn.onclick=e=>{ e.preventDefault(); e.stopPropagation();
     const open=notes[0].classList.contains("hidden");
     notes.forEach(n=>n.classList.toggle("hidden",!open));
@@ -5469,7 +5619,28 @@ document.querySelectorAll(".tab .card").forEach(card=>{
     // threw "Invalid left-hand side in assignment" on every tap; the toggle
     // above had already happened so it looked like it worked. 2026-09-13.)
     const t=open?"Hide notes":"Show notes"; btn.title=t; btn.setAttribute("aria-label",t); };
+}
+document.querySelectorAll(".tab .card").forEach(card=>{
+  const notes=helpNotes(card,".card");
+  if(!notes.length) return;
+  notes.forEach(n=>{ n.classList.add("help","hidden"); });
+  const btn=document.createElement("button");
+  btn.type="button"; btn.className="ib";
+  helpBind(btn,notes);
+  // Always the card's top-right corner (absolute; see .ib in the CSS).
+  card.classList.add("hashelp");
+  card.appendChild(btn);
 });
+// The port sheets (user, 2026-10-01: "he's missing from our new widgets"):
+// the hand sits in the sheet's header beside Done. Notes are gathered when
+// the sheet opens, so the white balance block's note counts once mounted.
+function pcHelpArm(node){
+  const hb=$("pcHelp"); if(!hb||!node) return;
+  const notes=helpNotes(node,".psheet");
+  notes.forEach(n=>n.classList.add("help","hidden"));
+  hb.classList.toggle("hidden",!notes.length); hb.classList.remove("on");
+  if(notes.length) helpBind(hb,notes);
+}
 
 // If an update run dies, the single most useful fact is WHERE it died. Record
 // the phase as it advances and stash it across the reload/reconnect, so the
