@@ -293,6 +293,7 @@
   .prepgrid #btnPrep { grid-area:1/1; }  .prepgrid #btnWbReset { grid-area:1/2; }
   .prepgrid #prepCap { grid-area:2/1; }  .prepgrid #wbResetCap { grid-area:2/2; }
   .prepgrid .mini { text-align:center; margin-top:6px; }
+  .prepgrid .na { display:none !important; }
   .pwrow input[type=number] { background:var(--card2); color:var(--text);
             border:1px solid var(--line); border-radius:8px; padding:8px; font-size:15px; }
   #supOv textarea { width:100%; box-sizing:border-box; margin-top:12px; padding:10px;
@@ -661,8 +662,11 @@
       <div class="prepgrid" id="prepGrid">
         <button id="btnPrep">Clear all</button>
         <button id="btnWbReset" class="hidden">Reset white balance</button>
-        <div class="mini" id="prepCap">RGB 100% · FX speed 50% · dimmer 0%</div>
-        <div class="mini hidden" id="wbResetCap">every colour of every port to full</div>
+        <!-- The captions are helper notes (user, 2026-10-01: hidden behind the
+             hand like every other description); .na = not available on this
+             firmware, kept apart from the hand's own hidden class. -->
+        <div class="mini" id="prepCap" data-help>RGB 100% · FX speed 50% · dimmer 0%</div>
+        <div class="mini na" id="wbResetCap" data-help>every colour of every port to full</div>
       </div>
     </div>
     <div id="ports"></div>
@@ -1354,7 +1358,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-01r.hands";
+const APP_VER="2026-10-01t.captions";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -4972,7 +4976,7 @@ function wbPaintAll(){
   const b=$("btnWbReset"); if(!b) return;
   const have=ports.length>0 && !!wbOf(1);
   b.classList.toggle("hidden",!have);
-  $("wbResetCap").classList.toggle("hidden",!have);
+  $("wbResetCap").classList.toggle("na",!have);
   $("prepGrid").classList.toggle("solo",!have);
   const any=ports.some((_,i)=>{ const w=wbOf(i+1); return w && (w.R<255||w.G<255||w.B<255); });
   b.classList.toggle("glow",any); b.disabled=!any; b.style.opacity=any?"":".45";
@@ -5270,7 +5274,7 @@ function cpPaint(fill){
   }
   const used=cpUsers(cpSel);
   $("cpUse").textContent = !c ? "not set" : used.length ? `port${used.length>1?"s":""} ${used.join(", ")}` : "not in use";
-  $("cpClear").disabled=!c;
+  $("cpClear").title = c ? "Remove this preset and go back to the starting values" : "Back to the starting values";
   $("cpNote").classList.toggle("hidden", +(kv.NCH||3)>=5);
   cpFootLine();
 }
@@ -5295,14 +5299,19 @@ function cpCommit(){
 }
 function cpDone(){ if(cpCommit()) $("cpOv").classList.add("hidden"); }
 for(let k=1;k<=4;k++) $("cpTab"+k).onclick=()=>{ if(!cpCommit()) return; cpSel=k; cpPaint(true); };
+// Clear always puts the starting values back in the form (user, 2026-10-01);
+// a saved preset is removed from the controller as well, with a word first
+// when a port is on it.
 $("cpClear").onclick=async()=>{
-  const used=cpUsers(cpSel);
-  if(used.length && !await askConfirm(`Port${used.length>1?"s":""} ${used.join(", ")} go${used.length>1?"":"es"} back to RGB 8-bit.`,
-        {title:`Clear Custom ${cpSel}?`,ok:"Clear",danger:true})) return;
-  hot["CPD"+cpSel]=Date.now(); kv["CPD"+cpSel]="0";
-  used.forEach(p=>{ if(ports[p-1]) ports[p-1].PE=0; });
-  send(`CPD${cpSel}=0`);
-  cpdSync(); cpPaint(true); renderControl();
+  if(cpdOf(cpSel)){
+    const used=cpUsers(cpSel);
+    if(used.length && !await askConfirm(`Port${used.length>1?"s":""} ${used.join(", ")} go${used.length>1?"":"es"} back to RGB 8-bit.`,
+          {title:`Clear Custom ${cpSel}?`,ok:"Clear",danger:true})) return;
+    hot["CPD"+cpSel]=Date.now(); kv["CPD"+cpSel]="0";
+    used.forEach(p=>{ if(ports[p-1]) ports[p-1].PE=0; });
+    send(`CPD${cpSel}=0`); cpdSync();
+  }
+  cpPaint(true); renderControl();
 };
 $("cpClose").onclick=cpDone;
 $("cpOv").addEventListener("click",e=>{ if(e.target===$("cpOv")) cpDone(); });
