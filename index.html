@@ -318,8 +318,10 @@
   .card.hashelp > .rows:first-child > .row:first-child { padding-right:30px; }
   /* Helper switch off (Setup → App): every hand goes; the notes stay hidden. */
   body.nohelp .ib { display:none !important; }
-  /* Sheet header: the hand sits beside Done, in flow rather than pinned. */
-  #pcHelp { position:static; margin:0 10px 0 auto; }
+  /* Pop-up title lines: the hand sits at the right end, in flow rather than
+     pinned; in the port sheet's header it sits beside Done. */
+  .wbhead > .ib { position:static; margin:0 0 0 auto; align-self:center; }
+  #pcHelp { margin-right:10px; }
   .tg { display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
   .card.hashelp > .ctlrow:first-child, .card.hashelp > .row:first-child,
   .card.hashelp > .port-head:first-child { padding-right:30px; }
@@ -1168,8 +1170,8 @@
 
 <!-- PWM library: the three custom entries (carrier + curve), controller-wide. -->
 <div id="pwOv" class="hidden"><div class="box">
-  <b>PWM library · custom entries</b>
-  <div class="mini" id="pwLimTxt" style="margin-top:4px"></div>
+  <div class="wbhead"><b>PWM library · custom entries</b></div>
+  <div class="mini" id="pwLimTxt" data-help style="margin-top:4px"></div>
   <div id="pwRows"></div>
   <div class="wbnote dmx">Custom entries are outside the tested set: check the result on the strip and on camera before a show.</div>
   <div class="ctlrow" style="margin-top:14px"><button id="pwClose" class="primary" style="flex:1;padding:12px">Done</button></div>
@@ -1180,7 +1182,7 @@
      works in Demo; on a unit the presets are kept and run once the five-channel
      firmware is on it. -->
 <div id="cpOv" class="hidden"><div class="box" id="cpForm">
-  <b>Custom personalities</b>
+  <div class="wbhead"><b>Custom personalities</b></div>
   <div class="mini" style="margin-top:4px">Four presets, held by the controller; any port can select one by name. Every channel has its own DMX address, in any order; only a 16-bit channel takes the next address too.</div>
   <div class="ctlrow across" style="margin-top:10px">
     <button id="cpTab1">1</button><button id="cpTab2">2</button><button id="cpTab3">3</button><button id="cpTab4">4</button>
@@ -1203,15 +1205,14 @@
   <div class="mini" id="cpFoot" style="margin-top:8px"></div>
   <div class="wbnote dmx" id="cpNote" style="margin-top:10px">This unit's firmware cannot run a preset yet (five-channel firmware); it is kept for when it can.</div>
   <div class="ctlrow" style="margin-top:14px">
-    <button id="cpSave" class="primary" style="flex:1;padding:12px">Save</button>
     <button id="cpClear" class="danger" style="flex:1;padding:12px">Clear</button>
-    <button id="cpClose" style="flex:1;padding:12px">Done</button>
+    <button id="cpClose" class="primary" style="flex:1;padding:12px">Done</button>
   </div>
 </div></div>
 
 <!-- Support: feedback + a status report, sent by the user from their own mail app. -->
 <div id="supOv" class="hidden"><div class="box">
-  <b>Support</b>
+  <div class="wbhead"><b>Support</b></div>
   <div class="mini" style="margin-top:4px">Say what happened. A status report goes with it to
     support@jmblighting.co.uk, from your own mail app, only when you send it.</div>
   <textarea id="supText" rows="5" maxlength="1500" placeholder="What were you doing, and what went wrong?"></textarea>
@@ -1353,7 +1354,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-01p.padlock";
+const APP_VER="2026-10-01r.hands";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -5265,7 +5266,7 @@ function cpPaint(fill){
     $("cpName").value=d.name; $("cpDimOn").value=d.dim.on?"1":"0"; $("cpDimOff").value=d.dim.addr||""; $("cpDimBits").value=d.dim.bits;
     $("cpFxOn").value=d.fx.on?"1":"0"; $("cpFxAddr").value=d.fx.addr||"";
     d.out.forEach((o,i)=>{ $("cpRole"+i).value=o.role; $("cpOff"+i).value=o.addr||""; $("cpBits"+i).value=o.bits; });
-    cpRowState();
+    cpRowState(); cpDirty=false;
   }
   const used=cpUsers(cpSel);
   $("cpUse").textContent = !c ? "not set" : used.length ? `port${used.length>1?"s":""} ${used.join(", ")}` : "not in use";
@@ -5278,16 +5279,22 @@ function cpOpen(p){
   const cur=(ports[cpPort-1]||{}).PE; cpSel=(cur>=13&&cur<=16)?cur-12:1;
   cpPaint(true); $("cpOv").classList.remove("hidden");
 }
-$("cpForm").addEventListener("input",cpFootLine);
-$("cpForm").addEventListener("change",e=>{ if(e.target.tagName==="SELECT"){ cpRowState(); cpFootLine(); } });
-for(let k=1;k<=4;k++) $("cpTab"+k).onclick=()=>{ cpSel=k; cpPaint(true); };
-$("cpSave").onclick=()=>{
+// No Save button (user, 2026-10-01): Done, a tap outside, or moving to another
+// preset's tab commits what changed. A changed form with a problem keeps the
+// sheet open and the problem named under the rows; an untouched form sends nothing.
+let cpDirty=false;
+$("cpForm").addEventListener("input",()=>{ cpDirty=true; cpFootLine(); });
+$("cpForm").addEventListener("change",e=>{ cpDirty=true; if(e.target.tagName==="SELECT"){ cpRowState(); cpFootLine(); } });
+function cpCommit(){
+  if(!cpDirty) return true;
   const c=cpForm(); if(!c.name) c.name="Custom "+cpSel;
-  const bad=cpProblem(c); if(bad){ cpFootLine(); return; }
+  const bad=cpProblem(c); if(bad){ cpFootLine(); return false; }
   hot["CPD"+cpSel]=Date.now(); kv["CPD"+cpSel]=cpdLine(c);                 // optimistic
   send(`CPD${cpSel}=${cpdLine(c)}`);
-  cpdSync(); cpPaint(true); renderControl();
-};
+  cpDirty=false; cpdSync(); renderControl(); return true;
+}
+function cpDone(){ if(cpCommit()) $("cpOv").classList.add("hidden"); }
+for(let k=1;k<=4;k++) $("cpTab"+k).onclick=()=>{ if(!cpCommit()) return; cpSel=k; cpPaint(true); };
 $("cpClear").onclick=async()=>{
   const used=cpUsers(cpSel);
   if(used.length && !await askConfirm(`Port${used.length>1?"s":""} ${used.join(", ")} go${used.length>1?"":"es"} back to RGB 8-bit.`,
@@ -5297,8 +5304,8 @@ $("cpClear").onclick=async()=>{
   send(`CPD${cpSel}=0`);
   cpdSync(); cpPaint(true); renderControl();
 };
-$("cpClose").onclick=()=>$("cpOv").classList.add("hidden");
-$("cpOv").addEventListener("click",e=>{ if(e.target===$("cpOv")) $("cpOv").classList.add("hidden"); });
+$("cpClose").onclick=cpDone;
+$("cpOv").addEventListener("click",e=>{ if(e.target===$("cpOv")) cpDone(); });
 
 // ---------- support report (Setup → Support) ----------
 // The app still sends nothing by itself. The report is built on the phone,
@@ -5783,6 +5790,16 @@ function pcHelpArm(node){
   hb.classList.toggle("hidden",!notes.length); hb.classList.remove("on");
   if(notes.length) helpBind(hb,notes);
 }
+// The other pop-ups with notes of their own (personality builder, PWM library,
+// Support; user, 2026-10-01: "helper dude missing and all text still visible"):
+// the hand sits at the right end of the box's title line.
+document.querySelectorAll("#cpOv .box, #pwOv .box, #supOv .box").forEach(box=>{
+  const head=box.querySelector(".wbhead"), notes=helpNotes(box,".box");
+  if(!head||!notes.length) return;
+  notes.forEach(n=>n.classList.add("help","hidden"));
+  const btn=document.createElement("button"); btn.type="button"; btn.className="ib";
+  helpBind(btn,notes); head.appendChild(btn);
+});
 
 // If an update run dies, the single most useful fact is WHERE it died. Record
 // the phase as it advances and stash it across the reload/reconnect, so the
