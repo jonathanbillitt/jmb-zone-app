@@ -86,8 +86,8 @@
   .dmxwarn.good strong { color:var(--ok); }
   .dmxwarn.bad { background:#3a1518; border-color:var(--bad); color:var(--bad); }
   .dmxwarn.bad strong { color:var(--bad); }
-  /* Current limit: the field and Apply fade while locked; the padlock is the
-     only live control then (user, 2026-09-24). */
+  /* Current limit: the padlock is the only control (it applies the field and
+     locks it; no Apply button, user 2026-10-01); the field fades while locked. */
   #setLim:disabled { opacity:.45; }
   button.lock { min-width:44px; padding:6px 8px; font-size:17px; line-height:1; }
   button.lock.on { border-color:var(--warn); background:#3d2f14; }
@@ -830,8 +830,7 @@
         <div class="row"><label>Current limit</label>
           <input type="number" id="setLim" min="0.5" max="6.75" step="0.5">
           <span class="unit">A</span>
-          <button id="btnLimApply">Apply</button>
-          <button id="btnLimLock" class="lock" title="Lock / unlock the limit">🔓</button>
+          <button id="btnLimLock" class="lock" title="Apply and lock / unlock the limit">🔓</button>
           <span class="mini" id="setLimNote" style="margin:0"></span>
         </div>
         <div class="row"><label>Current fold</label>
@@ -1354,7 +1353,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-01o.split";
+const APP_VER="2026-10-01p.padlock";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -3705,11 +3704,11 @@ function renderSetup(){
     const f=$("setLim");
     f.max=(clm/10).toString();
     if(document.activeElement!==f) f.value=(cl/10).toString();
-    f.disabled=lock; $("btnLimApply").disabled=lock;
+    f.disabled=lock;
     const lb=$("btnLimLock"); lb.textContent=lock?"🔒":"🔓"; lb.classList.toggle("on",lock);
     $("setLimNote").textContent = lock
-      ? `locked at ${cl/10} A — tap the padlock to unlock`
-      : `total current the controller may draw · up to ${clm/10} A · padlock applies and locks`;
+      ? `locked at ${cl/10} A · tap the padlock to unlock`
+      : `total current the controller may draw · up to ${clm/10} A · the padlock applies and locks`;
     const fc=+(kv.FC??100), ft=+(kv.FT??100), st=$("foldStatus");
     st.textContent = fc<100 ? `Current fold active — outputs at ${fc}%`+(ft<100?` · thermal fold at ${ft}%`:"")
                    : ft<100 ? `Thermal fold active — hottest port at ${ft}%`
@@ -3852,22 +3851,27 @@ function renderSetup(){
 }
 $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.value); };
 $("setCfold").onchange=e=>{ setupTouched=Date.now(); send("CFOLD="+ +e.target.value); };
-// Apply sends the limit in 0.1 A; at or above the product max it sends 0
+// The limit goes out in 0.1 A; at or above the product max it sends 0
 // (= "the max"), which is also what the firmware stores for anything over.
 function limApply(){
   const f=$("setLim"), clm=+(kv.CLM||68);
   let da=Math.round((+f.value||0)*10); if(da<5) da=5; if(da>=clm) da=0;
   f.value=((da||clm)/10).toString(); send("PSUDA="+da);
 }
-$("btnLimApply").onclick=()=>{ setupTouched=Date.now(); limApply(); };
-$("setLim").onkeydown=e=>{ if(e.key==="Enter") $("btnLimApply").click(); };
-// Padlock: unlocked → apply what is in the field, then lock it; locked → unlock.
+// The padlock is the only control (no Apply button, user 2026-10-01):
+// unlocked → apply what is in the field, then lock it; locked → unlock.
+// Enter in the field does the same as tapping it.
+$("setLim").onkeydown=e=>{ if(e.key==="Enter") $("btnLimLock").click(); };
 $("btnLimLock").onclick=()=>{ setupTouched=Date.now();
   const locked = kv.CLK==="1";
   if(!locked) limApply();
   send("CLOCK="+(locked?0:1));
-  $("setLim").disabled=!locked; $("btnLimApply").disabled=!locked;
-  $("btnLimLock").textContent=locked?"🔓":"🔒"; $("btnLimLock").classList.toggle("on",!locked); };
+  $("setLim").disabled=!locked;
+  $("btnLimLock").textContent=locked?"🔓":"🔒"; $("btnLimLock").classList.toggle("on",!locked);
+  // Say it now rather than after the Setup paint guard lifts.
+  $("setLimNote").textContent = locked
+    ? `total current the controller may draw · up to ${+(kv.CLM||68)/10} A · the padlock applies and locks`
+    : `locked at ${$("setLim").value} A · tap the padlock to unlock`; };
 // ---------- Developer mode (Setup → App card, small latched slider) ----------
 function setDev(on){
   document.body.classList.toggle("dev",!!on);
