@@ -1354,7 +1354,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-01n.camera";
+const APP_VER="2026-10-01o.split";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -5201,8 +5201,15 @@ function cpdChannels(c){
 const cpdFoot=c=>Math.max(1,cpdChannels(c).length);   // shown as "· n ch"
 function cpdLine(c){ return `${hexEnc(c.name)},${c.dim.on?1:0},${c.dim.addr},${c.dim.bits},${c.fx.on?1:0},${c.fx.addr},`+c.out.map(o=>`${o.role},${o.addr},${o.bits}`).join(","); }
 function cpdSync(){ for(let k=1;k<=4;k++) PERS_CH[12+k]=cpdFoot(cpdOf(k)); }
-// Address range of a port on a preset, for the card ("Address 101–120").
-function cpdRange(c){ const ch=cpdChannels(c); return ch.length ? (ch[0]===ch[ch.length-1] ? String(ch[0]) : `${ch[0]}–${ch[ch.length-1]}`) : "—"; }
+// Address range of a port on a preset, for the card: "101–120", or
+// "101–120 (split)" when the channels are not one unbroken run (user,
+// 2026-10-01: say when a personality is non-sequential).
+function cpdRange(c){
+  const ch=cpdChannels(c); if(!ch.length) return "—";
+  const a=ch[0], b=ch[ch.length-1];
+  if(a===b) return String(a);
+  return `${a}–${b}`+(b-a+1===ch.length ? "" : " (split)");
+}
 let cpSel=1, cpPort=0;
 $("cpOuts").innerHTML=[0,1,2,3,4].map(i=>`
     <div class="row"><label>Out ${i+1}</label>
@@ -5236,6 +5243,14 @@ function cpFootLine(){
   $("cpFoot").textContent = bad || `Listens on ${ch.length} channel${ch.length===1?"":"s"}: ${ch.join(", ")}.`;
   $("cpFoot").style.color = bad ? "var(--warn)" : "";
 }
+// A row whose function is Off has no address: its DMX and bits fields clear
+// and grey (user, 2026-10-01). Same for Dimmer and FX when they are Off.
+function cpRowState(){
+  const off=(sel,ids)=>{ const o=$(sel).value==="0"; ids.forEach(id=>{ const el=$(id); el.disabled=o; if(o && el.tagName==="INPUT") el.value=""; }); };
+  off("cpDimOn",["cpDimOff","cpDimBits"]);
+  off("cpFxOn",["cpFxAddr"]);
+  for(let i=0;i<5;i++) off("cpRole"+i,["cpOff"+i,"cpBits"+i]);
+}
 function cpPaint(fill){
   if($("cpOv").classList.contains("hidden") && !fill) return;
   for(let k=1;k<=4;k++){ const b=$("cpTab"+k), c=cpdOf(k); b.className=k===cpSel?"primary":""; b.textContent=c?`${k} · ${c.name}`:`${k} · —`; }
@@ -5246,6 +5261,7 @@ function cpPaint(fill){
     $("cpName").value=d.name; $("cpDimOn").value=d.dim.on?"1":"0"; $("cpDimOff").value=d.dim.addr||""; $("cpDimBits").value=d.dim.bits;
     $("cpFxOn").value=d.fx.on?"1":"0"; $("cpFxAddr").value=d.fx.addr||"";
     d.out.forEach((o,i)=>{ $("cpRole"+i).value=o.role; $("cpOff"+i).value=o.addr||""; $("cpBits"+i).value=o.bits; });
+    cpRowState();
   }
   const used=cpUsers(cpSel);
   $("cpUse").textContent = !c ? "not set" : used.length ? `port${used.length>1?"s":""} ${used.join(", ")}` : "not in use";
@@ -5259,6 +5275,7 @@ function cpOpen(p){
   cpPaint(true); $("cpOv").classList.remove("hidden");
 }
 $("cpForm").addEventListener("input",cpFootLine);
+$("cpForm").addEventListener("change",e=>{ if(e.target.tagName==="SELECT"){ cpRowState(); cpFootLine(); } });
 for(let k=1;k<=4;k++) $("cpTab"+k).onclick=()=>{ cpSel=k; cpPaint(true); };
 $("cpSave").onclick=()=>{
   const c=cpForm(); if(!c.name) c.name="Custom "+cpSel;
