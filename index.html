@@ -172,10 +172,12 @@
   .row.ir input[type=range]   { accent-color:#c0392b; }
   .row.wt label, .row.am label, .row.lime label, .row.mag label, .row.ir label { color:var(--text); }
   .row.w input[type=range] { accent-color:#f5f5f5; }   /* dim + speed: white */
-  .row.r.ww input[type=range] { accent-color:#ffc477; }  /* warm white: amber */
-  .row.r.uv input[type=range] { accent-color:#b16aff; }  /* Dim level: UV purple */
+  /* Function colours stand alone (user, chore 41: "c/w, ww all blue" — they
+     used to need .r / .g on the same row, which the rebuilt rows do not carry). */
+  .row.ww input[type=range] { accent-color:#ffc477; }  /* warm white: amber */
+  .row.uv input[type=range] { accent-color:#b16aff; }  /* Dim level / UV: purple */
   .row.uv label { color:var(--text); }
-  .row.g.cw input[type=range] { accent-color:#cfe8ff; }  /* cool white: ice   */
+  .row.cw input[type=range] { accent-color:#cfe8ff; }  /* cool white: ice   */
   .row.ww label, .row.cw label { color:var(--text); }
   .row .val { width:38px; text-align:right; font-variant-numeric:tabular-nums;
               color:var(--dim); font-size:12.5px; }
@@ -1195,8 +1197,8 @@
       <select id="cpDimBits" class="bits"><option value="8">8</option><option value="16">16</option></select></div>
     <div class="row"><label>FX</label>
       <select id="cpFxOn"><option value="0">Off</option><option value="1">On</option></select>
-      <input type="number" id="cpFxAddr" min="1" max="512" placeholder="ch">
-      <span class="mini" style="margin:0;width:62px;text-align:center">8</span></div>
+      <input type="number" id="cpFxAddr" min="1" max="511" placeholder="ch">
+      <span class="mini" style="margin:0;width:62px;text-align:center" title="effect, then speed on the next channel">2 ch</span></div>
     <div id="cpOuts"></div>
   </div>
   <div class="mini" id="cpFoot" style="margin-top:8px"></div>
@@ -1316,11 +1318,12 @@ function swatchMix(m,lv){
 // Channels per personality (index = PE). The whole footprint must fit the
 // universe, so the last legal start address is 513 - footprint (10ch → 503).
 const PERS_CH = [3,6,2,4,10,1,2, 4,8,5,10,12,14, 5,5,5,5];   // customs: five until a preset says otherwise
-// Display order for the Mode list: by channel count, ties dimmer / white /
-// RGB / RGBW / RGBWA / FX, customs last — the numbers in the list are the
-// planned personality numbers (they become the RDM numbers with the
-// five-channel firmware; today's firmware still counts the first seven 1-7).
-const PERS_ORDER = [5,6,2,0,3,7,9,1,8,4,10,11,12,13,14,15,16];
+// Display order for the Mode list (user, 2026-10-01, chore 24): grouped by
+// type, each type in channel order — Dim, CW/WW, RGB, RGBW, RGBWA, then the
+// four customs. The list numbers follow this order and become the RDM
+// personality numbers with the five-channel firmware (today's firmware still
+// counts the first seven 1-7).
+const PERS_ORDER = [5,6,2,3,0,1,4,7,8,11,9,10,12,13,14,15,16];
 // Can the connected firmware run this personality? Today's codes always;
 // the five-channel set once the state carries NCH=5; a custom preset once its
 // CPD<k> record says it is set. Demo mode is a three-channel unit.
@@ -1351,7 +1354,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-01l.sliders";
+const APP_VER="2026-10-01m.feedback";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1466,7 +1469,23 @@ function selectTab(name){
   }
   movePill();
   if(name==="control" && typeof fxPreviewKick==="function") fxPreviewKick();
+  if(name==="colour" && typeof fitCols==="function") fitCols();
 }
+// Colour tab: the picker columns stretch to the screen (user, 2026-10-01:
+// "always stretch the colour tab to fit"). Measure the room left above the
+// nav bar after a nominal 300 px and give it to the columns.
+function fitCols(){
+  if(activeTabName()!=="colour") return;
+  const cols=[...document.querySelectorAll("#colCols .colcol")]; if(!cols.length) return;
+  const card=$("colCols").closest(".card"), nav=$("nav"); if(!card||!nav) return;
+  cols.forEach(c=>c.style.height="300px");
+  // Synchronous: reading the rects after the style change forces the layout,
+  // so this works even when the page is not painting (background tab).
+  const room=nav.getBoundingClientRect().top - card.getBoundingClientRect().bottom - 14;
+  const h=Math.max(220, Math.round(300+room));
+  cols.forEach(c=>c.style.height=h+"px");
+}
+addEventListener("resize",fitCols);
 document.querySelectorAll("#nav button").forEach(btn=>{
   btn.onclick=()=>{
     selectTab(btn.dataset.tab);
@@ -2064,6 +2083,10 @@ function renderControl(){
     }
     el.classList.toggle("clash",clash);
     el.title=clash?"Overlaps another port's channels":"";
+    // The field lives in the Patch sheet now, so the card's own Address line
+    // carries the mark too (user, chore 41: "overspill not working").
+    const pv=$("pvAddr"+(i+1));
+    if(pv){ pv.classList.toggle("warn",clash); if(clash && !/⚠/.test(pv.textContent)) pv.textContent+=" ⚠"; }
   }
 }
 // Every DMX channel a port listens on, sorted: a standard personality from its
@@ -5171,7 +5194,7 @@ function cpdChannels(c){
   const s=new Set();
   const add=(a,bits)=>{ if(a>=1&&a<=512){ s.add(a); if(bits===16&&a<512) s.add(a+1); } };
   if(c.dim.on) add(c.dim.addr,c.dim.bits);
-  if(c.fx.on) add(c.fx.addr,8);
+  if(c.fx.on) add(c.fx.addr,16);          // FX is always two channels: effect, then speed (user, 2026-10-01)
   c.out.forEach(o=>{ if(o.role) add(o.addr,o.bits); });
   return [...s].sort((x,y)=>x-y);
 }
@@ -5199,11 +5222,11 @@ function cpProblem(c){
   const used=[];   // [addr, what]
   const take=(on,a,bits,what)=>{ if(!on) return null;
     if(a<1||a>512) return `${what} needs a DMX address 1–512.`;
-    if(bits===16&&a>511) return `${what} is 16-bit: its address must be 511 or less.`;
+    if(bits===16&&a>511) return `${what} takes two channels: its address must be 511 or less.`;
     for(const ch of (bits===16?[a,a+1]:[a])){ const hit=used.find(u=>u[0]===ch); if(hit) return `${what} and ${hit[1]} both use DMX ${ch}.`; used.push([ch,what]); }
     return null; };
   let e=take(c.dim.on,c.dim.addr,c.dim.bits,"Dimmer"); if(e) return e;
-  e=take(c.fx.on,c.fx.addr,8,"FX"); if(e) return e;
+  e=take(c.fx.on,c.fx.addr,16,"FX (effect + speed)"); if(e) return e;
   for(let i=0;i<5;i++){ const o=c.out[i]; e=take(!!o.role,o.addr,o.bits,`Out ${i+1} (${ROLE_NAMES[o.role]})`); if(e) return e; }
   if(!used.length) return "Give at least one channel an address.";
   return "";
@@ -5479,7 +5502,8 @@ function demoCmd(s){
   // Patch + protection sheets (2026-10-01): the demo keeps what a tester types,
   // so the chips and the card head answer at once.
   if(m=s.match(/^P(\d)\.LABEL=(.*)/)){ demoP[+m[1]-1].l=(m[2]==="0")?"":m[2].replace(/[^0-9A-Fa-f]/g,"").toUpperCase(); demoState(); return; }
-  if(m=s.match(/^P(\d)\.ADDR=(\d+)/)){ demoP[+m[1]-1].a=Math.max(1,Math.min(512,+m[2])); demoState(); return; }
+  if(m=s.match(/^P(\d)\.ADDR=(\d+)/)){ const d=demoP[+m[1]-1];
+    d.a=Math.max(1,Math.min(513-(PERS_CH[d.pe]||3),+m[2])); demoState(); return; }   // clamps like the firmware: no overspill past 512
   if(m=s.match(/^P(\d)\.HEAD=(\d+)/)){ demoP[+m[1]-1].h=+m[2]; demoState(); return; }
   if(m=s.match(/^P(\d)\.OCP=(\d+)/)){ demoP[+m[1]-1].oc=Math.max(250,Math.min(6750,+m[2])); demoState(); return; }
   if(m=s.match(/^P(\d)\.OT=(\d+)/)){ demoP[+m[1]-1].ot=Math.max(40,Math.min(110,+m[2])); demoState(); return; }
@@ -5713,7 +5737,9 @@ function helpBind(btn,notes){
     // (was `btn.title=btn.getAttribute(...)=...` — assigning to a call result
     // threw "Invalid left-hand side in assignment" on every tap; the toggle
     // above had already happened so it looked like it worked. 2026-09-13.)
-    const t=open?"Hide notes":"Show notes"; btn.title=t; btn.setAttribute("aria-label",t); };
+    const t=open?"Hide notes":"Show notes"; btn.title=t; btn.setAttribute("aria-label",t);
+    if(typeof fitCols==="function") fitCols();   // the Colour tab re-measures when its note shows or hides
+  };
 }
 document.querySelectorAll(".tab .card").forEach(card=>{
   const notes=helpNotes(card,".card");
