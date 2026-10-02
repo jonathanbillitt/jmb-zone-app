@@ -412,6 +412,7 @@
   .ctitle { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; }
   .ctitle label, .ctitle b { font-weight:600; font-size:15px; color:var(--text); width:auto; flex-shrink:0; white-space:nowrap; }
   .ctitle .mini { margin:0; text-align:right; }
+  .hashelp > .ctitle .mini { padding-right:34px; }   /* clear of the hand in the corner */
   .subhead { border-top:1px solid var(--line); margin-top:12px; padding-top:10px; font-weight:600; font-size:15px; }
   /* Setup's button rows are justified like column text (user, 2026-10-02):
      first button on the left edge, last on the right, the rest spread evenly;
@@ -859,7 +860,7 @@
       </div>
     </div>
     <div class="card">
-      <div class="ctitle"><label>Controller</label></div>
+      <div class="ctitle"><label>Controller</label><span class="mini" id="ctlUp"></span></div>   <!-- powered hours as the card's status (user, 2026-10-02) -->
       <div class="rows">
         <!-- One name (user, 2026-10-02): it is the controller's name on the
              screens and in RDM, and the Bluetooth name from the next restart. -->
@@ -904,6 +905,21 @@
           <span class="mini" style="margin:0">dim a hot port over its last 10°C instead of tripping</span>
         </div>
         <div class="mini" id="foldStatus" style="margin-top:4px"></div>
+        <!-- Model under the folds, so the foot of the card is all buttons
+             (user, 2026-10-02). -->
+        <div class="row"><label>Model</label>
+          <select id="setVariant" style="width:150px">
+            <option value="">auto-detect</option>
+            <option value="1">JMB Zone (1 port)</option>
+            <option value="4">JMB 4our (4 ports)</option>
+            <option value="8">JMB 8ight (8 ports)</option>
+          </select>
+          <button id="btnVariant">Set</button>
+        </div>
+        <div class="mini">Controllers detect their port count on the bus, but
+        detection only ever counts <em>up</em> — a unit that boots believing it is
+        bigger than it is (or a screenless <b>JMB Zone</b>, which has no panel to
+        set it from) needs pinning here once. The controller restarts.</div>
       </div>
       <!-- The unit's housekeeping at the foot of its own card (user, 2026-10-02):
            find it, reset it, PIN, disconnect, what it is. -->
@@ -926,23 +942,10 @@
       <div class="mini">Everything: ID, curve, apply mode, all port patch +
       looks + effects, and this phone's scenes — one shareable file.</div>
       <div class="mini" id="impStatus"></div>
-      <div class="mini" id="fwLine"></div>
+      <div class="mini" id="fwLine" data-help></div>   <!-- firmware, ports, last boot: behind the hand -->
       <div class="row" data-help style="margin-top:8px"><label>Hardware</label>   <!-- behind the hand (user, 2026-10-02) -->
         <span id="varLine" class="mini" style="margin:0;flex:1"></span>
       </div>
-      <div class="row"><label>Model</label>
-        <select id="setVariant" style="width:150px">
-          <option value="">auto-detect</option>
-          <option value="1">JMB Zone (1 port)</option>
-          <option value="4">JMB 4our (4 ports)</option>
-          <option value="8">JMB 8ight (8 ports)</option>
-        </select>
-        <button id="btnVariant">Set</button>
-      </div>
-      <div class="mini">Controllers detect their port count on the bus, but
-      detection only ever counts <em>up</em> — a unit that boots believing it is
-      bigger than it is (or a screenless <b>JMB Zone</b>, which has no panel to
-      set it from) needs pinning here once. The controller restarts.</div>
       <!-- Factory reset (user, 2026-10-02): everything back to as shipped, the
            controller restarts. Needs FACTORY=1 in firmware (state FR=1);
            greyed until the unit reports it. -->
@@ -1408,7 +1411,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02y.hwnote";
+const APP_VER="2026-10-02z.model";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -3931,7 +3934,10 @@ function renderSetup(){
       crs=" · crashed in "+(BC[bc]||("loop section "+(LS[ls]||ls)))+" at "+(up/1000).toFixed(1)+"s";
     }
   }
-  // Uptime / boot reason / crash marker are bench detail → Developer mode.
+  // Powered hours stand beside the card title (user, 2026-10-02); the rest of
+  // the line sits behind the hand. Uptime / boot reason / crash marker are
+  // bench detail → Developer mode.
+  { const u=$("ctlUp"); if(u) u.textContent=(kv.HRS??0)+" h powered"; }
   $("fwLine").innerHTML=esc("Firmware "+(kv.FW??"?")+" · "+(kv.PORTS??"?")+
     " ports · "+(kv.HRS??0)+" h powered")+
     '<span class="devonly">'+esc(
