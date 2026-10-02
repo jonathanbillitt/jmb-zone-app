@@ -403,6 +403,9 @@
   .pill { font-size:12px; font-weight:600; padding:3px 12px; border-radius:999px;
           background:#3a2325; color:var(--bad); }
   .pill.live { background:#12351c; color:var(--ok); }
+  .pill.demo { background:#1e2a3d; border:1px solid #4a6da8; color:#9cc0f5; margin-left:auto; flex-shrink:0; }
+  header #btnConnect { white-space:nowrap; flex-shrink:0; }
+  body.demo #title { display:none; }      /* the pill stands where the name would */
   .modechip { padding:5px 12px; font-size:12.5px; border-radius:999px; }
   .modechip.active { background:#123a5e; border-color:var(--acc); color:var(--acc);
                      font-weight:600; }
@@ -615,6 +618,9 @@
     <span id="prodMark"></span>
   </span>
   <h1 id="title">JMB Lighting</h1>
+  <!-- Demo lives in the header (user, 2026-10-02: the banner pushed the ports
+       down): this pill takes the name slot and Connect reads "Exit demo". -->
+  <span id="demoPill" class="pill demo hidden" title="Example data, not a live controller">DEMO</span>
   <span id="sigWrap" class="sig hidden" title="">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 7.5 17.5 16.5 12 22V2l5.5 5.5L6.5 16.5"/></svg>
     <span class="sigbars" id="sigBars"><i></i><i></i><i></i><i></i></span>
@@ -645,13 +651,6 @@
 
   <div id="connectSplash"><img src="jmb-splash.png" alt="JMB Lighting"></div>
   <div id="connectMarks" aria-label="JMB Zone, 4our and 8ight"></div>
-
-  <div id="demoBar" class="hidden" style="background:#1e2a3d;border:1px solid #4a6da8;
-       color:#9cc0f5;border-radius:12px;padding:8px 12px;margin-bottom:12px;font-size:13px;
-       display:flex;align-items:center;gap:10px">
-    <span style="flex:1"><b>DEMO</b> — example data, not a live controller.</span>
-    <button id="btnDemoExit" style="flex:none">Exit demo</button>
-  </div>
 
   <!-- Info boxes for the orange header chips (user, 2026-09-24): the chip
        carries the state; tapping it opens the box on whichever tab is showing,
@@ -1391,7 +1390,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02j.wbuniverse";
+const APP_VER="2026-10-02k.demopill";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1546,7 +1545,7 @@ document.querySelectorAll("#nav button").forEach(btn=>{
 });
 function showApp(){
   if(typeof demoTimer!=="undefined" && cmdChar||NBLE()&&NBLE().connected){
-    clearInterval(demoTimer); $("demoBar").classList.add("hidden");
+    clearInterval(demoTimer); setDemoUi(false);
   }
   const hello=$("hello");
   const reveal=()=>{
@@ -1663,7 +1662,7 @@ async function connect(){
     // ports so the controller's own count builds the cards from scratch.
     if(typeof demoOn!=="undefined" && demoOn){
       demoOn=false; clearInterval(demoTimer); demoTimer=null; clearInterval(demoFlkTimer);
-      $("demoBar").classList.add("hidden");
+      setDemoUi(false);
       ports.length=0; prunePortCards(); $("ports").innerHTML=""; $("portInfo").innerHTML="";
     }
     authed=false;
@@ -4893,13 +4892,22 @@ $("btnPin").onclick=async()=>{
   }
 };
 $("btnConnect").onclick=()=>{
-  // Leaving demo for real hardware: stop the simulator before connecting, or
-  // every command (PIN included) would be swallowed by demoCmd.
-  if(demoOn){ demoOn=false; clearInterval(demoTimer); demoTimer=null;
-    clearInterval(demoFlkTimer); ports=[]; kv={};
-    $("demoBar").classList.add("hidden"); }
+  // In demo the button reads "Exit demo" and leaves cleanly (reload to the
+  // connect screen); connecting to real hardware starts from there.
+  if(demoOn){ exitDemo(); return; }
   connect();
 };
+// The header in demo: DEMO pill where the name sits, Connect reads Exit demo.
+function setDemoUi(on){
+  document.body.classList.toggle("demo",on);
+  const p=$("demoPill"); if(p) p.classList.toggle("hidden",!on);
+  $("btnConnect").textContent=on?"Exit":"Connect";   // "Exit" beside the DEMO pill; "Exit demo" wrapped at 360 px
+}
+function exitDemo(){
+  clearInterval(demoTimer); demoTimer=null;
+  clearInterval(demoFlkTimer); demoOn=false;
+  location.reload();
+}
 // ---------- Connection sheet (tap the Bluetooth mark in the header) ----------
 function openBtSheet(){
   const n=+(kv.VAR??kv.PORTS??0), cn=hexDec(kv.CN);
@@ -4920,7 +4928,7 @@ $("btClose").onclick=closeBtSheet;
 $("btOv").onclick=e=>{ if(e.target===$("btOv")) closeBtSheet(); };
 $("btIdent").onclick=()=>{ send("IDENT"); closeBtSheet(); };
 $("btDisc").onclick=()=>{ closeBtSheet(); $("btnDisc").click(); };
-$("btDemoExit").onclick=()=>{ closeBtSheet(); $("btnDemoExit").click(); };
+$("btDemoExit").onclick=()=>{ closeBtSheet(); exitDemo(); };
 $("btSwitch").onclick=()=>{
   closeBtSheet();
   if(demoOn){ $("btnConnect").click(); return; }
@@ -5780,17 +5788,11 @@ function demoCmd(s){
 $("btnDemo").onclick=()=>{
   demoOn=true;
   demoState();
-  $("demoBar").classList.remove("hidden");
+  setDemoUi(true);
   $("title").textContent="JMB Lighting · demo";
   showApp();
   clearInterval(demoTimer);
   demoTimer=setInterval(demoState,3000);   // keep state fresh across tab hops
-};
-$("btnDemoExit").onclick=()=>{
-  // Leave demo: stop the seeder and return to the connect screen clean.
-  clearInterval(demoTimer); demoTimer=null;
-  clearInterval(demoFlkTimer); demoOn=false;
-  location.reload();
 };
 // ?demo[&tab=colour] — auto-start demo mode (store-screenshot capture via
 // headless Chrome; also handy for sharing a live demo link). Tab optional.
