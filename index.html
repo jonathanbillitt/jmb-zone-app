@@ -486,9 +486,10 @@
   .scene button { padding:8px 0; width:100%; }   /* fills its fixed column so the headings line up */
   /* Transport Go · Stop · Follow · Cue: a bar fixed just above the nav while
      the Scenes tab shows, so it never moves with the length of the list
-     (user, 2026-10-02). The nav is 58 px tall (57 + its top border) in both
-     helper states. */
-  #scnBar { position:fixed; left:0; right:0; bottom:calc(58px + env(safe-area-inset-bottom));
+     (user, 2026-10-02). The bottom offset is the nav's MEASURED height, set
+     by scnBarPlace() (a fixed 58 px sat on the tabs on the phone, where the
+     labels and the safe-area inset make the nav taller; user, 2026-10-03). */
+  #scnBar { position:fixed; left:0; right:0; bottom:58px;
             z-index:6; background:var(--card); border-top:1px solid var(--line);
             padding:8px 16px; margin:0; }
   #tab-scenes { padding-bottom:64px; }        /* the last row clears the bar */
@@ -1549,7 +1550,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-03c.marks";
+const APP_VER="2026-10-03d.barfit";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1681,10 +1682,20 @@ function selectTab(name){
     el.classList.remove("hidden");
   }
   movePill();
-  { const bar=$("scnBar"); if(bar) bar.classList.toggle("hidden", name!=="scenes"); }
+  { const bar=$("scnBar"); if(bar){ bar.classList.toggle("hidden", name!=="scenes"); scnBarPlace(); } }
   if(name==="control" && typeof fxPreviewKick==="function") fxPreviewKick();
   if(name==="colour" && typeof fitCols==="function") fitCols();
 }
+// The Scenes transport bar sits exactly on top of the nav, whatever height the
+// nav really is on this phone (labels, helper state, safe-area inset): measure
+// it, never assume it (user, 2026-10-03: "they're sitting on the tabs").
+function scnBarPlace(){
+  const bar=$("scnBar"), nav=$("nav"); if(!bar||!nav) return;
+  const h=nav.getBoundingClientRect().height;
+  if(h>0) bar.style.bottom=Math.ceil(h)+"px";
+}
+["resize","orientationchange","load"].forEach(ev=>addEventListener(ev,scnBarPlace));
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(scnBarPlace).catch(()=>{});
 // Colour tab: the picker columns stretch to the screen (user, 2026-10-01:
 // "always stretch the colour tab to fit"). Measure the room left above the
 // nav bar after a nominal 300 px and give it to the columns.
@@ -4310,6 +4321,7 @@ $("devMode").onchange=e=>setDev(e.target.checked);
 function setHelper(on){
   document.body.classList.toggle("nohelp",!on);
   if(typeof movePill==="function") movePill();   // the tab slots change width with the labels
+  if(typeof scnBarPlace==="function") scnBarPlace();   // and the nav's height changes too
   $("helpMode").checked=!!on;
   try{ localStorage.setItem("jmbHelper",on?"1":"0"); }catch(_){}
 }
