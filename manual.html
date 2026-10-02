@@ -464,8 +464,9 @@ the wire. Each tool answers a specific question:</p>
 <h3>Setup — controller and housekeeping</h3>
 <p><strong>Controller and Bluetooth name</strong> (one field; the Bluetooth name changes at the
 next restart) and <strong>ID</strong>, which together are what the pairing list shows, the current limit and
-folds, and the <strong>CRMX by LumenRadio</strong> card: <strong>Link</strong>, <strong>Unlink</strong> and antenna
-select (the Apply mode lives in port 1's Patch sheet, §Control). Two
+folds, and the <strong>CRMX by LumenRadio</strong> card: <strong>Link</strong> and <strong>Unlink</strong> (the
+external antenna is always on; the Apply mode lives in port 1's Patch sheet,
+§Control). Two
 things about linking that follow from how CRMX works: a receiver is linked
 <em>by the transmitter</em> — put the transmitter into link mode and any unlinked
 receiver in range joins — so the Link button matters on the transmitter, not
@@ -479,10 +480,12 @@ present but isn't sending DMX; and <strong>linked · N Hz</strong> is a live str
 Then <strong>Firmware update over Bluetooth</strong> (§2a), <strong>Flash to find</strong> (identifies
 this controller for 5 s so you can pick it out of a rack — <strong>it never touches
 the strip</strong>: a Zone pulses all its indicator lights together, a 4our or 8ight
-strobes its screens), <strong>Reset all ports</strong> with an <strong>Undo</strong>, <strong>show-file export /
-import</strong> (one <strong>.jmb</strong> file carrying the whole rig — addresses, heads, labels,
-looks and scenes — reloadable on any phone or controller), <strong>change PIN</strong>, and
-<strong>Disconnect</strong>.</p>
+strobes its screens), <strong>show-file export / import</strong> (one <strong>.jmb</strong> file carrying
+the whole rig — addresses, heads, labels, looks and scenes — reloadable on any
+phone or controller), <strong>change PIN</strong>, <strong>Disconnect</strong>, and <strong>Factory reset</strong>
+(everything back to as shipped, the controller restarts; needs a firmware that
+takes it over Bluetooth and is greyed until then). (The rig-wide <strong>Clear all</strong>
+and its <strong>Undo</strong> live on the Control tab's dashboard.)</p>
 <p><strong>Developer mode</strong> — the small slider in the App card at the foot of Setup,
 remembered per phone. <strong>Helper</strong>, beside it and on by default, is the
 raised-hand icon on each card and sheet that keeps the explanatory notes out of

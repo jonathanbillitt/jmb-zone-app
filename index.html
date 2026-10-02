@@ -407,10 +407,21 @@
   .chip.demo { background:#1e2a3d; border-color:#4a6da8; color:#9cc0f5; margin-left:auto; }
   .chip.demo b { color:#9cc0f5; }
   header #btnConnect { white-space:nowrap; flex-shrink:0; }
-  /* A titled section inside a card that holds two things (Setup tidy). */
-  .subhead { border-top:1px solid var(--line); margin-top:12px; padding-top:10px; font-weight:600; }
-  /* Setup's button rows sit centred, not left (user, 2026-10-02). */
-  #tab-setup .ctlrow { justify-content:center; }
+  /* Every Setup card titles itself the same way (user, 2026-10-02): bold
+     title left, any status right; a section inside a card matches the size. */
+  .ctitle { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; }
+  .ctitle label, .ctitle b { font-weight:600; font-size:15px; color:var(--text); width:auto; flex-shrink:0; white-space:nowrap; }
+  .ctitle .mini { margin:0; text-align:right; }
+  .subhead { border-top:1px solid var(--line); margin-top:12px; padding-top:10px; font-weight:600; font-size:15px; }
+  /* Setup's button rows are justified like column text (user, 2026-10-02):
+     first button on the left edge, last on the right, the rest spread evenly;
+     a row that does not fit wraps and each line justifies on its own. */
+  #tab-setup .ctlrow { justify-content:space-between; }
+  /* Colour targets: a five-column grid so an 8ight's P5-P8 sit under P1-P4
+     (user, 2026-10-02); the right padding keeps the last chip clear of the hand. */
+  #colTargets { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; padding-right:40px; }
+  #colTargets .tgt { min-width:0; padding-left:0; padding-right:0; text-align:center; }
+  #tab-setup .ctlrow > button, #tab-setup .ctlrow > .dbtn { flex:1 1 0; min-width:max-content; text-align:center; }
   .modechip { padding:5px 12px; font-size:12.5px; border-radius:999px; }
   .modechip.active { background:#123a5e; border-color:var(--acc); color:var(--acc);
                      font-weight:600; }
@@ -687,6 +698,7 @@
          is hidden on firmware without white balance. -->
     <div class="dash" id="prepGrid">
       <button id="btnPrep" title="Every port to full white, effects off, dimmer down">Clear all</button>
+      <button id="btnUndo" title="Put back the looks from before the last Clear all">Undo</button>
       <button id="btnWbReset" class="hidden" title="Every colour of every port back to full">Reset WB</button>
       <button id="btnFx" title="Tempo and spread for the whole rig">Effects</button>
     </div>
@@ -808,6 +820,9 @@
       <div id="txWarn" class="hidden">Transmitting test DMX — latched levels persist
         across reconnects until Clear.</div>
       <div id="txBusy" class="mini hidden">DMX is being received — transmit unavailable.</div>
+      <!-- The pad drops down while transmitting (user, 2026-10-02): Start opens
+           it, Stop folds it, so the card stays the size of its neighbours. -->
+      <div id="txWrap" class="hidden">
       <!-- inputmode=none: the on-screen keypad below is the entry method, so a
            phone must not raise its own keyboard; a hardware keyboard still types. -->
       <input id="txCmd" inputmode="none" autocomplete="off" placeholder="1 THRU 5 @ 80">
@@ -820,12 +835,32 @@
       </div>
       <div class="err" id="txErr"></div>
       <div class="mini" id="txList"></div>
+      </div>
     </div>
   </div>
 
   <div id="tab-setup" class="tab hidden">
-    <!-- Controller identity first (moved above Test sequences 2026-09-11). -->
+    <!-- Test sequences first (user, 2026-10-02), then the controller. -->
     <div class="card">
+      <div class="ctitle"><label>Test sequences</label></div>
+      <div class="ctlrow">
+        <button id="tsStep">Step RGBW</button>
+        <button id="tsFade">Fade</button>
+        <button id="tsOff">Off</button>
+      </div>
+      <div class="mini"><b>Step RGBW</b> — R → G → B → White at full, 1 s each,
+      gamma off. Flags a dead channel or weak output stage, and measures wiring
+      (below).<br><br>
+      <b>Fade</b> — rainbow sweep, for dimming smoothness and colour blending.<br><br>
+      Both drive all ports and override every source, including live DMX, until Off.</div>
+      <div class="mini" id="wireChk" data-help style="margin-top:10px;white-space:pre-line;
+           border-top:1px solid var(--line);padding-top:10px"></div>
+      <div class="ctlrow hidden" id="wireFaultRow" style="margin-top:8px">
+        <button id="btnWireClear" class="danger">Clear wiring fault &amp; re-enable</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ctitle"><label>Controller</label></div>
       <div class="rows">
         <!-- One name (user, 2026-10-02): it is the controller's name on the
              screens and in RDM, and the Bluetooth name from the next restart. -->
@@ -874,17 +909,24 @@
       <!-- The unit's housekeeping at the foot of its own card (user, 2026-10-02):
            find it, reset it, PIN, disconnect, what it is. -->
       <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px">
+      <!-- Reset all ports and its Undo left Setup (user, 2026-10-02): Clear
+           all on the Control dashboard is the reset, with Undo beside it. -->
       <div class="ctlrow across">
         <button id="btnIdent">Flash to find</button>
-        <button id="btnResetAll" class="danger">Reset all ports</button>
-        <button id="btnUndo">Undo reset</button>
-      </div>
-      <div class="mini" id="identMsg" data-help>Flash identifies this controller for 5
-      seconds — tap it after connecting to check you're on the right unit.</div>
-      <div class="ctlrow" style="margin-top:8px">
         <button id="btnPin">Change PIN…</button>
         <button id="btnDisc" class="danger">Disconnect</button>
       </div>
+      <div class="mini" id="identMsg" data-help>Flash identifies this controller for 5
+      seconds — tap it after connecting to check you're on the right unit.</div>
+      <!-- The settings file lives with the controller (user, 2026-10-02). -->
+      <div class="ctlrow across" style="margin-top:8px">
+        <button id="btnExport">Export settings</button>
+        <button id="btnImport">Import settings…</button>
+        <input type="file" id="impFile" accept=".jmb,.json,application/json" class="hidden">
+      </div>
+      <div class="mini">Everything: ID, curve, apply mode, all port patch +
+      looks + effects, and this phone's scenes — one shareable file.</div>
+      <div class="mini" id="impStatus"></div>
       <div class="mini" id="fwLine"></div>
       <div class="row" style="margin-top:8px"><label>Hardware</label>
         <span id="varLine" class="mini" style="margin:0;flex:1"></span>
@@ -902,6 +944,13 @@
       detection only ever counts <em>up</em> — a unit that boots believing it is
       bigger than it is (or a screenless <b>JMB Zone</b>, which has no panel to
       set it from) needs pinning here once. The controller restarts.</div>
+      <!-- Factory reset (user, 2026-10-02): everything back to as shipped, the
+           controller restarts. Needs FACTORY=1 in firmware (state FR=1);
+           greyed until the unit reports it. -->
+      <div class="ctlrow" style="margin-top:10px">
+        <button id="btnFactory" class="danger" style="flex:1">Factory reset</button>
+      </div>
+      <div class="mini">Everything back to as shipped: patch, looks, names, PIN, limits, presets and the CRMX link. The controller restarts.</div>
       <div class="devonly" style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">
         <div class="row"><label>Shunt</label>
           <select id="setShunt" style="width:160px">
@@ -938,39 +987,19 @@
       </div>
     </div>
     <div class="card">
-      <label style="font-weight:600">Test sequences</label>
-      <div class="ctlrow" style="margin-top:6px">
-        <button id="tsStep">Step RGBW</button>
-        <button id="tsFade">Fade</button>
-        <button id="tsOff">Off</button>
-      </div>
-      <div class="mini"><b>Step RGBW</b> — R → G → B → White at full, 1 s each,
-      gamma off. Flags a dead channel or weak output stage, and measures wiring
-      (below).<br><br>
-      <b>Fade</b> — rainbow sweep, for dimming smoothness and colour blending.<br><br>
-      Both drive all ports and override every source, including live DMX, until Off.</div>
-      <div class="mini" id="wireChk" data-help style="margin-top:10px;white-space:pre-line;
-           border-top:1px solid var(--line);padding-top:10px"></div>
-      <div class="ctlrow hidden" id="wireFaultRow" style="margin-top:8px">
-        <button id="btnWireClear" class="danger">Clear wiring fault &amp; re-enable</button>
-      </div>
-    </div>
-    <div class="card">
       <!-- LumenRadio's approved "CRMX by LumenRadio" mark (received 2026-09-15)
            is the card's title (user: in place of the "CRMX Wireless" wording). -->
-      <div class="row" style="justify-content:space-between;align-items:center">
+      <div class="ctitle">
         <img src="crmx-lumenradio-dark.png" alt="CRMX by LumenRadio" style="height:30px;width:auto;display:block">
-        <span class="mini" id="crmxStatus" style="margin:0">&#8212;</span>
+        <span class="mini" id="crmxStatus">&#8212;</span>
       </div>
       <div class="row devonly"><span class="mini" id="crmxRaw" style="margin:0;flex:1"></span></div>
       <div class="ctlrow" style="margin-top:6px">
         <button id="crmxLink" class="primary">Link</button>
         <button id="crmxUnlink" class="danger">Unlink</button>
-        <select id="crmxAnt" style="width:110px">
-          <option value="1">Ext antenna</option>
-          <option value="0">Int antenna</option>
-        </select>
       </div>
+      <!-- No antenna select (user, 2026-10-02): the external antenna is locked
+           on in firmware since 2026-09-25. -->
       <div class="mini">Link joins a CRMX transmitter that's in linking
       mode; Unlink forgets it. Status is data-truth: <b>linked &#8212; no RF</b>
       means linked but nothing is on air (transmitter off or out of range);
@@ -1001,16 +1030,8 @@
     <!-- Files: the settings file and the documents, one card, under CRMX so
          Firmware update and App are the last two (user, 2026-10-02). -->
     <div class="card">
-      <div class="ctlrow across">
-        <button id="btnExport">Export settings</button>
-        <button id="btnImport">Import settings…</button>
-        <input type="file" id="impFile" accept=".jmb,.json,application/json" class="hidden">
-      </div>
-      <div class="mini">Everything: ID, curve, apply mode, all port patch +
-      looks + effects, and this phone's scenes — one shareable file.</div>
-      <div class="mini" id="impStatus"></div>
-      <div class="subhead">Documentation</div>
-      <div class="ctlrow" style="margin-top:8px">
+      <div class="ctitle"><label>Documentation</label></div>
+      <div class="ctlrow">
         <a class="dbtn" href="./manual.html" target="_blank" rel="noopener">User manual</a>
         <a class="dbtn" href="./dmx-chart.html" target="_blank" rel="noopener">DMX chart</a>
         <a class="dbtn" href="./manual.pdf" target="_blank" rel="noopener">Manual PDF</a>
@@ -1054,9 +1075,9 @@
     </div>
 
     <div class="card" id="otaCard">
-      <div class="row" style="justify-content:space-between">
-        <label style="font-weight:600">Firmware update</label>
-        <span class="mini" id="otaState" style="margin:0">—</span>
+      <div class="ctitle">
+        <label>Firmware update</label>
+        <span class="mini" id="otaState">—</span>
       </div>
       <div class="ctlrow">
         <button id="btnOtaHosted" class="primary" disabled>Update Firmware</button>
@@ -1088,9 +1109,9 @@
       start it returns to the previous one on its own.</div>
     </div>
     <div class="card" id="appCard">
-      <div class="row" style="justify-content:space-between">
-        <label style="font-weight:600">App</label>
-        <span class="mini" id="appVerTxt" style="margin:0"></span>
+      <div class="ctitle">
+        <label>App</label>
+        <span class="mini" id="appVerTxt"></span>
       </div>
       <div class="ctlrow" style="align-items:center">
         <button id="appRefresh">Look for app update</button>
@@ -1386,7 +1407,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02s.notes";
+const APP_VER="2026-10-02u.setup3";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2051,8 +2072,11 @@ function renderControl(){
     // nothing with no effect running — it kept the button armed forever.)
     const dirty=ports.some(m=>(m.X||0)>0 || (+(m.D??0))>0 || (m.R??100)<100 || (m.G??100)<100 || (m.B??100)<100);
     bp.classList.toggle("glow",dirty); bp.classList.remove("danger","primary"); }
-  // Dashboard: Effects lights while any port runs an effect.
+  // Dashboard: Effects lights while any port runs an effect; Undo while a
+  // Clear all is there to take back.
   { const bf=$("btnFx"); if(bf) bf.classList.toggle("glow", ports.some(m=>(m.X||0)>0)); }
+  { const bu=$("btnUndo"); if(bu){ let has=false; try{ has=!!localStorage.getItem("jmb_undo"); }catch(_){}
+      bu.disabled=!has; bu.style.opacity=has?"":".45"; bu.classList.toggle("glow",has); } }
   const root=$("ports");
   ports.forEach((m,idx)=>{
     const p=idx+1;
@@ -2920,7 +2944,8 @@ function renderColourTargets(n){
     root.appendChild(b);
   };
   mk("all","All");
-  for(let p=1;p<=n;p++) mk(String(p),"P"+p);
+  // Five columns: All, then P1-P4; P5-P8 line up under P1-P4 (user, 2026-10-02).
+  for(let p=1;p<=n;p++){ mk(String(p),"P"+p); if(p>4) root.lastChild.style.gridColumn=String(((p-1)%4)+2); }
 }
 buildCols();
 
@@ -3582,6 +3607,7 @@ function renderTx(){
   $("txBusy").classList.toggle("hidden", !live);
   $("txWarn").classList.toggle("hidden", !on);
   const tb=$("txToggle"); tb.textContent=on?"Stop":"Start"; tb.classList.toggle("primary",!on); tb.classList.toggle("danger",on);
+  { const w=$("txWrap"); if(w) w.classList.toggle("hidden", !on); }   // the pad drops down while transmitting
   const n=+(kv.TXN||0), l=$("txList");
   if(!n){ l.textContent="No channels latched."; return; }
   const items=(kv.TXL||"").split(",").filter(Boolean).map(e=>{
@@ -3787,6 +3813,8 @@ function renderSetup(){
   if(document.activeElement!==$("setHold"))  $("setHold").value=kv.HOLD??"5";
   // Universe → Settings waits for a firmware that carries the settings baton.
   { const b=$("chSet"); if(b){ const ok=kv.CHS==="1"; b.disabled=!ok; b.title=ok?"":"Needs a firmware update"; } }
+  // Factory reset waits for a firmware that takes it over Bluetooth (FR=1).
+  { const b=$("btnFactory"); if(b){ const ok=kv.FR==="1"; b.disabled=!ok; b.title=ok?"":"Needs a firmware update"; } }
   // Network DMX — don't stomp a field the user is editing
   if(document.activeElement!==$("netEn"))  $("netEn").value=kv.NET??"0";
   if(document.activeElement!==$("netUni")) $("netUni").value=kv.NUN??"1";
@@ -3844,7 +3872,6 @@ function renderSetup(){
                    : cx===2 ? (rfOk ? "var(--ok)" : "var(--warn)")
                    : cx===1 ? "var(--warn)" : "var(--dim)";
     st.style.fontWeight = cx>=2 ? "600" : "400";
-    if(document.activeElement!==$("crmxAnt")) $("crmxAnt").value=kv.CA??"1";
   }
   // Chain-listen arm state (CHL) — armed reads amber like the panel banner.
   // Skip refreshes for 2.5s after the user flips it so an in-flight state
@@ -4214,7 +4241,6 @@ $("crmxLink").onclick=()=>{ send("CRMXLINK");
   $("crmxStatus").textContent="linking…"; };
 $("crmxUnlink").onclick=async()=>{ if(await askConfirm("The controller forgets its linked transmitter.",{title:"Unlink CRMX?",ok:"Unlink",danger:true}))
   send("CRMXUNLINK"); };
-$("crmxAnt").onchange=e=>{ setupTouched=Date.now(); send("CRMXANT="+ +e.target.value); };
 $("netEn").onchange=e=>{ setupTouched=Date.now(); send("NET="+ +e.target.value); };
 $("btnUniApply").onclick=()=>{ setupTouched=Date.now();
   send("WUNI="+Math.max(1,Math.min(63999,+$("netUni").value||1))); };
@@ -4253,6 +4279,8 @@ $("btnPrep").onclick=async()=>{
   // rig already clear there is nothing to warn about (user, 2026-09-13).
   if($("btnPrep").classList.contains("glow") &&
      !await askConfirm("Every port goes to full white, effects off, dimmer down.",{title:"Clear all ports?",ok:"Clear all",danger:true})) return;
+  // Keep what is about to go, for Undo on the dashboard (user, 2026-10-02).
+  try{ localStorage.setItem("jmb_undo",JSON.stringify(snapshotPorts())); }catch(_){}
   // Clear to a clean programming base: effect OFF, colour full, speed at
   // designed tempo, dimmer down — nothing lights until you raise a wheel.
   ports.forEach((m,i)=>{ const p=i+1;
@@ -4321,30 +4349,27 @@ function portQueue(list){
   });
   return q;
 }
-$("btnResetAll").onclick=async()=>{
-  if(!await askConfirm("DMX 001, head 0001, RGB 100%, FX off, speed 128, "+
-              "dimmer 0%.\nUndo will restore the current state.",
-              {title:"Reset all ports?",ok:"Reset",danger:true}))
-    return;
-  localStorage.setItem("jmb_undo",JSON.stringify(snapshotPorts()));
-  const q=[];
-  ports.forEach((_,i)=>{ const p=i+1;
-    q.push(`P${p}.ADDR=1`,`P${p}.HEAD=1`,`P${p}.RGB=100,100,100`,
-           `P${p}.DIM=0`,`P${p}.FX=0`,`P${p}.FXS=128`,`P${p}.MAN=0`);
-    for(const k of ["R","G","B","D","X","S","ADDR","HEAD"])
-      hot[p+"."+k]=Date.now()+4000;
-  });
-  await applyQueue(q,"Reset");
-};
+// Undo on the Control dashboard (user, 2026-10-02): puts back the looks
+// Clear all took away. The patch reset that lived in Setup is gone with it.
 $("btnUndo").onclick=async()=>{
   let snap; try{ snap=JSON.parse(localStorage.getItem("jmb_undo")||""); }
-  catch(_){ $("impStatus").textContent="Nothing to undo."; return; }
-  if(!Array.isArray(snap)){ $("impStatus").textContent="Nothing to undo."; return; }
-  if(!await askConfirm("All ports return to the state saved before the last reset.",{title:"Undo reset?",ok:"Restore"}))
+  catch(_){ toast("Nothing to undo"); return; }
+  if(!Array.isArray(snap)){ toast("Nothing to undo"); return; }
+  if(!await askConfirm("Every port goes back to how it was before the last Clear all.",{title:"Undo Clear all?",ok:"Restore"}))
     return;
   await applyQueue(portQueue(snap),"Undo");
+  localStorage.removeItem("jmb_undo");
+  renderControl();
+  toast("Looks restored");
 };
 $("btnIdent").onclick=()=>send("IDENT");
+// Factory reset (user, 2026-10-02): the panel's reset, from the app. Two
+// confirmations would be nagging; one strong one with a red button is enough.
+$("btnFactory").onclick=async()=>{
+  if(!await askConfirm("Everything goes back to as shipped: patch, looks, names, PIN, limits, presets and the CRMX link. The controller restarts. This cannot be undone.",
+                       {title:"Factory reset this controller?",ok:"Factory reset",danger:true})) return;
+  send("FACTORY=1"); toast("Factory reset sent — the controller restarts");
+};
 
 // ---------- settings export / import ----------
 $("btnExport").onclick=()=>{
@@ -5630,7 +5655,7 @@ function demoState(){
     `NET=${demoF.net};NW=${demoF.net};NUN=${demoF.nun};SRC=${demoF.net?1:0};`+
     `NIP=192.168.1.42;NRS=-52;TF=${demoF.tf};PB=${demoF.cl};`+demoLimits()+"CX=3;CA=1;"+
     `SH=${demoF.sh||5};SHM=${demoF.sh?1:0};`+     // 5 mΩ on every product since 2026-09-23: the ceiling reads 6.75 A
-    "NCH=5;CHP=1;CHS=1;"+                       // the demo is a five-channel unit with the universe patch + settings batons: no firmware greying
+    "NCH=5;CHP=1;CHS=1;FR=1;"+                  // the demo is a five-channel unit with the universe batons and a factory reset: no firmware greying
     "PWLIM=2000,25000;"+PWC+demoF.cpd.map((c,k)=>`CPD${k+1}=${c||"0"};`).join("")+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)).join("")+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
     `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+demoTxState()+
@@ -5715,6 +5740,7 @@ function demoCmd(s){
   if(m=s.match(/^P(\d)\.HEAD=(\d+)/)){ demoP[+m[1]-1].h=+m[2]; demoState(); return; }
   if(m=s.match(/^AMODE=(\d)/)){ demoF.am=+m[1]%3; demoState(); return; }   // the Patch sheet's Apply mode
   if(s.startsWith("CHPATCH=")||s.startsWith("CHSET=")){ demoF.chl=0; demoState(); return; }   // a baton leaves; an armed demo unit would disarm
+  if(s.startsWith("FACTORY=")){ setTimeout(()=>location.reload(),900); return; }   // the unit restarts: back to the connect screen
   if(m=s.match(/^P(\d)\.OCP=(\d+)/)){ demoP[+m[1]-1].oc=Math.max(250,Math.min(6750,+m[2])); demoState(); return; }
   if(m=s.match(/^P(\d)\.OT=(\d+)/)){ demoP[+m[1]-1].ot=Math.max(40,Math.min(110,+m[2])); demoState(); return; }
   // White balance + PWM library
