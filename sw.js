@@ -6,7 +6,7 @@
 // MUST be "jmb-" + the app's APP_VER with dots as dashes. deploy_pages.py
 // enforces it: a deploy that bumps APP_VER but not this key publishes new HTML
 // that no client ever sees, because the old shell stays cached and un-evicted.
-const CACHE="jmb-2026-10-02ad-tick";
+const CACHE="jmb-2026-10-02ae-cols";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./firmware.json",
                 "./icon.svg", "./icon-maskable.svg", "./icon-192.png",
                 "./icon-192-maskable.png", "./icon-512.png",
