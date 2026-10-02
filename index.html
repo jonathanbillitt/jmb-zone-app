@@ -1144,7 +1144,9 @@
   <button data-tab="ports"><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 4v16h16M7.5 15l3.5-4.5 3 3 5-6.5"/></svg></span><span class="lbl">Telemetry</span></button>
   <!-- Diagnostics: the DMX signal as a square wave, not a medical symbol (user). -->
   <button data-tab="diag"><span class="ico"><svg viewBox="0 0 24 24"><path d="M3 15h3.5V8H11v8h4.5V8H20v7"/></svg></span><span class="lbl">Diagnostics</span></button>
-  <button data-tab="setup"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><circle cx="12" cy="12" r="6.5"/><path d="M18.5 12H21M16.6 16.6l1.8 1.8M12 18.5V21M7.4 16.6l-1.8 1.8M5.5 12H3M7.4 7.4L5.6 5.6M12 5.5V3M16.6 7.4l1.8-1.8"/></svg></span><span class="lbl">Setup</span></button>
+  <!-- A toothed gear outline with a hub (user, 2026-10-02: the ringed-spoke
+       cog "looked like a virus"); eight square teeth, generated geometry. -->
+  <button data-tab="setup"><span class="ico"><svg viewBox="0 0 24 24"><path d="M10.09 2.18 A10 10 0 0 1 13.91 2.18 L13.45 4.54 A7.6 7.6 0 0 1 16.25 5.7 L17.59 3.71 A10 10 0 0 1 20.29 6.41 L18.3 7.75 A7.6 7.6 0 0 1 19.46 10.55 L21.82 10.09 A10 10 0 0 1 21.82 13.91 L19.46 13.45 A7.6 7.6 0 0 1 18.3 16.25 L20.29 17.59 A10 10 0 0 1 17.59 20.29 L16.25 18.3 A7.6 7.6 0 0 1 13.45 19.46 L13.91 21.82 A10 10 0 0 1 10.09 21.82 L10.55 19.46 A7.6 7.6 0 0 1 7.75 18.3 L6.41 20.29 A10 10 0 0 1 3.71 17.59 L5.7 16.25 A7.6 7.6 0 0 1 4.54 13.45 L2.18 13.91 A10 10 0 0 1 2.18 10.09 L4.54 10.55 A7.6 7.6 0 0 1 5.7 7.75 L3.71 6.41 A10 10 0 0 1 6.41 3.71 L7.75 5.7 A7.6 7.6 0 0 1 10.55 4.54 L10.09 2.18 Z"/><circle cx="12" cy="12" r="3"/></svg></span><span class="lbl">Setup</span></button>
 </nav>
 
 <!-- Transient confirmation ("Ports 2–4 patched: DMX 4, 7, 10"), above the nav. -->
@@ -1406,7 +1408,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02v.txwords";
+const APP_VER="2026-10-02w.gear";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
