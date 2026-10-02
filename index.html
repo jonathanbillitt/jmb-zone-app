@@ -1204,7 +1204,7 @@
   <div class="wbhead"><b>PWM library · custom entries</b></div>
   <div class="mini" id="pwLimTxt" data-help style="margin-top:4px"></div>
   <div id="pwRows"></div>
-  <div class="wbnote dmx">Custom entries are outside the tested set: check the result on the strip and on camera before a show.</div>
+  <div class="wbnote dmx" data-help>Custom entries are outside the tested set: check the result on the strip and on camera before a show.</div>
   <div class="ctlrow" style="margin-top:14px"><button id="pwClose" class="primary" style="flex:1;padding:12px">Done</button></div>
 </div></div>
 
@@ -1245,7 +1245,8 @@
 <div id="supOv" class="hidden"><div class="box">
   <div class="wbhead"><b>Support</b></div>
   <div class="mini" style="margin-top:4px">Say what happened. A status report goes with it to
-    support@jmblighting.co.uk, from your own mail app, only when you send it.</div>
+    support@jmblighting.co.uk, from your own mail app, only when you send it.
+    Never included: PIN, Wi-Fi details, network address, location.</div>
   <textarea id="supText" rows="5" maxlength="1500" placeholder="What were you doing, and what went wrong?"></textarea>
   <label class="suprow"><input type="checkbox" id="supNames"> Include controller name, ID and port labels</label>
   <details id="supDet"><summary>What the report contains</summary><pre id="supPre"></pre></details>
@@ -1385,7 +1386,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02r.limnote";
+const APP_VER="2026-10-02s.notes";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2275,11 +2276,11 @@ function buildCard(p){
         <div class="row"><label>Limit</label>
           <input type="number" id="ocp${p}" min="0.25" max="6.75" step="0.25">
           <span class="unit">A</span>
-          <span class="mini" id="ocpr${p}" style="margin:0 0 0 8px;color:var(--dim)">0.25&nbsp;&ndash;&nbsp;6.75&nbsp;A</span></div>
+          <span class="mini" id="ocpr${p}" data-help style="margin:0 0 0 8px;color:var(--dim)">0.25&nbsp;&ndash;&nbsp;6.75&nbsp;A</span></div>
         <div class="row"><label>Trip</label>
           <input type="number" id="ot${p}" min="40" max="110" step="5">
           <span class="unit">°C</span>
-          <span class="mini" style="margin:0 0 0 8px;color:var(--dim)">40&nbsp;&ndash;&nbsp;110&nbsp;&deg;C</span></div>
+          <span class="mini" data-help style="margin:0 0 0 8px;color:var(--dim)">40&nbsp;&ndash;&nbsp;110&nbsp;&deg;C</span></div>
         <div class="row">
           <button class="danger hidden" id="clrf${p}">Clear fault &amp; re-enable</button>
           <span class="mini" id="nof${p}" style="margin:0;color:var(--ok);font-weight:600">&#10003; No faults</span>
@@ -5545,7 +5546,7 @@ const supStamp=()=>{ const d=new Date(), p2=x=>String(x).padStart(2,"0");
 function supPreview(){ $("supPre").textContent=supAsText(supReport()); }
 function supMsg(t,bad){ const m=$("supMsg"); m.textContent=t; m.style.color=bad?"var(--bad)":""; }
 const SUP_NEVER="Never included: PIN, Wi-Fi details, network address, location.";
-$("btnSupport").onclick=()=>{ supPreview(); supMsg(SUP_NEVER); $("supOv").classList.remove("hidden"); };
+$("btnSupport").onclick=()=>{ supPreview(); supMsg(""); $("supOv").classList.remove("hidden"); };   // the "never included" line lives in the note behind the hand (2026-10-02)
 $("supClose").onclick=()=>$("supOv").classList.add("hidden");
 $("supNames").onchange=supPreview;
 $("supDet").addEventListener("toggle",supPreview);
