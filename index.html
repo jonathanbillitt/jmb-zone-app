@@ -651,9 +651,9 @@
        below the fixed height and the row sat under the bar on an edge-to-edge
        Android viewport (2026-10-03: "logos missing after an update, back after
        a restart" — the wordmarks, not the badge). */
-    body:has(#hello:not(.hidden)){ height:100vh; height:100dvh; overflow:hidden;
+    body:has(#hello:not(.hidden)){ height:100vh; height:100dvh; height:var(--vh,100dvh); overflow:hidden;
       display:flex; flex-direction:column; box-sizing:border-box;
-      padding-bottom:env(safe-area-inset-bottom); }
+      padding-bottom:env(safe-area-inset-bottom); }   /* --vh: set by marksCheck only when the column overran the window */
     body:has(#hello:not(.hidden)) main{ flex:1; min-height:0; width:100%;
       display:flex; flex-direction:column; padding-bottom:8px; }
     body:has(#hello:not(.hidden)) #connectSplash{ flex:1; min-height:0;
@@ -1550,7 +1550,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-03d.barfit";
+const APP_VER="2026-10-03e.vh";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -3349,20 +3349,34 @@ function marksCheck(tag){
     if(!cm || !hello || hello.classList.contains("hidden")) return;
     const wasEmpty=!cm.children.length;
     if(wasEmpty) buildConnectMarks();
-    const r=cm.getBoundingClientRect(), cs=getComputedStyle(cm);
-    if(wasEmpty || !cm.children.length || r.height<1){
+    let r=cm.getBoundingClientRect();
+    const cs=getComputedStyle(cm);
+    const nav=(performance.getEntriesByType("navigation")[0]||{}).type||"?";
+    const off=r.bottom>innerHeight+1;                 // present, but below the visible page
+    let heal="";
+    if(off){
+      // The fixed-height column overran the window: pin it to the window's
+      // own height instead of 100dvh (the rule reads --vh first) and re-measure.
+      document.documentElement.style.setProperty("--vh",innerHeight+"px");
+      r=cm.getBoundingClientRect();
+      heal=` healed:bottom=${Math.round(r.bottom)}`;
+    }
+    if(wasEmpty || !cm.children.length || r.height<1 || off || nav==="reload"){
       const probe=document.createElement("div");
       probe.style.cssText="position:fixed;left:-9999px;padding-bottom:env(safe-area-inset-bottom)";
       document.body.appendChild(probe); const inset=getComputedStyle(probe).paddingBottom; probe.remove();
-      const nav=(performance.getEntriesByType("navigation")[0]||{}).type||"?";
-      diagPush("err",`marks ${tag}: wasEmpty=${wasEmpty} kids=${cm.children.length} h=${Math.round(r.height)} top=${Math.round(r.top)} `
-        +`disp=${cs.display} vis=${cs.visibility} op=${cs.opacity} inner=${innerHeight} `
-        +`vv=${window.visualViewport?Math.round(visualViewport.height):"-"} body=${Math.round(document.body.getBoundingClientRect().height)} `
+      const vv=window.visualViewport;
+      diagPush("err",`marks ${tag}: wasEmpty=${wasEmpty} kids=${cm.children.length} h=${Math.round(r.height)} top=${Math.round(r.top)} bottom=${Math.round(r.bottom)} `
+        +`disp=${cs.display} vis=${cs.visibility} op=${cs.opacity} inner=${innerHeight} doc=${document.documentElement.clientHeight} `
+        +`vv=${vv?Math.round(vv.height)+"@"+Math.round(vv.offsetTop):"-"} sy=${Math.round(scrollY)} body=${Math.round(document.body.getBoundingClientRect().height)} `
         +`main=${Math.round(document.querySelector("main").getBoundingClientRect().height)} `
-        +`splash=${Math.round($("connectSplash").getBoundingClientRect().height)} inset=${inset} nav=${nav} ver=${APP_VER}`);
+        +`splash=${Math.round($("connectSplash").getBoundingClientRect().height)} inset=${inset} dpr=${devicePixelRatio} `
+        +`sa=${matchMedia("(display-mode: standalone)").matches?1:0} nav=${nav}${heal} ver=${APP_VER}`);
     }
   }catch(e){ diagPush("err","marks check: "+e); }
 }
+addEventListener("resize",()=>{ if(document.documentElement.style.getPropertyValue("--vh"))
+  document.documentElement.style.setProperty("--vh",innerHeight+"px"); });
 addEventListener("load",()=>setTimeout(()=>marksCheck("load"),1500));
 addEventListener("pageshow",()=>setTimeout(()=>marksCheck("pageshow"),300));
 
