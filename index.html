@@ -474,9 +474,22 @@
   .evt { display:flex; gap:10px; font:12px ui-monospace,monospace; padding:3px 0;
          border-bottom:1px solid var(--line); }
   .evt .ch { color:var(--acc); width:56px; }
-  .scene { display:flex; align-items:center; gap:8px; padding:9px 0;
-           border-bottom:1px solid var(--line); }
-  .scene b { flex:1; font-weight:600; font-size:14px; }
+  /* Scene rows are a grid — tick · name · Wait · Fade · Recall — so the Wait /
+     Fade headings above the list sit over their fields (user, 2026-10-02). The
+     active bar lives in the row's left padding, so it never shifts a column. */
+  .scene { display:grid; grid-template-columns:20px minmax(0,1fr) 44px 44px 62px; gap:5px;
+           align-items:center; padding:9px 0 9px 8px; border-bottom:1px solid var(--line); }
+  .scene b { min-width:0; font-weight:600; font-size:13.5px; overflow:hidden;
+             text-overflow:ellipsis; white-space:nowrap; }
+  .schead { padding:2px 0 2px 8px; border-bottom:0; color:var(--dim); font-size:11px;
+            text-align:center; letter-spacing:.04em; }
+  .scene button { padding:8px 0; width:100%; }   /* fills its fixed column so the headings line up */
+  /* Transport along the foot of the card: Go · Stop · Follow · Cue. */
+  .scntrans { margin-top:12px; flex-wrap:nowrap; }
+  .scntrans button { flex:1 1 0; min-width:0; white-space:nowrap; text-align:center; }
+  .scntrans button.sel { background:#123a5e; border-color:var(--acc); color:var(--acc); }
+  .scntrans button.glow { border-color:var(--acc); color:var(--acc);
+                          box-shadow:0 0 10px rgba(77,163,255,.45), inset 0 0 8px rgba(77,163,255,.18); }
   /* The name is the handle: tap renames, a hold lifts the row for a drag.
      touch-action none here only, so the rest of the row still scrolls the page. */
   .scname { cursor:pointer; touch-action:none; user-select:none; -webkit-user-select:none;
@@ -494,12 +507,12 @@
   /* The tick box at the left of every scene row. */
   .scene input.scsel { width:20px; height:20px; flex:none; margin:0; padding:0; border:0;
                        background:none; accent-color:var(--acc); cursor:pointer; }
-  .scene.active { border-left:3px solid var(--acc); padding-left:8px; }
+  .scene.active { box-shadow:inset 3px 0 0 var(--acc); }
   .scene.active .scname { color:var(--acc); }
-  .scfade { display:flex; align-items:center; gap:4px; font-size:12px;
-            color:var(--dim); white-space:nowrap; }
-  .scene input { width:56px; background:var(--card2); color:var(--text);
-                 border:1px solid var(--line); border-radius:7px; padding:6px; }
+  .scene input[type=number] { width:44px; background:var(--card2); color:var(--text);
+                 border:1px solid var(--line); border-radius:7px; padding:6px 4px; text-align:center;
+                 font-variant-numeric:tabular-nums; -moz-appearance:textfield; }
+  .scene input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
   /* Colour tab — MagicQ-style vertical picker columns */
   .cols { display:flex; gap:10px; margin-top:14px; }
   .colwrap { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
@@ -758,7 +771,7 @@
       <button id="btnPrep" title="Every port to full white, effects off, dimmer down">Clear all</button>
       <button id="btnUndo" title="Put back the looks from before the last Clear all">Undo</button>
       <button id="btnWbReset" class="hidden" title="Every colour of every port back to full">Reset WB</button>
-      <button id="btnFx" title="Tempo and spread for the whole rig">Effects</button>
+      <button id="btnFx" title="Tempo and spread for the whole rig">Tempo</button>   <!-- was Effects (user, 2026-10-02: "not really effects") -->
     </div>
     <div id="ports"></div>
   </div>
@@ -798,7 +811,22 @@
       and a ticked scene dragged takes the others along as a block.</div>
       <div class="mini">Tap a name to rename it; hold it to lift and drag. Up to
       100 scenes live in this phone's browser.</div>
+      <div class="mini">Go recalls the next scene in the list; Stop halts a run.
+      Cue steps once per Go; Follow runs on by itself, round and round.</div>
+      <div class="mini">Wait is how long a scene holds after its fade before
+      Follow moves on; both are in seconds.</div>
+      <!-- Wait / Fade once, above their columns (user, 2026-10-02). -->
+      <div class="scene schead hidden" id="scnHead"><span></span><span></span><span>Wait (s)</span><span>Fade (s)</span><span></span></div>
       <div id="sceneList"></div>
+      <!-- Transport (user, 2026-10-02): Go steps to the next scene; Cue = one
+           step per press, Follow = each scene holds for its Wait after its
+           fade, then the next goes, looping; Stop halts the run. -->
+      <div class="ctlrow scntrans">
+        <button id="scnGo" class="primary">Go</button>
+        <button id="scnStop" class="danger" disabled>Stop</button>
+        <button id="scnFollow">Follow</button>
+        <button id="scnCue" class="sel">Cue</button>
+      </div>
     </div>
   </div>
 
@@ -1279,7 +1307,7 @@
 <!-- Effects pop-up (user, 2026-10-02): tempo and spread for the whole rig,
      opened from Effects… on the Control tab; Setup no longer carries them. -->
 <div id="fxOv" class="hidden"><div class="box">
-  <div class="wbhead"><b>Effects</b></div>
+  <div class="wbhead"><b>Tempo and spread</b></div>
   <div class="mini" style="margin-top:4px">Tempo and spread are for the whole rig: beat effects keep in step across the ports, spread offsets them in time.</div>
   <div class="row" style="margin-top:12px"><label>Tempo</label>
     <button id="fxTap" style="min-width:92px">Tap</button>
@@ -1343,7 +1371,7 @@
   <div class="wbhead"><b>Support</b></div>
   <div class="mini" style="margin-top:4px">Say what happened. A status report goes with it to
     support@jmblighting.co.uk, from your own mail app, only when you send it.
-    Never included: PIN, Wi-Fi details, network address, location.</div>
+    Never included: PIN, network address, location.</div>
   <textarea id="supText" rows="5" maxlength="1500" placeholder="What were you doing, and what went wrong?"></textarea>
   <label class="suprow"><input type="checkbox" id="supNames"> Include controller name, ID and port labels</label>
   <details id="supDet"><summary>What the report contains</summary><pre id="supPre"></pre></details>
@@ -1483,7 +1511,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02af.pills";
+const APP_VER="2026-10-02ag.tempo";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2595,6 +2623,7 @@ function loadScenes(){ try{
   return a.filter(x=>x&&typeof x==="object").map(x=>({
     name:String(x.name??"Scene").slice(0,40),
     fade:Math.min(60,Math.max(0,+x.fade||0)),
+    wait:Math.min(3600,Math.max(0,+(x.wait??2)||0)),   // hold after the fade, for Follow (2026-10-02)
     ports:Array.isArray(x.ports)?x.ports:[]}));
  }catch(_){ return []; } }
 const SCENE_MAX=100;   // per-phone cap (documented in the manual)
@@ -2620,32 +2649,34 @@ function renderScenes(){
   const all=loadScenes();
   [...scnSel].forEach(i=>{ if(!(i<all.length)) scnSel.delete(i); });
   scnDelPaint();
+  { const h=$("scnHead"); if(h) h.classList.toggle("hidden",!all.length); }
   all.forEach((sc,i)=>{
     const row=document.createElement("div");
     row.className="scene"; row.dataset.i=String(i);
     if(i===activeSceneIdx) row.classList.add("active");
     const fv=(sc.fade==null)?2:Math.min(60,Math.max(0,+sc.fade||0));   // sanitise
+    const wv=Math.min(3600,Math.max(0,+(sc.wait??2)||0));
     row.innerHTML=`<input type="checkbox" class="scsel" title="Pick this scene"${scnSel.has(i)?" checked":""}>
       <b class="scname" title="Tap to rename, hold to move">${esc(sc.name)}</b>
-      <span class="scfade">Fade
-        <input type="number" min="0" max="60" step="0.5" value="${fv}"
-               inputmode="decimal">s</span>
+      <input type="number" class="scwait" min="0" max="3600" step="0.5" value="${wv}" inputmode="decimal" title="Wait, seconds">
+      <input type="number" class="scfade" min="0" max="60" step="0.5" value="${fv}" inputmode="decimal" title="Fade, seconds">
       <button class="primary">Recall</button>`;
-    const fadeIn=row.querySelector("input[type=number]");
+    const fadeIn=row.querySelector(".scfade"), waitIn=row.querySelector(".scwait");
     const btnGo=row.querySelector("button");
     row.querySelector(".scsel").onchange=ev=>{ if(ev.target.checked) scnSel.add(i); else scnSel.delete(i); scnDelPaint(); };
     sceneDragArm(row);
-    // Persist the fade the MOMENT it changes — no more "only saved on Recall,
-    // and via a whole-object overwrite" that let stale values slip in. Clamp
-    // 0-60s. Also block wheel-scroll from silently nudging the number.
-    const commitFade=()=>{
-      let v=Math.min(60,Math.max(0,+fadeIn.value||0));
-      v=Math.round(v*2)/2;                       // snap to 0.5
-      fadeIn.value=v; sc.fade=v;
-      const all=loadScenes(); if(all[i]){ all[i].fade=v; saveScenes(all); }
+    // Persist a number the MOMENT it changes — no more "only saved on Recall,
+    // and via a whole-object overwrite" that let stale values slip in. Clamp,
+    // snap to 0.5 s, and block wheel-scroll from silently nudging it.
+    const commitNum=(inp,key,max)=>()=>{
+      let v=Math.min(max,Math.max(0,+inp.value||0));
+      v=Math.round(v*2)/2;
+      inp.value=v; sc[key]=v;
+      const all=loadScenes(); if(all[i]){ all[i][key]=v; saveScenes(all); }
     };
-    fadeIn.addEventListener("change",commitFade);
-    fadeIn.addEventListener("wheel",e=>e.preventDefault(),{passive:false});
+    const commitFade=commitNum(fadeIn,"fade",60), commitWait=commitNum(waitIn,"wait",3600);
+    fadeIn.addEventListener("change",commitFade); waitIn.addEventListener("change",commitWait);
+    [fadeIn,waitIn].forEach(inp=>inp.addEventListener("wheel",e=>e.preventDefault(),{passive:false}));
     row.querySelector(".scname").onclick=async()=>{
       if(row.dataset.lifted){ delete row.dataset.lifted; return; }   // a hold, not a tap
       const v=await askText("",{title:"Rename scene",value:sc.name,ok:"Rename",maxlength:24});
@@ -2727,7 +2758,7 @@ $("btnSaveScene").onclick=async()=>{
   const snap=ports.map(m=>({r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
                             x:m.X??0,s:m.S??128}));
   const all=loadScenes();
-  all.push({name:name.trim(),fade:2,ports:snap});
+  all.push({name:name.trim(),fade:2,wait:2,ports:snap});
   saveScenes(all); renderScenes();
 };
 // One-tap capture of the current look — no prompt, auto-named by time.
@@ -2738,9 +2769,39 @@ $("btnCapture").onclick=()=>{
   const t=new Date(), hh=String(t.getHours()).padStart(2,"0"),
         mm=String(t.getMinutes()).padStart(2,"0");
   const all=loadScenes();
-  all.push({name:`Live ${hh}:${mm}`,fade:2,ports:snap});
+  all.push({name:`Live ${hh}:${mm}`,fade:2,wait:2,ports:snap});
   saveScenes(all); renderScenes();
 };
+// ---- Transport: Go · Stop · Follow · Cue (user, 2026-10-02) ----
+// Go recalls the scene after the active one (the first when none, the first
+// again after the last). Cue = one step per press. Follow = after each Go the
+// next is timed at fade + wait of the scene just recalled, round and round,
+// until Stop or a switch to Cue. A row's own Recall moves the pointer too.
+let scnMode="cue", scnTimer=null;
+function scnPaint(){
+  $("scnFollow").classList.toggle("sel",scnMode==="follow");
+  $("scnCue").classList.toggle("sel",scnMode==="cue");
+  $("scnGo").classList.toggle("glow",!!scnTimer);
+  $("scnStop").disabled=!scnTimer;
+}
+function scnStop(){ clearTimeout(scnTimer); scnTimer=null; scnPaint(); }
+function scnGo(){
+  const all=loadScenes();
+  clearTimeout(scnTimer); scnTimer=null;
+  if(!all.length){ toast("No scenes yet"); scnPaint(); return; }
+  const i=(activeSceneIdx+1)%all.length, sc=all[i];
+  activeSceneIdx=i;
+  recallScene(sc); renderScenes();
+  if(scnMode==="follow"){
+    const ms=Math.max(250,((+sc.fade||0)+(+sc.wait||0))*1000);
+    scnTimer=setTimeout(()=>{ scnTimer=null; scnGo(); },ms);
+  }
+  scnPaint();
+}
+$("scnGo").onclick=scnGo;
+$("scnStop").onclick=scnStop;
+$("scnFollow").onclick=()=>{ scnMode="follow"; scnPaint(); };
+$("scnCue").onclick=()=>{ scnMode="cue"; scnStop(); };
 let fadeTimer=null, recallGen=0;
 async function recallScene(sc){
   const myGen=++recallGen;             // supersede any in-flight recall
@@ -5755,7 +5816,7 @@ const supStamp=()=>{ const d=new Date(), p2=x=>String(x).padStart(2,"0");
   return `${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}`; };
 function supPreview(){ $("supPre").textContent=supAsText(supReport()); }
 function supMsg(t,bad){ const m=$("supMsg"); m.textContent=t; m.style.color=bad?"var(--bad)":""; }
-const SUP_NEVER="Never included: PIN, Wi-Fi details, network address, location.";
+const SUP_NEVER="Never included: PIN, network address, location.";
 $("btnSupport").onclick=()=>{ supPreview(); supMsg(""); $("supOv").classList.remove("hidden"); };   // the "never included" line lives in the note behind the hand (2026-10-02)
 $("supClose").onclick=()=>$("supOv").classList.add("hidden");
 $("supNames").onchange=supPreview;

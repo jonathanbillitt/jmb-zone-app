@@ -140,7 +140,7 @@ clean however many units are in it. Downstream fixtures' RDM answers are
 relayed back up to the desk through the same path.</p>
 <h2>2a. Firmware update over Bluetooth (BLE OTA)</h2>
 <p>The controller updates its own firmware straight over Bluetooth from the app —
-no USB, no cable, no Wi-Fi.</p>
+no USB, no cable.</p>
 <ul>
 <li><strong>One button: Update Firmware</strong> (Setup → <em>Firmware update</em>). It is only
   offered when there is actually something to install — otherwise it reads
@@ -184,9 +184,6 @@ no USB, no cable, no Wi-Fi.</p>
 <p>Keep the app open and the phone unlocked until an update finishes. Outputs
 hold their last look during a controller update; they go dark during a port
 module update.</p>
-<p>Wi-Fi / network DMX (sACN, Art-Net) and Wi-Fi OTA are not part of the
-shipping firmware — the control path is deliberately kept off the network for
-responsiveness. Wired DMX, CRMX and BLE cover input and updates.</p>
 </blockquote>
 <hr />
 <h2>3. Effects</h2>
@@ -220,7 +217,7 @@ faint mains buzz; Paparazzi fires irregular hard white pops, independent per
 port, like a press pit; Explosion is a white-hot flash blooming to an orange
 fireball with an ember-flicker decay; Clouds drifts daylight slowly dimmer
 and cooler as cloud crosses the sun, then back.</p>
-<p><strong>Rig-wide effect controls</strong> (the app's Effects pop-up, from the Effects button at the top of the Control tab): <strong>Tap tempo</strong> sets the
+<p><strong>Rig-wide effect controls</strong> (the app's Tempo pop-up, from the Tempo button at the top of the Control tab): <strong>Tap tempo</strong> sets the
 whole rig's beat-effect speed to the music — tap the app's Tap button in time
 (or type a BPM, 60–240; 128 is the designed tempo). <strong>Spread</strong> offsets
 each port in time (0–100 %) so effects sweep across the rig as a wave
@@ -361,7 +358,7 @@ deliberate — and both sides of the overlap are marked. Two ports set to the
 <em>same</em> start address are treated as mirroring and are not marked.</p>
 <p>Touching any colour or level control <strong>takes manual control automatically</strong> and
 stops a running effect on that port, so a fader never feels dead. When a live
-<strong>DMX, sACN or Art-Net</strong> signal is driving the rig, a <strong>"Live DMX in control"</strong>
+<strong>DMX or CRMX</strong> signal is driving the rig, a <strong>"Live DMX in control"</strong>
 banner appears — your manual moves here are overridden until that signal stops,
 which is <em>why</em> the faders would otherwise seem to do nothing.</p>
 <p><strong>Output</strong> holds the <strong>PWM mode</strong> (the dimming carrier frequency — see §8), the
@@ -408,6 +405,13 @@ left of a scene to pick it: <strong>Delete</strong> at the top removes every tic
 (after a confirm), and dragging a ticked scene moves all the ticked ones
 together as a block. <strong>The limit is 100 scenes per phone</strong>; the app says so
 when it is reached, so delete a few before saving more.</p>
+<p>Each scene has two times, in seconds, under the <strong>Wait</strong> and <strong>Fade</strong> headings:
+Fade is the crossfade into the scene, Wait is how long it holds after that
+fade before the list moves on. The buttons along the foot of the tab run the
+list: <strong>Go</strong> recalls the next scene (the first when none is lit, the first
+again after the last). <strong>Cue</strong> steps one scene per Go press; <strong>Follow</strong> carries
+on by itself, each scene holding for its Wait, round and round, until
+<strong>Stop</strong>. Recall on a row jumps to that scene, and Go continues from there.</p>
 <h3>Telemetry — the health glance</h3>
 <p>A read-only status page — the same telemetry the port screens show, gathered in
 one place: each port's <strong>patch</strong>, <strong>output current</strong> (calibrated to within about
@@ -419,7 +423,7 @@ the wire. Each tool answers a specific question:</p>
 <ul>
 <li>
 <p><strong>Signal card</strong> — <em>Is a signal arriving, and is it healthy?</em> Shows whether a
-  signal is present and from where (<strong>DMX / CRMX / sACN / Art-Net</strong>). It reads
+  signal is present and from where (<strong>DMX / CRMX</strong>). It reads
   <strong>CRMX</strong> only when the radio is verifiably carrying the data; otherwise it
   says simply <strong>DMX</strong>, because wired and wireless arrive on the same input and
   the source is picked by the XLR socket itself, not by the controller, its <strong>frame
@@ -562,8 +566,8 @@ Your own white and amber levels come back when the effect is cleared.</p>
 happened; the app adds a status report (versions, controller status, recent errors
 and commands) and hands it to your own mail app addressed to
 support@jmblighting.co.uk. Nothing is sent unless you send it, and <em>What the report
-contains</em> shows every line first. It never holds the PIN, Wi-Fi details, network
-address or location; names and labels are included only if you tick the box.</p>
+contains</em> shows every line first. It never holds the PIN, network address or
+location; names and labels are included only if you tick the box.</p>
 <p><strong>Demo mode.</strong> <em>Demo mode</em> on the connect screen walks the entire app
 — every tab, the analyser, even an RDM scan that discovers example fixtures —
 with no controller present. Nothing a demo user touches goes anywhere; it is for
