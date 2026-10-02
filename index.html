@@ -472,10 +472,10 @@
   .scnsave { flex-wrap:nowrap; }
   .scnsave button { flex:1 1 0; min-width:0; white-space:nowrap; }
   .scnpick { margin-top:10px; flex-wrap:nowrap; }
-  .scnpick select { flex:1 1 0; min-width:0; align-self:stretch; background:var(--card2);
-                    color:var(--text); border:1px solid var(--line); border-radius:9px;
-                    padding:0 10px; font-size:14px; }
-  .scnpick button { flex:0 0 auto; }
+  .scnpick button { flex:1 1 0; }
+  /* The tick box at the left of every scene row. */
+  .scene input.scsel { width:20px; height:20px; flex:none; margin:0; padding:0; border:0;
+                       background:none; accent-color:var(--acc); cursor:pointer; }
   .scene.active { border-left:3px solid var(--acc); padding-left:8px; }
   .scene.active .scname { color:var(--acc); }
   .scfade { display:flex; align-items:center; gap:4px; font-size:12px;
@@ -760,11 +760,12 @@
         <button id="btnSaveScene" class="primary">Save scene…</button>
         <button id="btnCapture">Capture live</button>
       </div>
-      <!-- One pick + Delete at the top instead of a cross on every row; hold a
-           name to lift its scene and drag it into a new order (user, 2026-10-02). -->
+      <!-- A tick box on every row and one Delete for the ticked set (user,
+           2026-10-02: "remove the drop down and just add the highlight box on
+           the left hand side of each box"); hold a name to lift its scene and
+           drag it into a new order, ticked scenes move as one block. -->
       <div class="ctlrow scnpick">
-        <select id="scnSel"></select>
-        <button id="btnScnDel" class="danger">Delete</button>
+        <button id="btnScnDel" class="danger" disabled>Delete</button>
       </div>
       <div class="mini">Save and Capture keep the same thing: each port's
       colour, level, effect and effect rate. Capture just skips the name.</div>
@@ -772,8 +773,10 @@
       the start on recall; tempo and spread are rig-wide, not part of a scene.</div>
       <div class="mini">Recall crossfades over the fade seconds (0 = snap) from
       wherever the rig is; effects dip out and in rather than snapping.</div>
-      <div class="mini">Tap a name to rename it. Hold a name to lift the scene,
-      then drag it up or down. Scenes live in this phone's browser.</div>
+      <div class="mini">Tick scenes to pick them: Delete removes every ticked one,
+      and a ticked scene dragged takes the others along as a block.</div>
+      <div class="mini">Tap a name to rename it; hold it to lift and drag. Up to
+      100 scenes live in this phone's browser.</div>
       <div id="sceneList"></div>
     </div>
   </div>
@@ -1459,7 +1462,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02ac.head";
+const APP_VER="2026-10-02ad.tick";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2569,38 +2572,36 @@ function saveScenes(s){
             if(el) el.textContent="Scene storage full — not saved."; }
 }
 let activeSceneIdx=-1;          // last-recalled scene this session
-// The pick list at the top: one select of every scene plus Delete (user,
-// 2026-10-02: "a select box and a delete button at the top which deletes
-// selected"). Keeps its pick across renders while that scene still exists.
-function renderScenePick(all){
-  const sel=$("scnSel"), del=$("btnScnDel"); if(!sel) return;
-  const keep=sel.value;
-  sel.innerHTML="";
-  if(!all.length){
-    const o=document.createElement("option"); o.value=""; o.textContent="No scenes yet";
-    sel.appendChild(o); sel.disabled=true; del.disabled=true; return;
-  }
-  all.forEach((sc,i)=>{ const o=document.createElement("option");
-    o.value=String(i); o.textContent=sc.name; sel.appendChild(o); });
-  sel.disabled=false; del.disabled=false;
-  sel.value=(keep!=="" && +keep<all.length)?keep:String(activeSceneIdx>=0?activeSceneIdx:0);
+// The ticked set (scene indexes). Delete acts on it and a drag of a ticked
+// scene moves the whole set (user, 2026-10-02: "select either queues for
+// delete or allows multiple scene moves"). Pruned on every render, cleared
+// by a delete, remapped by a move.
+const scnSel=new Set();
+function scnDelPaint(){
+  const b=$("btnScnDel"); if(!b) return;
+  const n=scnSel.size;
+  b.disabled=!n;
+  b.textContent = n===0 ? "Delete" : (n===1 ? "Delete scene" : `Delete ${n} scenes`);
 }
 function renderScenes(){
   const list=$("sceneList"); list.innerHTML="";
   const all=loadScenes();
-  renderScenePick(all);
+  [...scnSel].forEach(i=>{ if(!(i<all.length)) scnSel.delete(i); });
+  scnDelPaint();
   all.forEach((sc,i)=>{
     const row=document.createElement("div");
     row.className="scene"; row.dataset.i=String(i);
     if(i===activeSceneIdx) row.classList.add("active");
     const fv=(sc.fade==null)?2:Math.min(60,Math.max(0,+sc.fade||0));   // sanitise
-    row.innerHTML=`<b class="scname" title="Tap to rename, hold to move">${esc(sc.name)}</b>
+    row.innerHTML=`<input type="checkbox" class="scsel" title="Pick this scene"${scnSel.has(i)?" checked":""}>
+      <b class="scname" title="Tap to rename, hold to move">${esc(sc.name)}</b>
       <span class="scfade">Fade
         <input type="number" min="0" max="60" step="0.5" value="${fv}"
                inputmode="decimal">s</span>
       <button class="primary">Recall</button>`;
-    const fadeIn=row.querySelector("input");
+    const fadeIn=row.querySelector("input[type=number]");
     const btnGo=row.querySelector("button");
+    row.querySelector(".scsel").onchange=ev=>{ if(ev.target.checked) scnSel.add(i); else scnSel.delete(i); scnDelPaint(); };
     sceneDragArm(row);
     // Persist the fade the MOMENT it changes — no more "only saved on Recall,
     // and via a whole-object overwrite" that let stale values slip in. Clamp
@@ -2621,48 +2622,59 @@ function renderScenes(){
       const all=loadScenes(); all[i].name=nm; saveScenes(all); renderScenes();
     };
     btnGo.onclick=()=>{ commitFade(); activeSceneIdx=i;
-                        recallScene(sc); const s=$("scnSel"); if(s) s.value=String(i);
-                        renderScenes(); };
+                        recallScene(sc); renderScenes(); };
     list.appendChild(row);
   });
 }
 $("btnScnDel").onclick=async()=>{
-  const sel=$("scnSel"), i=+sel.value, all=loadScenes();
-  if(sel.disabled || !(i>=0 && i<all.length)) return;
-  if(!await askConfirm(`"${all[i].name}" goes for good.`,{title:"Delete scene?",ok:"Delete",danger:true})) return;
-  all.splice(i,1); saveScenes(all);
-  if(activeSceneIdx===i) activeSceneIdx=-1;
-  else if(activeSceneIdx>i) activeSceneIdx--;
-  sel.value=String(Math.min(i,all.length-1));
-  renderScenes(); toast("Scene deleted");
+  const all=loadScenes(), picks=[...scnSel].filter(i=>i<all.length).sort((a,b)=>a-b);
+  if(!picks.length) return;
+  const one=picks.length===1;
+  if(!await askConfirm(one?`"${all[picks[0]].name}" goes for good.`:`${picks.length} scenes go for good.`,
+        {title:one?"Delete scene?":`Delete ${picks.length} scenes?`,ok:"Delete",danger:true})) return;
+  const keep=all.filter((_,i)=>!scnSel.has(i));
+  if(activeSceneIdx>=0)
+    activeSceneIdx = scnSel.has(activeSceneIdx) ? -1 : activeSceneIdx - picks.filter(i=>i<activeSceneIdx).length;
+  scnSel.clear(); saveScenes(keep);
+  renderScenes(); toast(one?"Scene deleted":`${picks.length} scenes deleted`);
 };
 // Hold a scene's name (380 ms, no movement) to lift the row; drag it past the
-// row above or below to swap; let go to keep the order. Pointer capture holds
-// the stream once lifted; before that a move, a leave or a scroll cancels the
-// hold so a normal tap or page scroll is untouched.
+// row above or below to swap; let go to keep the order. A ticked scene lifts
+// every ticked scene with it as one block (in their order). Pointer capture
+// holds the stream once lifted; before that a move, a leave or a scroll
+// cancels the hold so a normal tap or page scroll is untouched.
 function sceneDragArm(row){
   const handle=row.querySelector(".scname"), list=$("sceneList");
   handle.addEventListener("contextmenu",e=>e.preventDefault());
   handle.addEventListener("pointerdown",e=>{
     if(e.button!==0) return;
-    const sx=e.clientX, sy=e.clientY; let lifted=false, timer=null;
-    const lift=()=>{ lifted=true; row.dataset.lifted="1"; row.classList.add("lift");
+    const sx=e.clientX, sy=e.clientY; let lifted=false, timer=null, group=[row];
+    const lift=()=>{ lifted=true; row.dataset.lifted="1";
+      if(row.querySelector(".scsel").checked){
+        // Gather the ticked rows into one block at the lifted row's place.
+        group=[...list.children].filter(r=>r.querySelector(".scsel").checked);
+        let pivot=row.nextElementSibling; while(pivot && group.includes(pivot)) pivot=pivot.nextElementSibling;
+        group.forEach(r=>list.insertBefore(r,pivot));
+      }
+      group.forEach(r=>r.classList.add("lift"));
       try{ handle.setPointerCapture(e.pointerId); }catch(_){}
       try{ if(navigator.vibrate) navigator.vibrate(12); }catch(_){} };
     const move=ev=>{
       if(!lifted){ if(Math.hypot(ev.clientX-sx,ev.clientY-sy)>8) cancel(); return; }
       ev.preventDefault();
-      const rows=[...list.children], k=rows.indexOf(row), y=ev.clientY;
-      const prev=rows[k-1], next=rows[k+1];
-      if(prev){ const r=prev.getBoundingClientRect(); if(y<r.top+r.height/2){ list.insertBefore(row,prev); return; } }
-      if(next){ const r=next.getBoundingClientRect(); if(y>r.top+r.height/2) list.insertBefore(next,row); }
+      const y=ev.clientY, first=group[0], last=group[group.length-1];
+      const prev=first.previousElementSibling, next=last.nextElementSibling;
+      if(prev){ const r=prev.getBoundingClientRect(); if(y<r.top+r.height/2){ group.forEach(g=>list.insertBefore(g,prev)); return; } }
+      if(next){ const r=next.getBoundingClientRect(); if(y>r.top+r.height/2) list.insertBefore(next,first); }
     };
     const drop=()=>{
       if(!lifted){ cancel(); return; }
-      cleanup(); row.classList.remove("lift");
+      cleanup(); group.forEach(g=>g.classList.remove("lift"));
       const order=[...list.children].map(r=>+r.dataset.i), all=loadScenes();
       const re=order.map(k=>all[k]).filter(Boolean);
       if(activeSceneIdx>=0) activeSceneIdx=order.indexOf(activeSceneIdx);
+      const picked=[...scnSel]; scnSel.clear();
+      picked.forEach(old=>{ const n=order.indexOf(old); if(n>=0) scnSel.add(n); });
       saveScenes(re);
       setTimeout(renderScenes,0);         // after the click this release raises
     };
