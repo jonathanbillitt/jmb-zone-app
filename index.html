@@ -815,12 +815,8 @@
           <button id="btnCidApply">Apply</button>
           <span class="mini" style="margin:0">on screens, BLE name (next boot), RDM label</span>
         </div>
-        <div class="row"><label>Apply</label>
-          <select id="setAmode" style="width:130px">
-            <option value="0">Same</option><option value="1">Seq</option>
-            <option value="2">Offset</option></select>
-          <span class="mini" style="margin:0">how base addresses fan out</span>
-        </div>
+        <!-- The Apply mode (Same / Seq / Offset) moved to each port's Patch
+             sheet beside the address (user, 2026-10-02). -->
         <div class="row"><label>DMX hold</label>
           <input type="number" id="setHold" min="0" max="60" step="1">
           <span class="unit">s</span>
@@ -1358,7 +1354,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-01t.captions";
+const APP_VER="2026-10-02a.apply";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2023,6 +2019,15 @@ function renderControl(){
     setIf(p,"HEAD",el=>el.value=m.H??0);
     setIf(p,"PERS",el=>{ el.value=m.PE??0;
       const af=$("addr"+p); if(af) af.max=maxAddr(m.PE??0); });
+    // Apply row: the shared mode, and the button names the ports it patches
+    // (none after the last port; the row is pointless on a one-port unit).
+    // (id fanM, not am: "am"+p is the amber slider's id on a five-channel port.)
+    { const n=ports.length, fr=$("fanRow"+p), fb=$("fan"+p), fm=$("fanM"+p);
+      if(fm && document.activeElement!==fm) fm.value=kv.AM??"0";
+      if(fr) fr.classList.toggle("hidden",n<2);
+      if(fb){ fb.disabled=p>=n;
+        if(!fb.dataset.ack)                 // a fresh "Set ✓" stays until its timer repaints
+          fb.textContent = p>=n ? "Last port" : (p+1===n ? `Port ${n}` : `Ports ${p+1}–${n}`); } }
     // Slider rows follow the personality: one per output it uses, labelled and
     // coloured by the function on that output (paintRows rebuilds only when
     // the set changes, so a slider under a finger is never replaced).
@@ -2164,11 +2169,21 @@ function buildCard(p){
           <label style="width:auto">Head</label>
           <input type="number" id="head${p}" min="0" max="9999">
         </div>
+        <!-- Sequential addressing lives with the address (user, 2026-10-02):
+             the Apply mode the panel and RDM fan out by, and a button that
+             patches the ports after this one from this port's address. -->
+        <div class="row" id="fanRow${p}"><label>Apply</label>
+          <select id="fanM${p}" style="width:96px">
+            <option value="0">Same</option><option value="1">Seq</option>
+            <option value="2">Offset</option></select>
+          <button id="fan${p}" style="padding:6px 10px;white-space:nowrap;min-width:96px">Ports</button>
+        </div>
         <div class="row"><label>Mode</label>
           <select id="pers${p}" style="flex:1;min-width:0">${PERS_ORDER.map(i=>`<option value="${i}">${persOptionText(i)}</option>`).join("")}</select>
           <button id="cpe${p}" style="padding:6px 10px">Custom…</button>
         </div>
         <div class="mini">Address, head and mode are the desk patch. The label names the port across the app.</div>
+        <div class="mini">Apply patches the later ports from this address: Seq follows on by footprint, Offset by a fixed stride. Heads follow +1.</div>
       </div>
       <div class="psheet rows" id="psOut${p}" data-title="Port ${p} · Output">
         <div class="row"><label>Curve</label>
@@ -2260,6 +2275,10 @@ function buildCard(p){
     let v=Math.max(0,Math.min(9999,+e.target.value||0));
     e.target.value=v; touch("HEAD"); send(`P${p}.HEAD=${v}`);
   });
+  // One Apply mode for the controller (state AM): the panel's All Ports edit
+  // and a desk's RDM base address fan out by it too.
+  d.querySelector("#fanM"+p).addEventListener("change",e=>send("AMODE="+ +e.target.value));
+  d.querySelector("#fan"+p).addEventListener("click",()=>fanOut(p));
   d.querySelector("#pers"+p).addEventListener("change",e=>{
     const pe=+e.target.value, mx=maxAddr(pe), af=$("addr"+p);
     af.max=mx;
@@ -3696,7 +3715,6 @@ function renderSetup(){
   // state echo rewrites the focused field first and the edit silently
   // vanishes ("ID / DMX hold refuse to change", bench 2026-08-28).
   if(document.activeElement!==$("setCid"))   $("setCid").value=kv.CID??"";
-  if(document.activeElement!==$("setAmode")) $("setAmode").value=kv.AM??"0";
   if(document.activeElement!==$("setHold"))  $("setHold").value=kv.HOLD??"5";
   // Network DMX — don't stomp a field the user is editing
   if(document.activeElement!==$("netEn"))  $("netEn").value=kv.NET??"0";
@@ -4150,7 +4168,6 @@ $("setName").addEventListener("change",e=>{
 });
 $("btnCidApply").onclick=()=>{ setupTouched=Date.now();
   send("CID="+Math.max(0,Math.min(9999,+$("setCid").value||0))); };
-$("setAmode").onchange=e=>{ setupTouched=Date.now(); send("AMODE="+ +e.target.value); };
 $("btnHoldApply").onclick=()=>{ setupTouched=Date.now();
   send("HOLD="+Math.max(0,Math.min(60,+$("setHold").value||5))); };
 // ---------- prep / reset-all / undo ----------
@@ -5085,6 +5102,41 @@ function pcPaintSet(p,m){
   put("pvFlt"+p, flt ? "⚠ "+(faultWords(m.F)||"Fault") : "✓ No faults", flt?"bad":"ok");
 }
 
+// ----- Patch sheet: fan this port's address out to the ports after it -----
+// The same three modes as the panel's All Ports edit and a desk's RDM base
+// address (AMODE / state AM): Same = one address on every port, Seq = each
+// port follows on from the channels of the port before it, Offset = a fixed
+// stride of the widest personality, so a port can change mode later without
+// a re-patch. The app works the map out and writes each port, so today's
+// firmware needs nothing new. Heads follow +1 in Seq and Offset, as on the
+// panel. A port on a custom preset is passed over: it listens on the preset's
+// own channels and its Address field is not used.
+function fanStride(){
+  let s=0; for(let c=0;c<13;c++) if(persAvail(c)) s=Math.max(s,PERS_CH[c]||0);
+  return s||10;
+}
+async function fanOut(p){
+  const n=ports.length, mode=+(kv.AM||0);
+  if(!ports[p-1] || p>=n) return;
+  let cur=ports[p-1], a=+(cur.A||1), h=+(cur.H||0);
+  const stride=fanStride(), done=[];
+  for(let i=p+1;i<=n;i++){
+    const m=ports[i-1], pe=m.PE||0;
+    if(mode===1){ const ch=portChans(cur); if(ch.length) a=ch[ch.length-1]+1; }
+    else if(mode===2) a+=stride;
+    if(mode!==0) h=(h+1)%10000;
+    if(pe>=13 && cpdOf(pe-12)){ cur=m; continue; }
+    const aa=Math.max(1,Math.min(maxAddr(pe),a));
+    await send(`P${i}.ADDR=${aa}`); await send(`P${i}.HEAD=${h}`);
+    cur={PE:pe,A:aa}; a=aa; done.push(aa);
+  }
+  // Receipt on the button itself, so the row keeps its height: "Set ✓" for a
+  // moment, then the port list comes back with the next paint. The card
+  // values under Patch show the new addresses once the sheet closes.
+  const fb=$("fan"+p);
+  if(fb && done.length){ fb.dataset.ack=Date.now(); fb.textContent="Set ✓"; setTimeout(()=>{ delete fb.dataset.ack; renderControl(); },1200); }
+}
+
 // ----- PWM library: the three custom entries -----
 function pwCaveat(hz){
   const lim=pwLim(); if(!lim||!hz) return "";
@@ -5451,7 +5503,7 @@ function demoState(){
   const W=(n,d)=>{ const w=d.wb||[255,255,255]; return `W${n}=${w[0]},${w[1]},${w[2]},${d.wbp||0};`; };
   const PWC=demoF.pwc.map((c,k)=>`PWC${k+1}=${c?`${c.hz},${pwActual(c.hz)}`:"0,0"};`).join("");
   onState(
-    `JMB;FW=demo;PORTS=${demoF.var};CID=7;DMX=1;FPS=44;DI=0;CRV=1;AM=1;HOLD=5;SL=512;SC=0;ASC=3;ERR=0;`+
+    `JMB;FW=demo;PORTS=${demoF.var};CID=7;DMX=1;FPS=44;DI=0;CRV=1;AM=${demoF.am??1};HOLD=5;SL=512;SC=0;ASC=3;ERR=0;`+
     "RDM=42;ANS=42;AGE=23;"+
     `CAPON=${demoF.capon};CAPMS=${demoF.capon?Date.now()-demoF.capt0:0};CFL=43;CFH=45;`+
     `VAR=${demoF.var};VARM=${demoF.varm};BTN=${demoF.btn};`+
@@ -5542,6 +5594,7 @@ function demoCmd(s){
   if(m=s.match(/^P(\d)\.ADDR=(\d+)/)){ const d=demoP[+m[1]-1];
     d.a=Math.max(1,Math.min(513-(PERS_CH[d.pe]||3),+m[2])); demoState(); return; }   // clamps like the firmware: no overspill past 512
   if(m=s.match(/^P(\d)\.HEAD=(\d+)/)){ demoP[+m[1]-1].h=+m[2]; demoState(); return; }
+  if(m=s.match(/^AMODE=(\d)/)){ demoF.am=+m[1]%3; demoState(); return; }   // the Patch sheet's Apply mode
   if(m=s.match(/^P(\d)\.OCP=(\d+)/)){ demoP[+m[1]-1].oc=Math.max(250,Math.min(6750,+m[2])); demoState(); return; }
   if(m=s.match(/^P(\d)\.OT=(\d+)/)){ demoP[+m[1]-1].ot=Math.max(40,Math.min(110,+m[2])); demoState(); return; }
   // White balance + PWM library

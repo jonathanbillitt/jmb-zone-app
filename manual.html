@@ -326,7 +326,11 @@ by feel during a take. Under the encoders every port prints its settings in
 three columns, each headed by a button that opens the sheet to change them:
 <strong>Patch</strong> (Mode, Address, Head — the sheet also holds the <strong>Label</strong>, up to
 16 characters, which shows in the card header and on that port's own screen
-when the panel is locked), <strong>Output</strong> (Curve, PWM, white balance) and
+when the panel is locked, and an <strong>Apply</strong> row: pick Same / Seq / Offset and
+press the button to patch the ports after this one from its address — Seq
+follows on by each port's footprint, Offset by a fixed stride, heads follow
++1; the panel's All Ports edit and a desk's RDM base address fan out by the
+same mode), <strong>Output</strong> (Curve, PWM, white balance) and
 <strong>Protection</strong> (Limit, Trip, faults). <strong>Clear all</strong> returns
 every port to a clean base — full white, effects off, dimmer down — after a
 confirmation.</p>
@@ -568,9 +572,10 @@ steps up to the product maximum — <strong>6.75 A</strong> on the Zone, <strong
 4our → 10 A). <strong>Limit Lock</strong> freezes the value and is <strong>on by default</strong>: a new
 unit arrives locked at its product maximum, and the lock must be released before
 the limit can be changed, then set again. The row shows the lock with a <code>*</code> on
-the panel; in the app the <strong>padlock</strong> beside the field applies the value and
-locks it in one press — the field fades and only the padlock stays live until
-it is pressed again — so a hirer cannot raise it. <strong>Current Fold</strong> (on by default) is what happens when the draw reaches the
+the panel; in the app the <strong>padlock</strong> beside the field is the only control: one
+press applies the value and locks it (there is no separate Apply; Enter in the
+field does the same) — the field fades and only the padlock stays live until it
+is pressed again — so a hirer cannot raise it. <strong>Current Fold</strong> (on by default) is what happens when the draw reaches the
 limit: every output is scaled back together — colour and balance unchanged,
 brightness down — until the draw sits under the limit, then eases back up. With
 Current Fold off the limit is only <em>reported</em> and the per-port trips remain the
