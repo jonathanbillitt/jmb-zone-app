@@ -235,6 +235,12 @@
      the primary answer on top, Cancel at the bottom. */
   #cfOv .ctlrow.stack { flex-direction:column-reverse; align-items:stretch; gap:8px; }
   #cfOv .ctlrow.stack button { flex:none; width:100%; white-space:nowrap; }
+  /* Toast: a short confirmation that needs no tap, sitting just above the nav. */
+  #toast { position:fixed; left:50%; bottom:calc(76px + env(safe-area-inset-bottom));
+           transform:translateX(-50%); max-width:92vw; z-index:13;
+           background:var(--card2); color:var(--text); border:1px solid var(--line);
+           border-radius:10px; padding:10px 16px; font-size:13px; text-align:center;
+           box-shadow:0 8px 24px rgba(0,0,0,.45); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #btOv { z-index:11; }
   #btOv .box button { width:100%; margin-top:8px; padding:12px; }
   .sig { cursor:pointer; }
@@ -1126,6 +1132,9 @@
   <button data-tab="setup"><span class="ico">⚙️</span>Setup</button>
 </nav>
 
+<!-- Transient confirmation ("Ports 2–4 patched: DMX 4, 7, 10"), above the nav. -->
+<div id="toast" class="hidden" role="status"></div>
+
 <div id="cfOv" class="hidden"><div class="box">
   <b id="cfTitle"></b>
   <div class="mini" id="cfMsg" style="white-space:pre-line;text-align:left;margin-top:8px"></div>
@@ -1360,7 +1369,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02b.modeask";
+const APP_VER="2026-10-02c.applied";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1719,6 +1728,13 @@ function hideOverlay(){ $("overlay").classList.add("hidden"); }
 // its connection just sits there doing nothing when pressed, which reads as the
 // app being broken rather than as the link having gone.
 let cfCancel=null;
+// A confirmation that needs no tap: shows for a moment above the nav.
+let toastT=0;
+function toast(msg,ms){
+  const t=$("toast"); if(!t) return;
+  t.textContent=msg; t.classList.remove("hidden");
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.add("hidden"), ms||2200);
+}
 function askConfirm(msg,opt){
   const o=opt||{};
   return new Promise(res=>{
@@ -2036,8 +2052,7 @@ function renderControl(){
       if(fm && document.activeElement!==fm) fm.value=kv.AM??"0";
       if(fr) fr.classList.toggle("hidden",n<2);
       if(fb){ fb.disabled=p>=n;
-        if(!fb.dataset.ack)                 // a fresh "Set ✓" stays until its timer repaints
-          fb.textContent = p>=n ? "Last port" : (p+1===n ? `Port ${n}` : `Ports ${p+1}–${n}`); } }
+        fb.textContent = p>=n ? "Last port" : (p+1===n ? `Port ${n}` : `Ports ${p+1}–${n}`); } }
     // Slider rows follow the personality: one per output it uses, labelled and
     // coloured by the function on that output (paintRows rebuilds only when
     // the set changes, so a slider under a finger is never replaced).
@@ -5135,8 +5150,8 @@ async function fanOut(p){
   const pe0=cur.PE||0, cp0=pe0>=13?cpdOf(pe0-12):null;
   const modeName=cp0?cp0.name:(PERS_NAMES[pe0]||"this Mode");
   const list=p+1===n?`port ${n}`:`ports ${p+1}–${n}`;
-  const ans=await askConfirm(`Address and head from port ${p}, ${AMODES[mode]||"Same"}. Set their Mode to ${modeName} as well?`,
-                             {title:`Patch ${list}`, ok:"Mode too", alt:"Address only"});
+  const ans=await askConfirm(`DMX address and head from port ${p}, ${AMODES[mode]||"Same"}. Set their Mode to ${modeName} as well?`,
+                             {title:`Patch ${list}`, ok:"DMX + Mode", alt:"DMX only"});
   if(ans===false) return;
   const withMode=ans===true;
   const stride=fanStride(), done=[];
@@ -5147,17 +5162,17 @@ async function fanOut(p){
     else if(mode===2) a+=stride;
     if(mode!==0) h=(h+1)%10000;
     if(pe>=13 && cpdOf(pe-12)){                 // on a preset: its own channels, Address unused
-      if(withMode){ await send(`P${i}.HEAD=${h}`); done.push("p"); }
+      if(withMode){ await send(`P${i}.HEAD=${h}`); done.push("preset"); }
       cur={PE:pe,A:+(m.A||1)}; continue; }
     const aa=Math.max(1,Math.min(maxAddr(pe),a));
     await send(`P${i}.ADDR=${aa}`); await send(`P${i}.HEAD=${h}`);
     cur={PE:pe,A:aa}; a=aa; done.push(aa);
   }
-  // Receipt on the button itself, so the row keeps its height: "Set ✓" for a
-  // moment, then the port list comes back with the next paint. The card
-  // values under Patch show the new addresses once the sheet closes.
-  const fb=$("fan"+p);
-  if(fb && done.length){ fb.dataset.ack=Date.now(); fb.textContent="Set ✓"; setTimeout(()=>{ delete fb.dataset.ack; renderControl(); },1200); }
+  // Applied: the sheet closes and a message says what was set (user,
+  // 2026-10-02); the cards underneath show the new values.
+  if(!done.length){ toast("No port changed"); return; }
+  pcClose();
+  toast(`${list[0].toUpperCase()+list.slice(1)} patched: DMX ${done.join(", ")}`+(withMode?` · Mode ${modeName}`:""));
 }
 
 // ----- PWM library: the three custom entries -----
