@@ -1199,10 +1199,10 @@
        armed unit down the DMX line (the chain baton). Reset clears this port. -->
   <div class="ctlrow across" style="margin-top:12px">
     <button id="wbAll">All ports</button>
-    <button id="wbChain">Chain</button>
+    <button id="wbChain">Universe</button>
     <button id="wbReset">Reset</button>
   </div>
-  <div class="mini">Preview lights the port at that level while you adjust, never over live DMX. 255 = full. All ports copies these trims to every port here; Chain sends them to every armed unit down the line as well.</div>
+  <div class="mini">Preview lights the port at that level while you adjust, never over live DMX. 255 = full. All ports copies these trims to every port here; Universe sends them to every armed unit down the line as well.</div>
 </div></div>
 
 <!-- PWM library: the three custom entries (carrier + curve), controller-wide. -->
@@ -1391,7 +1391,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02i.iconsonly";
+const APP_VER="2026-10-02j.wbuniverse";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -5113,7 +5113,7 @@ $("wbAll").onclick=async()=>{
 $("wbChain").onclick=async()=>{
   const p=wbPort; if(!p) return;
   if(!await askConfirm(`This unit's ports and every armed unit down the DMX line take Port ${p}'s white balance (${wbTrio()}). Arm each downstream unit first: Setup → Universe → Listen.`,
-        {title:"White balance across the chain?",ok:"Send"})) return;
+        {title:"White balance across the universe?",ok:"Send"})) return;
   send(`CHWB=${wbVals.R},${wbVals.G},${wbVals.B}`);
   wbStampAll();
   setTimeout(()=>send("GET"),800);
