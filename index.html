@@ -1549,7 +1549,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-03b.default";
+const APP_VER="2026-10-03c.marks";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -3320,10 +3320,40 @@ function renderProductMark(){
 // Connect screen: the range, Zone · 4our · 8ight, under the splash. Each mark's
 // id-bearing mask (eight) is renamed so it cannot collide with the header copy.
 // Bars are WHITE here (currentColor); they fill purple during the connect intro.
-{ const cm = $("connectMarks");
+function buildConnectMarks(){
+  const cm = $("connectMarks");
   if(cm) cm.innerHTML = [1,4,8].map(n => `<span data-n="${n}">`
       + PROD_MARKS[n].replace(/desc-am-eight/g,"desc-cm-eight").replace(/fill="#8b34f7"/g,'fill="currentColor"')
-      + `</span>`).join(""); }
+      + `</span>`).join("");
+}
+buildConnectMarks();
+// Self-check (2026-10-03: on the phone the row went missing after an in-app
+// update and came back on a restart; never seen on the desktop). A beat after
+// load and on every pageshow, while the connect card is up: an empty row is
+// rebuilt, and an empty or flat row is written to the error log with the
+// layout facts, so Diagnostics / the Support report say what the phone saw.
+function marksCheck(tag){
+  try{
+    const cm=$("connectMarks"), hello=$("hello");
+    if(!cm || !hello || hello.classList.contains("hidden")) return;
+    const wasEmpty=!cm.children.length;
+    if(wasEmpty) buildConnectMarks();
+    const r=cm.getBoundingClientRect(), cs=getComputedStyle(cm);
+    if(wasEmpty || !cm.children.length || r.height<1){
+      const probe=document.createElement("div");
+      probe.style.cssText="position:fixed;left:-9999px;padding-bottom:env(safe-area-inset-bottom)";
+      document.body.appendChild(probe); const inset=getComputedStyle(probe).paddingBottom; probe.remove();
+      const nav=(performance.getEntriesByType("navigation")[0]||{}).type||"?";
+      diagPush("err",`marks ${tag}: wasEmpty=${wasEmpty} kids=${cm.children.length} h=${Math.round(r.height)} top=${Math.round(r.top)} `
+        +`disp=${cs.display} vis=${cs.visibility} op=${cs.opacity} inner=${innerHeight} `
+        +`vv=${window.visualViewport?Math.round(visualViewport.height):"-"} body=${Math.round(document.body.getBoundingClientRect().height)} `
+        +`main=${Math.round(document.querySelector("main").getBoundingClientRect().height)} `
+        +`splash=${Math.round($("connectSplash").getBoundingClientRect().height)} inset=${inset} nav=${nav} ver=${APP_VER}`);
+    }
+  }catch(e){ diagPush("err","marks check: "+e); }
+}
+addEventListener("load",()=>setTimeout(()=>marksCheck("load"),1500));
+addEventListener("pageshow",()=>setTimeout(()=>marksCheck("pageshow"),300));
 
 // CONNECT INTRO (2026-09-13). When a real controller connects, the connect
 // screen fades away while that unit's wordmark lifts off the row under the
@@ -5917,7 +5947,7 @@ const demoP=[{a:1,pe:0,r:100,g:85,b:60,x:0,s:128},{a:4,pe:0,r:100,g:100,b:100,x:
              {a:7,pe:2,r:100,g:100,b:0,x:15,s:128},{a:10,pe:4,r:100,g:100,b:100,x:9,s:128},
              {a:20,pe:0,r:100,g:100,b:100,x:2,s:128},{a:23,pe:0,r:100,g:0,b:60,x:0,s:128},
              {a:26,pe:0,r:100,g:100,b:100,x:14,s:128},{a:29,pe:4,r:100,g:100,b:100,x:4,s:128}];
-const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1,bpm:128,btn:'44656D6F20526967',txa:0,
+const demoF={capon:0,capt0:0,flkon:0,net:1,nun:1,bpm:128,spr:30,btn:'44656D6F20526967',txa:0,   // spr: a set spread holds for the session (user, 2026-10-03)
              var:4, varm:0, cl:0, clk:1, cf:1, tf:1,    // cl 0 = product max (0.1 A units); limit LOCKED by default (user, 2026-10-01)
              pwc:[{hz:12300},null,null],                 // PWM library: Custom 1 set, 2 and 3 empty
              cpd:[null,null,null,null]};                 // custom personalities: none set until the builder saves one
@@ -5953,7 +5983,7 @@ function demoState(){
     "NCH=5;CHP=1;CHS=1;FR=1;"+                  // the demo is a five-channel unit with the universe batons and a factory reset: no firmware greying
     "PWLIM=2000,25000;"+PWC+demoF.cpd.map((c,k)=>`CPD${k+1}=${c||"0"};`).join("")+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)).join("")+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
-    `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+demoTxState()+
+    `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=${demoF.spr};`+demoTxState()+
     "LPX=9;LPS=5;LPN=0;LPA=31;LPG=22;RR=1;BSY=0;BRT=3;"+
     "CN="+(demoF.cn!=null?demoF.cn:Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join(""))+";"+
     demoP.slice(0,demoF.var).map((d,i)=>P(i+1,d)).join(""));
@@ -6074,6 +6104,7 @@ function demoCmd(s){
   if(s.startsWith("BTNAME=")){ demoF.btn=s.slice(7); demoState(); return; }
   if(m=s.match(/^CNAME=(.*)$/)){ demoF.cn=(m[1]==="0"||!m[1])?"":m[1]; demoState(); return; }   // the demo keeps a typed name
   if(m=s.match(/^BPM=(\d+)/)){ demoF.bpm=+m[1]; demoState(); return; }
+  if(m=s.match(/^SPREAD=(\d+)/)){ demoF.spr=+m[1]; demoState(); return; }   // was never echoed: the next state line put the slider back (2026-10-03)
   if(m=s.match(/^SHUNT=(\d+)/)){ demoF.sh=+m[1]; demoState(); return; }
   if(m=s.match(/^PSUDA=(\d+)/)){ if(!demoF.clk) demoF.cl=+m[1]; demoState(); return; }
   if(m=s.match(/^CLOCK=(\d)/)){ demoF.clk=+m[1]; demoState(); return; }
