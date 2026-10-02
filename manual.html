@@ -83,7 +83,9 @@ never masquerade as a live source.</p>
 <h3>Port Settings (per port, or All Ports)</h3>
 <p>DMX Address and Head Number open the digit editor (turn = digit, click =
 next, SAVE commits; hold cancels; the footprint hint shows the span).
-Personality cycles RGB / RGB16 / CCT / CCT16 / <strong>FX10</strong> / <strong>Dim1 / Dim16</strong> (see DMX chart).
+Personality cycles the list in the DMX chart's order — Dim 1ch / Dim 2ch / CW/WW 8 / CW/WW 16 /
+RGB 8 / RGB 16 / <strong>RGB FX</strong> / RGBW 8 / RGBW 16 / <strong>RGBW FX</strong> / RGBWA 8 / RGBWA 16 / <strong>RGBWA FX</strong> —
+skipping the RGBW and RGBWA entries on a port whose module has three outputs.
 Effect opens the effect picker. PWM Mode cycles the PWM library: <strong>Smooth 8 kHz /
 Silent 20 kHz / Camera 15.6 kHz</strong>, then any custom entry that has been set in the
 app (shown as <strong>C1 12.3k</strong>; see §8). Current and Temp limits step their trip points
@@ -261,8 +263,9 @@ ports and strobes the main screen <strong>HERE</strong>), device info, start add
 personality — the root device carries the rack view (a SET fans out per the
 Apply mode) and each port is addressable individually as a sub-device.
 E1.37-1 dimmer curve and PWM frequency are settable from the desk, on the root
-for the whole rack and on each port. <strong>White balance</strong> (three parameters per
-port, raw 0–255), its <strong>preview</strong>, and the PWM library's <strong>custom entries</strong> are
+for the whole rack and on each port. <strong>White balance</strong> (one parameter per output,
+raw 0–255: red, green, blue, and white and amber on a five-output module), its
+<strong>preview</strong>, and the PWM library's <strong>custom entries</strong> are
 manufacturer parameters that a console can list and edit; the table is in the DMX
 chart. The
 controller also publishes <strong>per-port temperature and current as E1.20 sensors</strong>
@@ -316,21 +319,25 @@ connection it loads the newest version, then keeps working from its cached copy
 at a venue. There is nothing to install from a store and no updates to chase.</p>
 <h3>Control — the working screen</h3>
 <p>One card per output. Each card holds the port's <strong>DMX address</strong> and <strong>head
-number</strong>, its <strong>personality</strong> (RGB or tuneable white, 8- or 16-bit, the
-10-channel effect mode, or a <strong>single-channel dimmer</strong> — one DMX level over the
-port's set colour, ideal for single-colour and IR strips), an <strong>effect</strong> picker with a <strong>speed</strong> control, and the
-level controls: <strong>R / G / B sliders</strong> — which become <strong>Cool / Warm</strong> on a
-tuneable-white port (ice-blue and amber tracks, the unused Blue row hidden) —
-plus two <strong>encoders</strong> for <strong>Dim</strong> and <strong>FX speed</strong> that are easy to ride
+number</strong>, its <strong>personality</strong> (RGB, RGBW or RGBWA, each 8-bit, 16-bit or with
+the effect channels; tuneable white 8- or 16-bit; or a <strong>single-channel
+dimmer</strong> — one DMX level over the port's set colour, ideal for single-colour and
+IR strips; the RGBW and RGBWA entries need a five-output port module), an
+<strong>effect</strong> picker with a <strong>speed</strong> control, and the level controls: one slider
+per output the personality uses — <strong>R / G / B</strong>, plus <strong>White</strong> and <strong>Amber</strong>
+on the five-channel personalities, or <strong>Cool / Warm</strong> on a tuneable-white port
+(ice-blue and amber tracks) — plus two <strong>encoders</strong> for <strong>Dim</strong> and <strong>FX speed</strong>
+that are easy to ride
 by feel during a take. Under the encoders every port prints its settings in
 three columns, each headed by a button that opens the sheet to change them:
 <strong>Patch</strong> (Mode, Address, Head — the sheet also holds the <strong>Label</strong>, up to
 16 characters, which shows in the card header and on that port's own screen
 when the panel is locked, and an <strong>Apply</strong> row: pick Same / Seq / Offset and
-press the button to patch the ports after this one from its address — Seq
-follows on by each port's footprint, Offset by a fixed stride, heads follow
-+1; the panel's All Ports edit and a desk's RDM base address fan out by the
-same mode), <strong>Output</strong> (Curve, PWM, white balance) and
+press the button to patch the ports after this one from its address; a
+pop-up asks whether their Mode follows too. Seq follows on by each port's
+footprint, Offset by a fixed stride, heads follow +1; the panel's All Ports
+edit and a desk's RDM base address fan out by the same mode), <strong>Output</strong>
+(Curve, PWM, white balance) and
 <strong>Protection</strong> (Limit, Trip, faults). <strong>Clear all</strong> returns
 every port to a clean base — full white, effects off, dimmer down — after a
 confirmation.</p>
@@ -355,8 +362,9 @@ field's range shows which), <strong>Trip</strong>, the temperature it shuts down
 only while the port is latched. A latched port shows its fault in red on the
 card and on the header badge; tapping the badge opens the sheet.</p>
 <p><strong>White balance.</strong> In the Output sheet, under the curve and PWM, is a master for
-each colour of that port: Red, Green and Blue on a colour port, Cool and Warm on
-a tuneable-white port, one Level on a dimmer port. Drag the slider or type the
+each output of that port: Red, Green and Blue on a colour port, with White and
+Amber on a five-output module, Cool and Warm on a tuneable-white port, one Level
+on a dimmer port. Drag the slider or type the
 value; 255 is full. The trim is applied after the dimmer curve, so the balance
 holds from full to the bottom of a fade and does not move if you change the
 curve. The <strong>Preview</strong> slider sets how bright the port shows while you adjust:
@@ -521,7 +529,12 @@ live.</p>
 <p><strong>Effects on tuneable-white ports.</strong> On a CW/WW personality the effect list only
 offers the effects that read on a white strip (Candle, Fire, Lightning, TV Sim,
 Strobe, Pulse, Fluoro, Paparazzi, Explosion); the colour-only effects are hidden
-so you can't pick one that would do nothing.</p>
+so you can't pick one that would do nothing. On a five-output module the
+tuneable-white personality drives the white (cool) and amber (warm) terminals.</p>
+<p><strong>Effects on RGBW and RGBWA ports.</strong> The effects are written in red, green and
+blue; the white output follows the white already in the mix (a white strobe uses
+it, a saturated rainbow leaves it dark) and amber stays dark under an effect.
+Your own white and amber levels come back when the effect is cleared.</p>
 <p><strong>Support.</strong> <em>Setup → App → Support</em> lets you tell us about a problem. Type what
 happened; the app adds a status report (versions, controller status, recent errors
 and commands) and hands it to your own mail app addressed to

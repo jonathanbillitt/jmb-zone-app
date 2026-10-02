@@ -230,6 +230,11 @@
              align-items:flex-start; justify-content:center; z-index:10;
              padding-top:max(24px,6vh); overflow-y:auto; }
   #cfOv { z-index:12; }
+  /* Three answers do not fit one row at phone width without wrapping inside
+     the buttons, so a dialog with a third answer stacks them full width,
+     the primary answer on top, Cancel at the bottom. */
+  #cfOv .ctlrow.stack { flex-direction:column-reverse; align-items:stretch; gap:8px; }
+  #cfOv .ctlrow.stack button { flex:none; width:100%; white-space:nowrap; }
   #btOv { z-index:11; }
   #btOv .box button { width:100%; margin-top:8px; padding:12px; }
   .sig { cursor:pointer; }
@@ -1126,6 +1131,7 @@
   <div class="mini" id="cfMsg" style="white-space:pre-line;text-align:left;margin-top:8px"></div>
   <div class="ctlrow" style="margin-top:16px">
     <button id="cfNo" style="flex:1">Cancel</button>
+    <button id="cfAlt" class="hidden" style="flex:1">—</button>   <!-- a third answer, when askConfirm is given one -->
     <button id="cfYes" class="primary" style="flex:1">OK</button>
   </div>
 </div></div>
@@ -1354,7 +1360,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02a.apply";
+const APP_VER="2026-10-02b.modeask";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1718,14 +1724,18 @@ function askConfirm(msg,opt){
   return new Promise(res=>{
     $("cfTitle").textContent=o.title||"Are you sure?";
     $("cfMsg").textContent=msg;
-    const y=$("cfYes"), n=$("cfNo");
+    const y=$("cfYes"), n=$("cfNo"), a=$("cfAlt");
     y.textContent=o.ok||"OK"; y.className=o.danger?"danger":"primary";
     n.classList.remove("hidden");
+    // Optional third answer (o.alt = its label) between Cancel and OK; the
+    // promise then resolves "alt" for it, true for OK, false for Cancel.
+    if(o.alt){ a.textContent=o.alt; a.classList.remove("hidden"); } else a.classList.add("hidden");
+    a.parentNode.classList.toggle("stack",!!o.alt);
     $("cfOv").classList.remove("hidden");
-    const done=v=>{ $("cfOv").classList.add("hidden");
-                    y.onclick=n.onclick=null; cfCancel=null; res(v); };
+    const done=v=>{ $("cfOv").classList.add("hidden"); a.classList.add("hidden"); a.parentNode.classList.remove("stack");
+                    y.onclick=n.onclick=a.onclick=null; cfCancel=null; res(v); };
     cfCancel=()=>done(false);
-    y.onclick=()=>done(true); n.onclick=()=>done(false);
+    y.onclick=()=>done(true); n.onclick=()=>done(false); a.onclick=()=>done("alt");
   });
 }
 function dismissConfirm(){ if(cfCancel) cfCancel(); }
@@ -2183,7 +2193,7 @@ function buildCard(p){
           <button id="cpe${p}" style="padding:6px 10px">Custom…</button>
         </div>
         <div class="mini">Address, head and mode are the desk patch. The label names the port across the app.</div>
-        <div class="mini">Apply patches the later ports from this address: Seq follows on by footprint, Offset by a fixed stride. Heads follow +1.</div>
+        <div class="mini">Apply patches the later ports from this address, Seq by footprint, Offset by stride, and asks if the Mode follows.</div>
       </div>
       <div class="psheet rows" id="psOut${p}" data-title="Port ${p} · Output">
         <div class="row"><label>Curve</label>
@@ -5119,13 +5129,26 @@ async function fanOut(p){
   const n=ports.length, mode=+(kv.AM||0);
   if(!ports[p-1] || p>=n) return;
   let cur=ports[p-1], a=+(cur.A||1), h=+(cur.H||0);
+  // Mode too? (user, 2026-10-02): the pop-up asks whether the later ports
+  // also take this port's Mode. With it, each port is set to the Mode first,
+  // so Seq follows on by that footprint and the address clamp is right.
+  const pe0=cur.PE||0, cp0=pe0>=13?cpdOf(pe0-12):null;
+  const modeName=cp0?cp0.name:(PERS_NAMES[pe0]||"this Mode");
+  const list=p+1===n?`port ${n}`:`ports ${p+1}–${n}`;
+  const ans=await askConfirm(`Address and head from port ${p}, ${AMODES[mode]||"Same"}. Set their Mode to ${modeName} as well?`,
+                             {title:`Patch ${list}`, ok:"Mode too", alt:"Address only"});
+  if(ans===false) return;
+  const withMode=ans===true;
   const stride=fanStride(), done=[];
   for(let i=p+1;i<=n;i++){
-    const m=ports[i-1], pe=m.PE||0;
+    const m=ports[i-1], pe=withMode?pe0:(m.PE||0);
+    if(withMode && (m.PE||0)!==pe0) await send(`P${i}.PERS=${pe0}`);
     if(mode===1){ const ch=portChans(cur); if(ch.length) a=ch[ch.length-1]+1; }
     else if(mode===2) a+=stride;
     if(mode!==0) h=(h+1)%10000;
-    if(pe>=13 && cpdOf(pe-12)){ cur=m; continue; }
+    if(pe>=13 && cpdOf(pe-12)){                 // on a preset: its own channels, Address unused
+      if(withMode){ await send(`P${i}.HEAD=${h}`); done.push("p"); }
+      cur={PE:pe,A:+(m.A||1)}; continue; }
     const aa=Math.max(1,Math.min(maxAddr(pe),a));
     await send(`P${i}.ADDR=${aa}`); await send(`P${i}.HEAD=${h}`);
     cur={PE:pe,A:aa}; a=aa; done.push(aa);

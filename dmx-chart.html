@@ -38,8 +38,13 @@ blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #b7ade6; 
 </style></head><body>
 <div id="jmbsearch"><input type="search" placeholder="Search this manual — e.g. port bus" aria-label="Search this manual"><div class="jr"></div></div>
 <h1>JMB Lighting — DMX Personality Chart</h1>
-<p>JMB one / 4our / 8ight · Firmware 2.x · 2026-08-20</p>
+<p>JMB Zone / 4our / 8ight · Firmware 2.x · 2026-10-02 (five-channel set added)</p>
 <h2>Personalities (per port)</h2>
+<p>The number is the one the panel, the app and an RDM console all show. The
+RGBW and RGBWA personalities need a <strong>five-output port module</strong> (the .3
+boards: outputs red, green, blue, white, amber on XLR pins 2–6, the white
+and amber terminals printed CW / WW); on a three-output module they are
+greyed out and cannot be selected.</p>
 <table>
 <thead>
 <tr>
@@ -52,15 +57,15 @@ blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #b7ade6; 
 <tbody>
 <tr>
 <td>1</td>
-<td>RGB 8-bit</td>
-<td>3</td>
-<td>R, G, B</td>
+<td>Dim 1ch</td>
+<td>1</td>
+<td>Level</td>
 </tr>
 <tr>
 <td>2</td>
-<td>RGB 16-bit</td>
-<td>6</td>
-<td>R, Rf, G, Gf, B, Bf</td>
+<td>Dim 2ch (16-bit)</td>
+<td>2</td>
+<td>Level coarse, fine</td>
 </tr>
 <tr>
 <td>3</td>
@@ -76,37 +81,77 @@ blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #b7ade6; 
 </tr>
 <tr>
 <td>5</td>
-<td><strong>FX 10ch</strong></td>
+<td>RGB 8-bit</td>
+<td>3</td>
+<td>R, G, B</td>
+</tr>
+<tr>
+<td>6</td>
+<td>RGB 16-bit</td>
+<td>6</td>
+<td>R, Rf, G, Gf, B, Bf</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>RGB FX</strong></td>
 <td>10</td>
 <td>see below</td>
 </tr>
 <tr>
-<td>6</td>
-<td>Dim 1ch</td>
-<td>1</td>
-<td>Level</td>
+<td>8</td>
+<td>RGBW 8-bit</td>
+<td>4</td>
+<td>R, G, B, W</td>
 </tr>
 <tr>
-<td>7</td>
-<td>Dim 2ch (16-bit)</td>
-<td>2</td>
-<td>Level coarse, fine</td>
+<td>9</td>
+<td>RGBW 16-bit</td>
+<td>8</td>
+<td>R, Rf, G, Gf, B, Bf, W, Wf</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>RGBW FX</strong></td>
+<td>12</td>
+<td>see below</td>
+</tr>
+<tr>
+<td>11</td>
+<td>RGBWA 8-bit</td>
+<td>5</td>
+<td>R, G, B, W, A</td>
+</tr>
+<tr>
+<td>12</td>
+<td>RGBWA 16-bit</td>
+<td>10</td>
+<td>R, Rf, G, Gf, B, Bf, W, Wf, A, Af</td>
+</tr>
+<tr>
+<td>13</td>
+<td><strong>RGBWA FX</strong></td>
+<td>14</td>
+<td>see below</td>
 </tr>
 </tbody>
 </table>
+<p><strong>CW/WW on a five-output module</strong> drives the white (cool) and amber (warm)
+terminals and leaves red, green and blue dark; on a three-output module cool
+rides the green terminal and warm the red one, as it always has.</p>
 <p><strong>Dim personalities</strong> patch a port like a classic dimmer channel: the one
 DMX level scales the port's <em>set colour</em> (chosen in the app). With no colour
-set it acts as white — all three outputs carry the level — so a
-single-colour or <strong>IR strip</strong> lights straight from its one patched channel,
-whichever output terminal it's wired to.</p>
+set it acts as white — every output carries the level — so a single-colour
+or <strong>IR strip</strong> lights straight from its one patched channel, whichever
+output terminal it's wired to.</p>
 <p>Each port's whole footprint must fit inside the universe, so the start
-address caps at <strong>513 − footprint</strong>: RGB 8-bit → 510, RGB 16-bit → 507,
-CW/WW 8-bit → 511, CW/WW 16-bit → 509, <strong>FX 10ch → 503</strong>, Dim 1ch → 512,
-Dim 2ch → 511. Changing a port to
-a larger personality re-clamps its start down if it would overhang. Offset
-apply mode spaces ports by the widest footprint (10ch → 40ch across a
-4-port, 80ch across an 8-port).</p>
-<h2>FX 10ch personality</h2>
+address caps at <strong>513 − footprint</strong>: Dim 1ch → 512, Dim 2ch → 511, CW/WW
+8-bit → 511, CW/WW 16-bit → 509, RGB 8-bit → 510, RGB 16-bit → 507, RGB FX →
+503, RGBW 8-bit → 509, RGBW 16-bit → 505, RGBW FX → 501, RGBWA 8-bit → 508,
+RGBWA 16-bit → 503, <strong>RGBWA FX → 499</strong>. Changing a port to a larger
+personality re-clamps its start down if it would overhang. Offset apply mode
+spaces ports by the widest footprint (14ch → 56ch across a 4-port, 112ch
+across an 8-port).</p>
+<h2>FX personalities (RGB FX 10ch, RGBW FX 12ch, RGBWA FX 14ch)</h2>
 <table>
 <thead>
 <tr>
@@ -137,24 +182,36 @@ apply mode spaces ports by the widest footprint (10ch → 40ch across a
 <td>16-bit</td>
 </tr>
 <tr>
-<td>8</td>
-<td>Effect select</td>
-<td>ranges below</td>
+<td>8–9</td>
+<td>White coarse + fine</td>
+<td>16-bit — RGBW FX and RGBWA FX only</td>
 </tr>
 <tr>
-<td>9</td>
+<td>10–11</td>
+<td>Amber coarse + fine</td>
+<td>16-bit — RGBWA FX only</td>
+</tr>
+<tr>
+<td>next</td>
+<td>Effect select</td>
+<td>ranges below (CH8 on RGB FX, CH10 on RGBW FX, CH12 on RGBWA FX)</td>
+</tr>
+<tr>
+<td>next</td>
 <td>Effect speed</td>
 <td>128 = designed tempo; exponential — 0 ≈ ⅛×, 255 = 8×</td>
 </tr>
 <tr>
-<td>10</td>
+<td>last</td>
 <td>Strobe</td>
 <td>0 = open · 1–128 fixed rate ~0.8→14 Hz · 129–255 random, mean 1 s→60 ms</td>
 </tr>
 </tbody>
 </table>
-<p>When CH8 selects an effect it replaces the RGB channels as the colour
-source; the strobe shutter chops whatever is playing; the dimmer scales last.</p>
+<p>When the effect channel selects an effect it replaces the colour channels as
+the colour source (white then follows the white in the effect's mix and
+amber stays dark); the strobe shutter chops whatever is playing; the dimmer
+scales last.</p>
 <div class="page-break"></div>
 
 <h2>Effect ranges (CH8)</h2>
@@ -280,16 +337,16 @@ to every port.</p>
 </thead>
 <tbody>
 <tr>
-<td>White balance red / warm</td>
+<td>White balance red</td>
 <td>0x8010</td>
 <td>root, ports</td>
-<td>0–255, 255 = full</td>
+<td>0–255, 255 = full (also warm on a three-output module)</td>
 </tr>
 <tr>
-<td>White balance green / cool</td>
+<td>White balance green</td>
 <td>0x8011</td>
 <td>root, ports</td>
-<td>0–255</td>
+<td>0–255 (also cool on a three-output module)</td>
 </tr>
 <tr>
 <td>White balance blue</td>
@@ -302,6 +359,18 @@ to every port.</p>
 <td>0x8013</td>
 <td>root, ports</td>
 <td>0 / 1 — acts only with no DMX present; off after 5 min</td>
+</tr>
+<tr>
+<td>White balance white</td>
+<td>0x8014</td>
+<td>root, ports</td>
+<td>0–255 — output 4 of a five-output module (cool on CW/WW)</td>
+</tr>
+<tr>
+<td>White balance amber</td>
+<td>0x8015</td>
+<td>root, ports</td>
+<td>0–255 — output 5 (warm on CW/WW)</td>
 </tr>
 <tr>
 <td>Custom 1 / 2 / 3 carrier</td>
