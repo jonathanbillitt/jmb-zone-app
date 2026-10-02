@@ -491,9 +491,28 @@
   #scnBar { position:fixed; left:0; right:0; bottom:calc(58px + env(safe-area-inset-bottom));
             z-index:6; background:var(--card); border-top:1px solid var(--line);
             padding:8px 16px; margin:0; }
-  #tab-scenes { padding-bottom:56px; }        /* the last row clears the bar */
-  .scntrans { display:flex; gap:10px; flex-wrap:nowrap; }
-  .scntrans button { flex:1 1 0; min-width:0; white-space:nowrap; text-align:center; }
+  #tab-scenes { padding-bottom:64px; }        /* the last row clears the bar */
+  .scntrans { display:flex; gap:10px; flex-wrap:nowrap; align-items:stretch; }
+  .scntrans button { flex:1 1 0; min-width:0; white-space:nowrap; text-align:center;
+                     padding-left:0; padding-right:0; }   /* equal side padding, so flex-grow alone sets the widths */
+  .scntrans .conkey { flex:1.35 1 0; }
+  /* Cue mode: Wait is not in play, so it greys — still editable (user, 2026-10-03). */
+  #tab-scenes.cuemode .scwait, #tab-scenes.cuemode #scnHead span:nth-child(3) { opacity:.4; }
+  /* Go and Stop as console keys (user, 2026-10-03: "look more like real
+     console buttons"): a filled cap with a lit top edge, a dark bottom edge
+     it sinks onto when pressed, bold capitals; Go lights up while Follow runs. */
+  .conkey { flex:1.35 1 0; border-radius:11px; font-size:15px; font-weight:800; letter-spacing:.08em;
+            text-transform:uppercase; padding:12px 0; border:1px solid rgba(0,0,0,.55);
+            text-shadow:0 1px 0 rgba(255,255,255,.18);
+            box-shadow:0 4px 0 var(--edge), 0 6px 12px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.35);
+            transform:translateY(-2px); transition:transform .06s, box-shadow .06s, filter .2s; }
+  .conkey:active:not(:disabled) { transform:translateY(2px);
+            box-shadow:0 0 0 var(--edge), 0 2px 6px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.2); }
+  #scnGo { --edge:#0e5a2b; background:linear-gradient(180deg,#4fe389 0%,#2db25c 55%,#219a4d 100%); color:#06240f; }
+  #scnGo.glow { box-shadow:0 4px 0 var(--edge), 0 0 20px rgba(63,217,119,.75), inset 0 1px 0 rgba(255,255,255,.45);
+                filter:brightness(1.12); }
+  #scnStop { --edge:#6e1612; background:linear-gradient(180deg,#ff6b63 0%,#d9342c 55%,#b8261f 100%); color:#2b0604; }
+  #scnStop:disabled { opacity:.5; filter:saturate(.35); }
   .scntrans button.sel { background:#123a5e; border-color:var(--acc); color:var(--acc); }
   .scntrans button.glow { border-color:var(--acc); color:var(--acc);
                           box-shadow:0 0 10px rgba(77,163,255,.45), inset 0 0 8px rgba(77,163,255,.18); }
@@ -1238,8 +1257,8 @@
      then the next goes, looping; Stop halts the run. Fixed above the nav on
      the Scenes tab only (selectTab shows it). -->
 <div id="scnBar" class="scntrans hidden">
-  <button id="scnGo" class="primary">Go</button>
-  <button id="scnStop" class="danger" disabled>Stop</button>
+  <button id="scnGo" class="conkey">Go</button>
+  <button id="scnStop" class="conkey" disabled>Stop</button>
   <button id="scnFollow">Follow</button>
   <button id="scnCue" class="sel">Cue</button>
 </div>
@@ -1521,7 +1540,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02ah.bar";
+const APP_VER="2026-10-03a.keys";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2795,6 +2814,7 @@ function scnPaint(){
   $("scnCue").classList.toggle("sel",scnMode==="cue");
   $("scnGo").classList.toggle("glow",!!scnTimer);
   $("scnStop").disabled=!scnTimer;
+  $("tab-scenes").classList.toggle("cuemode",scnMode==="cue");   // Wait greys in Cue, stays editable
 }
 function scnStop(){ clearTimeout(scnTimer); scnTimer=null; scnPaint(); }
 function scnGo(){
@@ -2814,6 +2834,7 @@ $("scnGo").onclick=scnGo;
 $("scnStop").onclick=scnStop;
 $("scnFollow").onclick=()=>{ scnMode="follow"; scnPaint(); };
 $("scnCue").onclick=()=>{ scnMode="cue"; scnStop(); };
+scnPaint();
 let fadeTimer=null, recallGen=0;
 async function recallScene(sc){
   const myGen=++recallGen;             // supersede any in-flight recall
