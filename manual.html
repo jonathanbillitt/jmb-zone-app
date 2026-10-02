@@ -332,13 +332,16 @@ by feel during a take. Under the encoders every port prints its settings in
 three columns, each headed by a button that opens the sheet to change them:
 <strong>Patch</strong> (Mode, Address, Head — the sheet also holds the <strong>Label</strong>, up to
 16 characters, which shows in the card header and on that port's own screen
-when the panel is locked, and an <strong>Apply</strong> row: pick Same / Seq / Offset and
-press the button to patch the ports after this one from its address; a
-pop-up asks <strong>DMX only</strong> or <strong>DMX + Mode</strong>, then the sheet closes and a
-message confirms what was set. Seq follows on by each port's footprint,
-Offset by a fixed stride, heads follow +1; the panel's All Ports edit and a
-desk's RDM base address fan out by the same mode), <strong>Output</strong> (Curve, PWM,
-white balance) and
+when the panel is locked. Port 1's sheet also has the <strong>Apply</strong> row: pick
+Same / Seq / Offset, then <strong>Ports 2–4</strong> (2–8 on an 8ight) patches the other
+ports from port 1's address, or <strong>Chain</strong> does the same and sends the patch
+on down the DMX line to every unit armed to Listen, each following on from
+the last. A pop-up asks <strong>DMX only</strong> or <strong>DMX + Mode</strong> first, then the sheet
+closes and a message confirms what was set. Seq follows on by each port's
+footprint, Offset by a fixed stride, heads follow +1; the panel's All Ports
+edit and a desk's RDM base address fan out by the same mode. Chain needs a
+firmware that carries the patch baton and is greyed until then), <strong>Output</strong>
+(Curve, PWM, white balance) and
 <strong>Protection</strong> (Limit, Trip, faults). <strong>Clear all</strong> returns
 every port to a clean base — full white, effects off, dimmer down — after a
 confirmation.</p>
