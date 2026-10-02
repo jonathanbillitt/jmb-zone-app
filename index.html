@@ -1411,7 +1411,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02z.model";
+const APP_VER="2026-10-02aa.undostat";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -4312,14 +4312,18 @@ $("btnPrep").onclick=async()=>{
   send("ALL.RGB=100,100,100");
   send("ALL.FXS=128");
 };
-async function applyQueue(q,label){
+// statusEl: where the progress and "done" line goes. Only Import passes one
+// (its own line under Export / Import); Undo and the white balance report by
+// toast where the user is (user, 2026-10-02: "Undo done" was left sitting in
+// Setup under Export / Import).
+async function applyQueue(q,label,statusEl){
   clearInterval(fadeTimer);               // a running scene fade would fight
   for(let i=0;i<q.length;i++){
     await send(q[i]); await sleep(60);
-    $("impStatus").textContent=`${label}… ${i+1}/${q.length}`;
+    if(statusEl) statusEl.textContent=`${label}… ${i+1}/${q.length}`;
   }
   await send("GET");
-  $("impStatus").textContent=label+" done ✓";
+  if(statusEl) statusEl.textContent=label+" done ✓";
 }
 function snapshotPorts(){
   return ports.map(m=>({a:m.A??1,h:m.H??0,pe:m.PE??0,m:m.M??0,
@@ -4433,7 +4437,7 @@ $("impFile").addEventListener("change",async ev=>{
     lib.push(`CPD${k+1}=${s}`); });
   const q=["CID="+(data.cid||0),"CNAME="+(nm?hexEnc(nm):"0"),
            "AMODE="+(data.amode||0)].concat(lib,portQueue(data.ports));
-  await applyQueue(q,"Applying");
+  await applyQueue(q,"Applying",$("impStatus"));
   if(nsc){ saveScenes(data.scenes.slice(0,100)); renderScenes(); }
 });
 
@@ -5136,7 +5140,7 @@ function wbStampAll(){
 }
 $("wbAll").onclick=async()=>{
   const p=wbPort; if(!p) return;
-  if(ports.length<2){ $("impStatus").textContent="Only one port here."; return; }
+  if(ports.length<2){ toast("Only one port here"); return; }
   if(!await askConfirm(`Every port on this controller takes Port ${p}'s white balance (${wbTrio()}).`,
         {title:"White balance to all ports?",ok:"Send"})) return;
   const q=[];
@@ -5144,6 +5148,7 @@ $("wbAll").onclick=async()=>{
     q.push(`P${k}.WBR=${wbVals.R}`,`P${k}.WBG=${wbVals.G}`,`P${k}.WBB=${wbVals.B}`); });
   wbStampAll();
   await applyQueue(q,"White balance");
+  toast("White balance sent to all ports");
 };
 $("wbChain").onclick=async()=>{
   const p=wbPort; if(!p) return;
