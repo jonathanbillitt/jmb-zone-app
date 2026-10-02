@@ -1369,7 +1369,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02d.chain";
+const APP_VER="2026-10-02e.universe";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1756,7 +1756,10 @@ function askConfirm(msg,opt){
     n.classList.remove("hidden");
     // Optional third answer (o.alt = its label) between Cancel and OK; the
     // promise then resolves "alt" for it, true for OK, false for Cancel.
-    if(o.alt){ a.textContent=o.alt; a.classList.remove("hidden"); } else a.classList.add("hidden");
+    // With three answers both choices read blue and Cancel reads red (user,
+    // 2026-10-02); the two-button dialogs keep their plain Cancel.
+    if(o.alt){ a.textContent=o.alt; a.className="primary"; } else a.classList.add("hidden");
+    n.className=o.alt?"danger":"";
     a.parentNode.classList.toggle("stack",!!o.alt);
     $("cfOv").classList.remove("hidden");
     const done=v=>{ $("cfOv").classList.add("hidden"); a.classList.add("hidden"); a.parentNode.classList.remove("stack");
@@ -2221,7 +2224,7 @@ function buildCard(p){
              baton in firmware (state CHP=1); greyed until the unit reports it. -->
         <div class="row" id="fanBtns${p}">
           <button id="fan${p}" style="flex:1;padding:6px 10px;white-space:nowrap">Ports</button>
-          <button id="fanC${p}" style="flex:1;padding:6px 10px;white-space:nowrap">Chain</button>
+          <button id="fanC${p}" style="flex:1;padding:6px 10px;white-space:nowrap">Universe</button>
         </div>
         <div class="row"><label>Mode</label>
           <select id="pers${p}" style="flex:1;min-width:0">${PERS_ORDER.map(i=>`<option value="${i}">${persOptionText(i)}</option>`).join("")}</select>
@@ -2229,7 +2232,7 @@ function buildCard(p){
         </div>
         <div class="mini">Address, head and mode are the desk patch. The label names the port across the app.</div>
         <div class="mini">Apply patches the later ports from this address, Seq by footprint, Offset by stride, and asks if the Mode follows.</div>
-        <div class="mini">Chain carries the patch on to every unit armed to Listen, each following on from the last.</div>
+        <div class="mini">Universe carries the patch on to every unit armed to Listen, each following on from the last.</div>
       </div>
       <div class="psheet rows" id="psOut${p}" data-title="Port ${p} · Output">
         <div class="row"><label>Curve</label>
@@ -5178,7 +5181,7 @@ async function fanOut(p,chain){
   const modeName=cp0?cp0.name:(PERS_NAMES[pe0]||"this Mode");
   const list=p+1===n?`port ${n}`:`ports ${p+1}–${n}`;
   const ans=await askConfirm(`DMX address and head from port ${p}, ${AMODES[mode]||"Same"}.`+(chain?" Armed units down the line follow on.":"")+` Set their Mode to ${modeName} as well?`,
-                             {title:chain?`Patch ${list} and the chain`:`Patch ${list}`, ok:"DMX + Mode", alt:"DMX only"});
+                             {title:chain?`Patch ${list} and the universe`:`Patch ${list}`, ok:"DMX + Mode", alt:"DMX only"});
   if(ans===false) return;
   const withMode=ans===true;
   const stride=fanStride(), done=[];
@@ -5204,7 +5207,7 @@ async function fanOut(p,chain){
     if(mode!==0) nh=(h+1)%10000;
     na=Math.max(1,Math.min(512,na));
     await send(`CHPATCH=${na},${nh},${mode},${withMode?pe0:-1}`);
-    chainNote=` · chain from ${na}`;
+    chainNote=` · universe from ${na}`;
   }
   // Applied: the sheet closes and a message says what was set (user,
   // 2026-10-02); the cards underneath show the new values.
