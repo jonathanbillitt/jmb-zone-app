@@ -828,10 +828,13 @@
     <!-- Controller identity first (moved above Test sequences 2026-09-11). -->
     <div class="card">
       <div class="rows">
+        <!-- One name (user, 2026-10-02): it is the controller's name on the
+             screens and in RDM, and the Bluetooth name from the next restart. -->
         <div class="row"><label>Name</label>
           <input type="text" id="setName" maxlength="16" placeholder="name this controller"
                  style="flex:1" autocomplete="off">
         </div>
+        <div class="mini">The name shows on the screens and in RDM, and is the Bluetooth name from the next restart.</div>
         <div class="row"><label>ID</label>
           <input type="number" id="setCid" min="0" max="9999">
           <button id="btnCidApply">Apply</button>
@@ -1050,13 +1053,6 @@
       detection only ever counts <em>up</em> — a unit that boots believing it is
       bigger than it is (or a screenless <b>JMB Zone</b>, which has no panel to
       set it from) needs pinning here once. The controller restarts.</div>
-      <div class="row"><label>BT name</label>
-        <input type="text" id="setBtName" maxlength="24" style="flex:1"
-               placeholder="JMB Zone" autocomplete="off">
-        <button id="btNameApply">Set</button>
-      </div>
-      <div class="mini">The Bluetooth name is what you see when connecting.
-        It changes at the controller's next restart.</div>
       <div class="devonly" style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">
         <div class="row"><label>Shunt</label>
           <select id="setShunt" style="width:160px">
@@ -1389,7 +1385,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02l.setup";
+const APP_VER="2026-10-02m.name";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -3941,8 +3937,6 @@ function renderSetup(){
     if(document.activeElement!==$("setVariant"))
       $("setVariant").value = (kv.VARM==="1" && n) ? String(n) : "";
   }
-  if(document.activeElement!==$("setBtName"))
-    $("setBtName").value=hexDec(kv.BTN)||"";
 }
 $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.value); };
 $("setCfold").onchange=e=>{ setupTouched=Date.now(); send("CFOLD="+ +e.target.value); };
@@ -4215,14 +4209,6 @@ $("crmxUnlink").onclick=async()=>{ if(await askConfirm("The controller forgets i
   send("CRMXUNLINK"); };
 $("crmxAnt").onchange=e=>{ setupTouched=Date.now(); send("CRMXANT="+ +e.target.value); };
 $("netEn").onchange=e=>{ setupTouched=Date.now(); send("NET="+ +e.target.value); };
-$("btNameApply").onclick=()=>{
-  const t=$("setBtName").value.trim();
-  setupTouched=Date.now();
-  send("BTNAME="+hexEnc(t));
-  tellUser(t ? `Set to "${t}" — takes effect when the controller next restarts.`
-             : "Reset to the default — takes effect when the controller next restarts.",
-           {title:"Bluetooth name"});
-};
 $("btnUniApply").onclick=()=>{ setupTouched=Date.now();
   send("WUNI="+Math.max(1,Math.min(63999,+$("netUni").value||1))); };
 $("btnWifiApply").onclick=()=>{ setupTouched=Date.now();
@@ -4237,6 +4223,9 @@ $("setName").addEventListener("change",e=>{
   setupTouched=Date.now();
   const v=e.target.value.replace(/[^\x20-\x7E]/g,"").trim().slice(0,16);
   e.target.value=v; send("CNAME="+(v?hexEnc(v):"0"));
+  // The same name is the Bluetooth name (user, 2026-10-02): empty clears it
+  // back to the variant default at the next restart.
+  send("BTNAME="+hexEnc(v));
 });
 // Editing ANY setup field opens the hot window IMMEDIATELY (focus/typing),
 // not just on Apply: tapping Apply blurs the input first, and a state echo
@@ -5635,7 +5624,7 @@ function demoState(){
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
     `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=30;`+demoTxState()+
     "LPX=9;LPS=5;LPN=0;LPA=31;LPG=22;RR=1;BSY=0;BRT=3;"+
-    "CN="+Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join("")+";"+
+    "CN="+(demoF.cn!=null?demoF.cn:Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join(""))+";"+
     demoP.slice(0,demoF.var).map((d,i)=>P(i+1,d)).join(""));
 }
 function demoChunks(pfx,arr){
@@ -5746,6 +5735,7 @@ function demoCmd(s){
   if(m=s.match(/^TESTSEQ=(\d)/)){ demoF.test=+m[1]; demoState(); return; }
   if(m=s.match(/^CHARM=(\d)/)){ demoF.chl=+m[1]; demoState(); return; }
   if(s.startsWith("BTNAME=")){ demoF.btn=s.slice(7); demoState(); return; }
+  if(m=s.match(/^CNAME=(.*)$/)){ demoF.cn=(m[1]==="0"||!m[1])?"":m[1]; demoState(); return; }   // the demo keeps a typed name
   if(m=s.match(/^BPM=(\d+)/)){ demoF.bpm=+m[1]; demoState(); return; }
   if(m=s.match(/^SHUNT=(\d+)/)){ demoF.sh=+m[1]; demoState(); return; }
   if(m=s.match(/^PSUDA=(\d+)/)){ if(!demoF.clk) demoF.cl=+m[1]; demoState(); return; }
