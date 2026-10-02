@@ -484,8 +484,15 @@
   .schead { padding:2px 0 2px 8px; border-bottom:0; color:var(--dim); font-size:11px;
             text-align:center; letter-spacing:.04em; }
   .scene button { padding:8px 0; width:100%; }   /* fills its fixed column so the headings line up */
-  /* Transport along the foot of the card: Go · Stop · Follow · Cue. */
-  .scntrans { margin-top:12px; flex-wrap:nowrap; }
+  /* Transport Go · Stop · Follow · Cue: a bar fixed just above the nav while
+     the Scenes tab shows, so it never moves with the length of the list
+     (user, 2026-10-02). The nav is 58 px tall (57 + its top border) in both
+     helper states. */
+  #scnBar { position:fixed; left:0; right:0; bottom:calc(58px + env(safe-area-inset-bottom));
+            z-index:6; background:var(--card); border-top:1px solid var(--line);
+            padding:8px 16px; margin:0; }
+  #tab-scenes { padding-bottom:56px; }        /* the last row clears the bar */
+  .scntrans { display:flex; gap:10px; flex-wrap:nowrap; }
   .scntrans button { flex:1 1 0; min-width:0; white-space:nowrap; text-align:center; }
   .scntrans button.sel { background:#123a5e; border-color:var(--acc); color:var(--acc); }
   .scntrans button.glow { border-color:var(--acc); color:var(--acc);
@@ -818,15 +825,8 @@
       <!-- Wait / Fade once, above their columns (user, 2026-10-02). -->
       <div class="scene schead hidden" id="scnHead"><span></span><span></span><span>Wait (s)</span><span>Fade (s)</span><span></span></div>
       <div id="sceneList"></div>
-      <!-- Transport (user, 2026-10-02): Go steps to the next scene; Cue = one
-           step per press, Follow = each scene holds for its Wait after its
-           fade, then the next goes, looping; Stop halts the run. -->
-      <div class="ctlrow scntrans">
-        <button id="scnGo" class="primary">Go</button>
-        <button id="scnStop" class="danger" disabled>Stop</button>
-        <button id="scnFollow">Follow</button>
-        <button id="scnCue" class="sel">Cue</button>
-      </div>
+      <!-- The transport (Go / Stop / Follow / Cue) is #scnBar, fixed above the
+           nav while this tab shows. -->
     </div>
   </div>
 
@@ -1233,6 +1233,16 @@
   </div>
 </main>
 
+<!-- Scenes transport (user, 2026-10-02): Go steps to the next scene; Cue = one
+     step per press, Follow = each scene holds for its Wait after its fade,
+     then the next goes, looping; Stop halts the run. Fixed above the nav on
+     the Scenes tab only (selectTab shows it). -->
+<div id="scnBar" class="scntrans hidden">
+  <button id="scnGo" class="primary">Go</button>
+  <button id="scnStop" class="danger" disabled>Stop</button>
+  <button id="scnFollow">Follow</button>
+  <button id="scnCue" class="sel">Cue</button>
+</div>
 <nav id="nav" class="hidden">
   <i id="navPill" aria-hidden="true"></i>
   <!-- Tab icons: monoline SVG in the wordmarks' manner (single stroke weight,
@@ -1511,7 +1521,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02ag.tempo";
+const APP_VER="2026-10-02ah.bar";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1643,6 +1653,7 @@ function selectTab(name){
     el.classList.remove("hidden");
   }
   movePill();
+  { const bar=$("scnBar"); if(bar) bar.classList.toggle("hidden", name!=="scenes"); }
   if(name==="control" && typeof fxPreviewKick==="function") fxPreviewKick();
   if(name==="colour" && typeof fitCols==="function") fitCols();
 }
@@ -1699,6 +1710,7 @@ function showApp(){
 function hideApp(){
   $("chips").classList.add("hidden");
   $("nav").classList.add("hidden");
+  { const bar=$("scnBar"); if(bar) bar.classList.add("hidden"); }
   document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
 }
 
