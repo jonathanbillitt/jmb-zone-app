@@ -334,6 +334,12 @@
   .card.hashelp > .rows:first-child > .row:first-child { padding-right:30px; }
   /* Helper switch off (Setup → App): every hand goes; the notes stay hidden. */
   body.nohelp .ib { display:none !important; }
+  /* …and the tab names go too, the icons growing to fill the same bar height
+     (user, 2026-10-02): 13 + 30 + 1 + 13 = the 57 px the labelled bar stands. */
+  body.nohelp nav button .lbl { display:none; }
+  body.nohelp nav button { padding:13px 3px 13px; }
+  body.nohelp nav button .ico { height:30px; margin:0 auto 1px; }
+  body.nohelp nav button .ico svg { width:30px; height:30px; stroke-width:1.6; }
   /* Pop-up title lines: the hand sits at the right end, in flow rather than
      pinned; in the port sheet's header it sits beside Done. */
   .wbhead > .ib { position:static; margin:0 0 0 auto; align-self:center; }
@@ -1121,7 +1127,7 @@
            word). Helper = the raised-hand icons that hide the notes; on by default. -->
       <div class="ctlrow" style="align-items:center;margin-top:10px;gap:18px">
         <span class="tg"><span class="mini" style="margin:0">Helper</span>
-          <label class="toggle sm" title="Help notes behind the hand"><input type="checkbox" id="helpMode" checked><span></span></label></span>
+          <label class="toggle sm" title="Help notes behind the hand; off also hides the tab names"><input type="checkbox" id="helpMode" checked><span></span></label></span>
         <span class="tg"><span class="mini" style="margin:0">Developer</span>
           <label class="toggle sm" title="Developer mode"><input type="checkbox" id="devMode"><span></span></label></span>
       </div>
@@ -1138,14 +1144,14 @@
        colours apply. Emojis were dropped (user, 2026-10-02: they differ by
        phone and looked cheap). Faders, droplet, clapperboard, gauge,
        stethoscope, cog. -->
-  <button data-tab="control" class="active"><span class="ico"><svg viewBox="0 0 24 24"><path d="M8 4v16M16 4v16M5.5 9.5h5M13.5 14.5h5"/></svg></span>Control</button>
-  <button data-tab="colour"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="5"/><circle cx="8.3" cy="14.8" r="5"/><circle cx="15.7" cy="14.8" r="5"/></svg></span>Colour</button>
-  <button data-tab="scenes"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="10.5" width="18" height="9.5" rx="1.5"/><g transform="rotate(-18 3 10.5)"><rect x="3" y="6.5" width="18" height="4" rx="1"/><path d="M8.5 6.5l-1.5 4M13.5 6.5l-1.5 4M18.5 6.5l-1.5 4"/></g></svg></span>Scenes</button>
+  <button data-tab="control" class="active"><span class="ico"><svg viewBox="0 0 24 24"><path d="M8 4v16M16 4v16M5.5 9.5h5M13.5 14.5h5"/></svg></span><span class="lbl">Control</span></button>
+  <button data-tab="colour"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="5"/><circle cx="8.3" cy="14.8" r="5"/><circle cx="15.7" cy="14.8" r="5"/></svg></span><span class="lbl">Colour</span></button>
+  <button data-tab="scenes"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="10.5" width="18" height="9.5" rx="1.5"/><g transform="rotate(-18 3 10.5)"><rect x="3" y="6.5" width="18" height="4" rx="1"/><path d="M8.5 6.5l-1.5 4M13.5 6.5l-1.5 4M18.5 6.5l-1.5 4"/></g></svg></span><span class="lbl">Scenes</span></button>
   <!-- "Telemetry" (was "Ports" with a plug; user, 2026-10-02): readings only. -->
-  <button data-tab="ports"><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 4v16h16M7.5 15l3.5-4.5 3 3 5-6.5"/></svg></span>Telemetry</button>
+  <button data-tab="ports"><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 4v16h16M7.5 15l3.5-4.5 3 3 5-6.5"/></svg></span><span class="lbl">Telemetry</span></button>
   <!-- Diagnostics: the DMX signal as a square wave, not a medical symbol (user). -->
-  <button data-tab="diag"><span class="ico"><svg viewBox="0 0 24 24"><path d="M3 15h3.5V8H11v8h4.5V8H20v7"/></svg></span>Diagnostics</button>
-  <button data-tab="setup"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><circle cx="12" cy="12" r="6.5"/><path d="M18.5 12H21M16.6 16.6l1.8 1.8M12 18.5V21M7.4 16.6l-1.8 1.8M5.5 12H3M7.4 7.4L5.6 5.6M12 5.5V3M16.6 7.4l1.8-1.8"/></svg></span>Setup</button>
+  <button data-tab="diag"><span class="ico"><svg viewBox="0 0 24 24"><path d="M3 15h3.5V8H11v8h4.5V8H20v7"/></svg></span><span class="lbl">Diagnostics</span></button>
+  <button data-tab="setup"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><circle cx="12" cy="12" r="6.5"/><path d="M18.5 12H21M16.6 16.6l1.8 1.8M12 18.5V21M7.4 16.6l-1.8 1.8M5.5 12H3M7.4 7.4L5.6 5.6M12 5.5V3M16.6 7.4l1.8-1.8"/></svg></span><span class="lbl">Setup</span></button>
 </nav>
 
 <!-- Transient confirmation ("Ports 2–4 patched: DMX 4, 7, 10"), above the nav. -->
@@ -1385,7 +1391,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02h.icons";
+const APP_VER="2026-10-02i.iconsonly";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -3975,6 +3981,7 @@ $("devMode").onchange=e=>setDev(e.target.checked);
 // notes out of the way. Off = no hands at all, notes stay hidden. On by default.
 function setHelper(on){
   document.body.classList.toggle("nohelp",!on);
+  if(typeof movePill==="function") movePill();   // the tab slots change width with the labels
   $("helpMode").checked=!!on;
   try{ localStorage.setItem("jmbHelper",on?"1":"0"); }catch(_){}
 }
