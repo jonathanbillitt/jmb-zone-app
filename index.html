@@ -230,7 +230,7 @@
                         stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
   /* PIN box sits in the TOP part of the screen, not centred — a centred box
      lands under the phone's number pad and needs a scroll to reach Unlock. */
-  #overlay, #cfOv, #btOv, #wbOv, #pwOv, #supOv, #pcOv, #cpOv { position:fixed; inset:0; background:rgba(5,8,12,.82); display:flex;
+  #overlay, #cfOv, #btOv, #wbOv, #pwOv, #supOv, #pcOv, #cpOv, #fxOv { position:fixed; inset:0; background:rgba(5,8,12,.82); display:flex;
              align-items:flex-start; justify-content:center; z-index:10;
              padding-top:max(24px,6vh); overflow-y:auto; }
   #cfOv { z-index:12; }
@@ -248,7 +248,7 @@
   #btOv { z-index:11; }
   #btOv .box button { width:100%; margin-top:8px; padding:12px; }
   .sig { cursor:pointer; }
-  #overlay .box, #cfOv .box, #btOv .box, #wbOv .box, #pwOv .box, #supOv .box, #pcOv .box, #cpOv .box { background:var(--card); border:1px solid var(--line);
+  #overlay .box, #cfOv .box, #btOv .box, #wbOv .box, #pwOv .box, #supOv .box, #pcOv .box, #cpOv .box, #fxOv .box { background:var(--card); border:1px solid var(--line);
                   border-radius:16px; padding:26px; width:min(340px,90vw);
                   text-align:center; }
   #overlay input { width:100%; margin:14px 0; padding:11px; font-size:18px;
@@ -258,7 +258,7 @@
   /* White balance widget, PWM library editor, support sheet (2026-09-29) */
   #wbOv, #pwOv, #supOv, #cpOv { z-index:11; }
   #pcOv { z-index:10; }                       /* the PWM editor and the personality builder (11) open above a port sheet */
-  #wbOv .box, #pwOv .box, #supOv .box, #pcOv .box, #cpOv .box { text-align:left; width:min(400px,94vw); padding:20px; margin-bottom:24px; }
+  #wbOv .box, #pwOv .box, #supOv .box, #pcOv .box, #cpOv .box, #fxOv .box { text-align:left; width:min(400px,94vw); padding:20px; margin-bottom:24px; }
   /* Personality builder rows: Out n · colour · offset · bits on one line at phone width */
   #cpOv .row label { width:40px; }
   #cpOv .row select { width:98px; }  #cpOv .row select.bits { width:62px; }
@@ -297,16 +297,17 @@
   .wbnote.live { border-color:var(--ok); color:var(--ok); }
   .wbnote.dmx  { border-color:var(--warn); color:var(--warn); }
   .badge.wb { background:#3d2f14; color:var(--warn); cursor:pointer; }
-  #btnWbReset.glow { border-color:var(--warn); color:var(--warn); }
   /* Clear all + Reset white balance: two equal columns, buttons on the first
      row, their captions on the second, so the long label wraps inside its own
      button instead of pushing the pair onto two lines. .solo = white balance
      not available (older firmware): Clear all alone across the row. */
-  .prepgrid { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; margin-top:22px; }
-  .prepgrid.solo { grid-template-columns:1fr; }
-  .prepgrid button { min-width:0; padding:14px 8px; font-size:1.05em; line-height:1.2; white-space:normal; }
-  .prepgrid #btnPrep { grid-area:1/1; }  .prepgrid #btnWbReset { grid-area:1/2; }
-  .prepgrid #prepCap { grid-area:2/1; }  .prepgrid #wbResetCap { grid-area:2/2; }
+  /* Dashboard row under the chips: equal bare buttons, lit (.glow) while their
+     state is active (user, 2026-10-02: "visible and lit when active"). */
+  .dash { display:flex; gap:8px; padding:10px 16px 0; }
+  .dash button { flex:1; min-width:0; padding:11px 6px; font-size:13.5px; line-height:1.2;
+                 white-space:nowrap; border-radius:10px; }
+  .dash button.glow { border-color:var(--acc); color:var(--acc);
+                      box-shadow:0 0 12px rgba(77,163,255,.35), inset 0 0 10px rgba(77,163,255,.10); }
   .prepgrid .mini { text-align:center; margin-top:6px; }
   .prepgrid .na { display:none !important; }
   .pwrow input[type=number] { background:var(--card2); color:var(--text);
@@ -408,6 +409,8 @@
   header #btnConnect { white-space:nowrap; flex-shrink:0; }
   /* A titled section inside a card that holds two things (Setup tidy). */
   .subhead { border-top:1px solid var(--line); margin-top:12px; padding-top:10px; font-weight:600; }
+  /* Setup's button rows sit centred, not left (user, 2026-10-02). */
+  #tab-setup .ctlrow { justify-content:center; }
   .modechip { padding:5px 12px; font-size:12.5px; border-radius:999px; }
   .modechip.active { background:#123a5e; border-color:var(--acc); color:var(--acc);
                      font-weight:600; }
@@ -677,19 +680,15 @@
       every source</em> — live DMX included — until it is switched off.</span>
       <button id="btnTestStop">Stop test</button>
     </div>
-    <div class="card">
-      <!-- Two equal buttons, each with its own caption underneath, so neither
-           label wraps and each reads as one action (user, 2026-10-01). The
-           white-balance pair is hidden on firmware without white balance. -->
-      <div class="prepgrid" id="prepGrid">
-        <button id="btnPrep">Clear all</button>
-        <button id="btnWbReset" class="hidden">Reset white balance</button>
-        <!-- The captions are helper notes (user, 2026-10-01: hidden behind the
-             hand like every other description); .na = not available on this
-             firmware, kept apart from the hand's own hidden class. -->
-        <div class="mini" id="prepCap" data-help>RGB 100% · FX speed 50% · dimmer 0%</div>
-        <div class="mini na" id="wbResetCap" data-help>every colour of every port to full</div>
-      </div>
+    <!-- Dashboard (user, 2026-10-02): the rig-wide actions as bare buttons
+         under the status chips, no card, each lit while its state is active:
+         Clear all while there is something to clear, Reset WB while a trim is
+         set, Effects while any port runs an effect. The white-balance button
+         is hidden on firmware without white balance. -->
+    <div class="dash" id="prepGrid">
+      <button id="btnPrep" title="Every port to full white, effects off, dimmer down">Clear all</button>
+      <button id="btnWbReset" class="hidden" title="Every colour of every port back to full">Reset WB</button>
+      <button id="btnFx" title="Tempo and spread for the whole rig">Effects</button>
     </div>
     <div id="ports"></div>
   </div>
@@ -872,6 +871,71 @@
         </div>
         <div class="mini" id="foldStatus" style="margin-top:4px"></div>
       </div>
+      <!-- The unit's housekeeping at the foot of its own card (user, 2026-10-02):
+           find it, reset it, PIN, disconnect, what it is. -->
+      <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px">
+      <div class="ctlrow across">
+        <button id="btnIdent">Flash to find</button>
+        <button id="btnResetAll" class="danger">Reset all ports</button>
+        <button id="btnUndo">Undo reset</button>
+      </div>
+      <div class="mini" id="identMsg" data-help>Flash identifies this controller for 5
+      seconds — tap it after connecting to check you're on the right unit.</div>
+      <div class="ctlrow" style="margin-top:8px">
+        <button id="btnPin">Change PIN…</button>
+        <button id="btnDisc" class="danger">Disconnect</button>
+      </div>
+      <div class="mini" id="fwLine"></div>
+      <div class="row" style="margin-top:8px"><label>Hardware</label>
+        <span id="varLine" class="mini" style="margin:0;flex:1"></span>
+      </div>
+      <div class="row"><label>Model</label>
+        <select id="setVariant" style="width:150px">
+          <option value="">auto-detect</option>
+          <option value="1">JMB Zone (1 port)</option>
+          <option value="4">JMB 4our (4 ports)</option>
+          <option value="8">JMB 8ight (8 ports)</option>
+        </select>
+        <button id="btnVariant">Set</button>
+      </div>
+      <div class="mini">Controllers detect their port count on the bus, but
+      detection only ever counts <em>up</em> — a unit that boots believing it is
+      bigger than it is (or a screenless <b>JMB Zone</b>, which has no panel to
+      set it from) needs pinning here once. The controller restarts.</div>
+      <div class="devonly" style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">
+        <div class="row"><label>Shunt</label>
+          <select id="setShunt" style="width:160px">
+            <option value="0">auto by model</option>
+            <option value="5">5 mΩ (Zone, .3 boards)</option>
+            <option value="10">10 mΩ (stock .2 module)</option>
+          </select>
+          <span class="mini" id="shuntLine" style="margin:0"></span>
+        </div>
+        <div class="mini">The current-sense shunt fitted to the port module. Auto = 5 mΩ
+          on a Zone, 10 mΩ on a 4our/8ight. The wrong value halves or doubles every
+          current reading and the trip point. Needs port firmware 2.5.</div>
+        <!-- No label: 52 px + four fields overflowed a phone-width card (Reset
+             dropped to its own line). The calLine text underneath names it. -->
+        <div class="row" style="margin-top:6px">
+          <select id="calPort" style="width:52px"></select>
+          <input type="number" id="calMa" min="250" max="13000" step="1" placeholder="meter mA" style="width:80px">
+          <button id="btnCal">Calibrate current</button>
+          <button id="btnCalReset" style="padding-left:8px;padding-right:8px">Reset</button>
+        </div>
+        <div class="mini" id="calLine"></div>
+        <div class="row" style="margin-top:6px">
+          <input type="number" id="calAmb" min="-10" max="60" step="0.1" placeholder="ambient °C" style="width:100px">
+          <button id="btnCalTemp">Calibrate temperature</button>
+        </div>
+        <div class="mini" id="calTempLine">With the unit powered but dark and at room temperature
+          for a while, enter the true ambient. Outputs hold dark for 2.5 s, then every port's
+          offset is captured; a port more than 10 °C out is flagged, not stored.</div>
+        <div class="row"><label>Command</label>
+          <input type="text" id="devCmd" placeholder="raw command, e.g. P1.CALCUR=0" style="flex:1" autocomplete="off">
+          <button id="devSend">Send</button>
+        </div>
+      </div>
+      </div>
     </div>
     <div class="card">
       <label style="font-weight:600">Test sequences</label>
@@ -934,6 +998,27 @@
       Listen down the DMX line. Arm each unit here or on its panel (Setup →
       <b>Chain Listen</b>); one baton per arming, it disarms after.</div>
     </div>
+    <!-- Files: the settings file and the documents, one card, under CRMX so
+         Firmware update and App are the last two (user, 2026-10-02). -->
+    <div class="card">
+      <div class="ctlrow across">
+        <button id="btnExport">Export settings</button>
+        <button id="btnImport">Import settings…</button>
+        <input type="file" id="impFile" accept=".jmb,.json,application/json" class="hidden">
+      </div>
+      <div class="mini">Everything: ID, curve, apply mode, all port patch +
+      looks + effects, and this phone's scenes — one shareable file.</div>
+      <div class="mini" id="impStatus"></div>
+      <div class="subhead">Documentation</div>
+      <div class="ctlrow" style="margin-top:8px">
+        <a class="dbtn" href="./manual.html" target="_blank" rel="noopener">User manual</a>
+        <a class="dbtn" href="./dmx-chart.html" target="_blank" rel="noopener">DMX chart</a>
+        <a class="dbtn" href="./manual.pdf" target="_blank" rel="noopener">Manual PDF</a>
+        <a class="dbtn" href="./safety.html" target="_blank" rel="noopener">Safety guide</a>
+      </div>
+      <div class="mini">The full user manual and DMX channel chart. Bundled with
+        the app — they open even with no internet, once the app has loaded once.</div>
+    </div>
     <!-- Network DMX (sACN/Art-Net over Wi-Fi) PARKED 2026-08-20 — hidden; the
          controller no longer starts WiFi. Elements kept so existing JS is inert
          rather than erroring. Un-hide (and set firmware JMB_WIFI=1) to restore. -->
@@ -968,26 +1053,6 @@
       still works and out-prioritises the network on a tie.</div>
     </div>
 
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <label style="font-weight:600">Effects</label>
-      </div>
-      <div class="row"><label>Tempo</label>
-        <button id="fxTap" style="min-width:92px">Tap</button>
-        <input type="number" id="fxBpm" min="60" max="240" step="1" style="width:76px">
-        <span class="unit">BPM</span>
-        <button id="fxBpmSet">Set</button>
-      </div>
-      <div class="mini" id="fxTapHint" data-help>Tap 4+ times in time with the music, or
-        type a BPM. 128 = the designed tempo. Beat effects (Party, Club, Pulse)
-        follow it rig-wide, and the ports' Speed wheels move with it.</div>
-      <div class="row"><label>Spread</label>
-        <input type="range" id="fxSpread" min="0" max="100" step="5" style="flex:1">
-        <span id="fxSpreadV" style="width:38px;text-align:right"></span>
-      </div>
-      <div class="mini">Spread offsets each port in time so effects sweep across
-      the rig as a wave.</div>
-    </div>
     <div class="card" id="otaCard">
       <div class="row" style="justify-content:space-between">
         <label style="font-weight:600">Firmware update</label>
@@ -1021,92 +1086,6 @@
       files to find. Keep the app open and the phone unlocked until it finishes.
       The controller reboots into the new build itself, and if that build fails to
       start it returns to the previous one on its own.</div>
-    </div>
-    <!-- One card for this unit's identity and housekeeping (Setup tidy, user
-         2026-10-02): find it, reset it, PIN, disconnect, what it is. -->
-    <div class="card">
-      <div class="ctlrow across">
-        <button id="btnIdent">Flash to find</button>
-        <button id="btnResetAll" class="danger">Reset all ports</button>
-        <button id="btnUndo">Undo reset</button>
-      </div>
-      <div class="mini" id="identMsg" data-help>Flash identifies this controller for 5
-      seconds — tap it after connecting to check you're on the right unit.</div>
-      <div class="ctlrow" style="margin-top:8px">
-        <button id="btnPin">Change PIN…</button>
-        <button id="btnDisc" class="danger">Disconnect</button>
-      </div>
-      <div class="mini" id="fwLine"></div>
-      <div class="row" style="margin-top:8px"><label>Hardware</label>
-        <span id="varLine" class="mini" style="margin:0;flex:1"></span>
-      </div>
-      <div class="row"><label>Model</label>
-        <select id="setVariant" style="width:150px">
-          <option value="">auto-detect</option>
-          <option value="1">JMB Zone (1 port)</option>
-          <option value="4">JMB 4our (4 ports)</option>
-          <option value="8">JMB 8ight (8 ports)</option>
-        </select>
-        <button id="btnVariant">Set</button>
-      </div>
-      <div class="mini">Controllers detect their port count on the bus, but
-      detection only ever counts <em>up</em> — a unit that boots believing it is
-      bigger than it is (or a screenless <b>JMB Zone</b>, which has no panel to
-      set it from) needs pinning here once. The controller restarts.</div>
-      <div class="devonly" style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">
-        <div class="row"><label>Shunt</label>
-          <select id="setShunt" style="width:160px">
-            <option value="0">auto by model</option>
-            <option value="5">5 mΩ (Zone, .3 boards)</option>
-            <option value="10">10 mΩ (stock .2 module)</option>
-          </select>
-          <span class="mini" id="shuntLine" style="margin:0"></span>
-        </div>
-        <div class="mini">The current-sense shunt fitted to the port module. Auto = 5 mΩ
-          on a Zone, 10 mΩ on a 4our/8ight. The wrong value halves or doubles every
-          current reading and the trip point. Needs port firmware 2.5.</div>
-        <!-- No label: 52 px + four fields overflowed a phone-width card (Reset
-             dropped to its own line). The calLine text underneath names it. -->
-        <div class="row" style="margin-top:6px">
-          <select id="calPort" style="width:52px"></select>
-          <input type="number" id="calMa" min="250" max="13000" step="1" placeholder="meter mA" style="width:80px">
-          <button id="btnCal">Calibrate current</button>
-          <button id="btnCalReset" style="padding-left:8px;padding-right:8px">Reset</button>
-        </div>
-        <div class="mini" id="calLine"></div>
-        <div class="row" style="margin-top:6px">
-          <input type="number" id="calAmb" min="-10" max="60" step="0.1" placeholder="ambient °C" style="width:100px">
-          <button id="btnCalTemp">Calibrate temperature</button>
-        </div>
-        <div class="mini" id="calTempLine">With the unit powered but dark and at room temperature
-          for a while, enter the true ambient. Outputs hold dark for 2.5 s, then every port's
-          offset is captured; a port more than 10 °C out is flagged, not stored.</div>
-        <div class="row"><label>Command</label>
-          <input type="text" id="devCmd" placeholder="raw command, e.g. P1.CALCUR=0" style="flex:1" autocomplete="off">
-          <button id="devSend">Send</button>
-        </div>
-      </div>
-    </div>
-    <!-- Files: the settings file and the documents, one card (Setup tidy,
-         user 2026-10-02). -->
-    <div class="card">
-      <div class="ctlrow across">
-        <button id="btnExport">Export settings</button>
-        <button id="btnImport">Import settings…</button>
-        <input type="file" id="impFile" accept=".jmb,.json,application/json" class="hidden">
-      </div>
-      <div class="mini">Everything: ID, curve, apply mode, all port patch +
-      looks + effects, and this phone's scenes — one shareable file.</div>
-      <div class="mini" id="impStatus"></div>
-      <div class="subhead">Documentation</div>
-      <div class="ctlrow" style="margin-top:8px">
-        <a class="dbtn" href="./manual.html" target="_blank" rel="noopener">User manual</a>
-        <a class="dbtn" href="./dmx-chart.html" target="_blank" rel="noopener">DMX chart</a>
-        <a class="dbtn" href="./manual.pdf" target="_blank" rel="noopener">Manual PDF</a>
-        <a class="dbtn" href="./safety.html" target="_blank" rel="noopener">Safety guide</a>
-      </div>
-      <div class="mini">The full user manual and DMX channel chart. Bundled with
-        the app — they open even with no internet, once the app has loaded once.</div>
     </div>
     <div class="card" id="appCard">
       <div class="row" style="justify-content:space-between">
@@ -1200,6 +1179,27 @@
 </div></div>
 
 <!-- PWM library: the three custom entries (carrier + curve), controller-wide. -->
+<!-- Effects pop-up (user, 2026-10-02): tempo and spread for the whole rig,
+     opened from Effects… on the Control tab; Setup no longer carries them. -->
+<div id="fxOv" class="hidden"><div class="box">
+  <div class="wbhead"><b>Effects</b></div>
+  <div class="mini" style="margin-top:4px">Tempo and spread are for the whole rig: beat effects keep in step across the ports, spread offsets them in time.</div>
+  <div class="row" style="margin-top:12px"><label>Tempo</label>
+    <button id="fxTap" style="min-width:92px">Tap</button>
+    <input type="number" id="fxBpm" min="60" max="240" step="1" style="width:76px">
+    <span class="unit">BPM</span>
+  </div>
+  <div class="mini" id="fxTapHint" data-help>Tap 4+ times in time with the music, or
+    type a BPM. 128 = the designed tempo. Beat effects (Party, Club, Pulse)
+    follow it rig-wide, and the ports' Speed wheels move with it.</div>
+  <div class="row" style="margin-top:10px"><label>Spread</label>
+    <input type="range" id="fxSpread" min="0" max="100" step="5" style="flex:1">
+    <span id="fxSpreadV" style="width:38px;text-align:right"></span>
+  </div>
+  <div class="mini">Spread offsets each port in time so effects sweep across
+  the rig as a wave.</div>
+  <div class="ctlrow" style="margin-top:14px"><button id="fxClose" class="primary" style="flex:1;padding:12px">Done</button></div>
+</div></div>
 <div id="pwOv" class="hidden"><div class="box">
   <div class="wbhead"><b>PWM library · custom entries</b></div>
   <div class="mini" id="pwLimTxt" data-help style="margin-top:4px"></div>
@@ -1385,7 +1385,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02o.looks";
+const APP_VER="2026-10-02q.dash";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2050,6 +2050,8 @@ function renderControl(){
     // nothing with no effect running — it kept the button armed forever.)
     const dirty=ports.some(m=>(m.X||0)>0 || (+(m.D??0))>0 || (m.R??100)<100 || (m.G??100)<100 || (m.B??100)<100);
     bp.classList.toggle("glow",dirty); bp.classList.remove("danger","primary"); }
+  // Dashboard: Effects lights while any port runs an effect.
+  { const bf=$("btnFx"); if(bf) bf.classList.toggle("glow", ports.some(m=>(m.X||0)>0)); }
   const root=$("ports");
   ports.forEach((m,idx)=>{
     const p=idx+1;
@@ -4202,7 +4204,9 @@ $("fxTap").onclick = () => {
   iv /= (tapTimes.length - 1);
   applyTempo(60000 / iv);
 };
-$("fxBpmSet").onclick = () => { tapTimes = []; applyTempo(+$("fxBpm").value || FX_BASE_BPM); };
+// A typed BPM applies on change (Enter or leaving the field); the Set button
+// wrapped the row at phone width (2026-10-02).
+$("fxBpm").onchange = () => { tapTimes = []; applyTempo(+$("fxBpm").value || FX_BASE_BPM); };
 $("fxSpread").oninput=()=>{ $("fxSpreadV").textContent=$("fxSpread").value+"%"; };
 $("fxSpread").onchange=()=>{ setupTouched=Date.now(); send("SPREAD="+ +$("fxSpread").value); };
 $("crmxLink").onclick=()=>{ send("CRMXLINK");
@@ -5074,7 +5078,7 @@ function wbPaintAll(){
   const b=$("btnWbReset"); if(!b) return;
   const have=ports.length>0 && !!wbOf(1);
   b.classList.toggle("hidden",!have);
-  $("wbResetCap").classList.toggle("na",!have);
+  { const wc=$("wbResetCap"); if(wc) wc.classList.toggle("na",!have); }   // (caption gone with the dashboard, 2026-10-02)
   $("prepGrid").classList.toggle("solo",!have);
   const any=ports.some((_,i)=>{ const w=wbOf(i+1); return w && (w.R<255||w.G<255||w.B<255); });
   b.classList.toggle("glow",any); b.disabled=!any; b.style.opacity=any?"":".45";
@@ -5320,6 +5324,10 @@ function pwPaint(fill){
 }
 $("pwClose").onclick=()=>$("pwOv").classList.add("hidden");
 $("pwOv").addEventListener("click",e=>{ if(e.target===$("pwOv")) $("pwOv").classList.add("hidden"); });
+// Effects pop-up: rig-wide tempo and spread, from the Control tab's Effects… button.
+$("btnFx").onclick=()=>$("fxOv").classList.remove("hidden");
+$("fxClose").onclick=()=>$("fxOv").classList.add("hidden");
+$("fxOv").addEventListener("click",e=>{ if(e.target===$("fxOv")) $("fxOv").classList.add("hidden"); });
 
 // Port card, Output sheet: the library picker and the Custom… button. The
 // port's curve stays its own whatever entry it runs (user, 2026-10-01).
@@ -5966,7 +5974,7 @@ function pcHelpArm(node){
 // The other pop-ups with notes of their own (personality builder, PWM library,
 // Support; user, 2026-10-01: "helper dude missing and all text still visible"):
 // the hand sits at the right end of the box's title line.
-document.querySelectorAll("#cpOv .box, #pwOv .box, #supOv .box").forEach(box=>{
+document.querySelectorAll("#cpOv .box, #pwOv .box, #supOv .box, #fxOv .box").forEach(box=>{
   const head=box.querySelector(".wbhead"), notes=helpNotes(box,".box");
   if(!head||!notes.length) return;
   notes.forEach(n=>n.classList.add("help","hidden"));
