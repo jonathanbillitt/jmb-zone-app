@@ -115,7 +115,7 @@
   /* The badges sit centred on the card's top border, half above it, so the
      name keeps the whole left of the head. The card's 12 px top margin takes
      the overhang. */
-  .pcard { position:relative; }
+  .pcard { position:relative; margin-top:24px; }   /* room above each card so its badge reads as its own (user, 2026-10-02) */
   .pbadges { position:absolute; top:-10px; left:0; right:0; display:flex; justify-content:center;
              gap:6px; pointer-events:none; }
   .pbadges .badge { pointer-events:auto; line-height:16px; box-shadow:0 0 0 3px var(--bg); }
@@ -452,8 +452,15 @@
   #tab-setup .ctlrow { justify-content:space-between; }
   /* Colour targets: a five-column grid so an 8ight's P5-P8 sit under P1-P4
      (user, 2026-10-02); the right padding keeps the last chip clear of the hand. */
-  #colTargets { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; padding-right:40px; }
+  /* Pills spread across the card's full width, the same extent as the colour
+     bar beneath; an 8ight's P5–P8 line up under P1–P4 (user, 2026-10-02). The
+     Colour card's hand moves to the bottom-right corner, beside the note it
+     reveals, so the row can use the corner. */
+  #colTargets { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; padding-right:0; }
   #colTargets .tgt { min-width:0; padding-left:0; padding-right:0; text-align:center; }
+  #tab-colour .card > .ib { top:auto; bottom:12px; }
+  #tab-colour .card .mini.help { padding-right:34px; }
+  #cctMix { padding:0 34px; }
   #tab-setup .ctlrow > button, #tab-setup .ctlrow > .dbtn { flex:1 1 0; min-width:max-content; text-align:center; }
   .modechip { padding:5px 12px; font-size:12.5px; border-radius:999px; }
   .modechip.active { background:#123a5e; border-color:var(--acc); color:var(--acc);
@@ -480,8 +487,8 @@
                 border-bottom-color:transparent; transform:scale(1.03);
                 box-shadow:0 8px 22px rgba(0,0,0,.5), 0 0 0 1px var(--acc); }
   .scene.lift .scname { color:var(--acc); }
-  .scnsave { flex-wrap:nowrap; }
-  .scnsave button { flex:1 1 0; min-width:0; white-space:nowrap; }
+  .scnsave { flex-wrap:nowrap; justify-content:space-between; }   /* Save left, Capture live right (user, 2026-10-02) */
+  .scnsave button { flex:0 0 auto; min-width:0; white-space:nowrap; }
   .scnpick { margin-top:10px; flex-wrap:nowrap; }
   .scnpick button { flex:1 1 0; }
   /* The tick box at the left of every scene row. */
@@ -713,7 +720,10 @@
     </div>
   </div>
 
-  <div id="connectSplash"><img src="jmb-splash.png" alt="JMB Lighting"></div>
+  <!-- fetchpriority high: on the first load after an update the caches are
+       empty and the worker's precache competes for the line; the badge goes
+       first (user, 2026-10-02: logos missing after an update until a restart). -->
+  <div id="connectSplash"><img src="jmb-splash.png" alt="JMB Lighting" fetchpriority="high"></div>
   <div id="connectMarks" aria-label="JMB Zone, 4our and 8ight"></div>
 
   <!-- Info boxes for the orange header chips (user, 2026-09-24): the chip
@@ -1473,7 +1483,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02ae.cols";
+const APP_VER="2026-10-02af.pills";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1545,8 +1555,15 @@ const LOOP_SECS=["mcp","ble","dmx","net","misc","out","bus","recon","ind","nvs",
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
-if("serviceWorker" in navigator)
+if("serviceWorker" in navigator){
   addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+  // The manual, chart and safety PDFs (~900 KB) are precached only once the
+  // page has settled, so the first load after an update is not fighting them
+  // for the line (2026-10-02; the worker handles "precache-docs").
+  navigator.serviceWorker.ready.then(reg=>setTimeout(()=>{
+    try{ (navigator.serviceWorker.controller||reg.active).postMessage("precache-docs"); }catch(_){}
+  },6000)).catch(()=>{});
+}
 let ports=[], kv={};
 const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
