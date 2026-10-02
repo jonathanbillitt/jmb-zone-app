@@ -817,7 +817,7 @@
       <div class="mini">Sends a test universe from the OUT socket while no DMX is
         being received. Desk syntax: <code>1 THRU 5 @ 80</code> ·
         <code>10 + 12 @ FULL</code>. Levels stay latched until Clear or power-off.</div>
-      <div id="txWarn" class="hidden">Sending test DMX. Set levels stay until Clear, even after a reconnect.</div>
+      <div id="txWarn" class="hidden">Sending test DMX. Levels that have been set are retained until cleared or the controller is powered off.</div>
       <div id="txBusy" class="mini hidden">DMX is being received — transmit unavailable.</div>
       <!-- The pad drops down while transmitting (user, 2026-10-02): Start opens
            it, Stop folds it, so the card stays the size of its neighbours. -->
@@ -927,7 +927,7 @@
       looks + effects, and this phone's scenes — one shareable file.</div>
       <div class="mini" id="impStatus"></div>
       <div class="mini" id="fwLine"></div>
-      <div class="row" style="margin-top:8px"><label>Hardware</label>
+      <div class="row" data-help style="margin-top:8px"><label>Hardware</label>   <!-- behind the hand (user, 2026-10-02) -->
         <span id="varLine" class="mini" style="margin:0;flex:1"></span>
       </div>
       <div class="row"><label>Model</label>
@@ -1408,7 +1408,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02w.gear";
+const APP_VER="2026-10-02y.hwnote";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
