@@ -89,8 +89,14 @@
   /* Current limit: the padlock is the only control (it applies the field and
      locks it; no Apply button, user 2026-10-01); the field fades while locked. */
   #setLim:disabled { opacity:.45; }
-  button.lock { min-width:44px; padding:6px 8px; font-size:17px; line-height:1; }
-  button.lock.on { border-color:var(--warn); background:#3d2f14; }
+  button.lock { min-width:44px; padding:6px 8px; font-size:17px; line-height:1; color:var(--dim); }
+  button.lock.on { border-color:var(--warn); background:#3d2f14; color:var(--warn); }
+  button.lock svg { width:20px; height:20px; display:block; margin:0 auto; fill:none;
+                    stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  /* The shackle hinges on its left foot: open = swung up and out, locked = seated. */
+  button.lock .shackle { transform-origin:8px 11px; transform:rotate(-32deg) translate(-1px,-1px);
+                         transition:transform .35s cubic-bezier(.3,1.4,.4,1); }
+  button.lock.on .shackle { transform:none; }
   .dmxwarn { cursor:pointer; }   /* tap the box to close it */
   main { padding:10px 16px 24px; max-width:720px; margin:0 auto; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px;
@@ -157,6 +163,14 @@
   .swatch { width:26px; height:26px; border-radius:7px; border:1px solid var(--line); }
   .rows { display:flex; flex-direction:column; gap:9px; }
   .chrows { display:flex; flex-direction:column; gap:9px; }   /* the card's channel sliders, rebuilt per personality */
+  /* Port card, Effect row: the address and head number, big and bold, to the
+     right of the select (user, 2026-10-02: "nice big space … nice and big and thick"). */
+  .pbig { margin-left:auto; display:flex; gap:14px; align-items:flex-end; }
+  .pbig > div { display:flex; flex-direction:column; align-items:center; line-height:1; gap:3px; }
+  .pbl { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
+  .pbv { font-size:22px; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .pbv.sm { font-size:14px; font-weight:700; }   /* a preset's address list */
+  .pbv.warn { color:var(--warn); }
   .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .row label { width:52px; color:var(--dim); font-size:12.5px; flex-shrink:0; }
   .row input[type=range] { flex:1; min-width:120px; accent-color:var(--acc); height:26px; }
@@ -438,8 +452,23 @@
   .scene { display:flex; align-items:center; gap:8px; padding:9px 0;
            border-bottom:1px solid var(--line); }
   .scene b { flex:1; font-weight:600; font-size:14px; }
-  .scname { cursor:pointer; }
+  /* The name is the handle: tap renames, a hold lifts the row for a drag.
+     touch-action none here only, so the rest of the row still scrolls the page. */
+  .scname { cursor:pointer; touch-action:none; user-select:none; -webkit-user-select:none;
+            -webkit-touch-callout:none; }
   .scname:active { color:var(--acc); }
+  .scene { transition:transform .15s, box-shadow .15s; }
+  .scene.lift { position:relative; z-index:2; background:var(--card2); border-radius:10px;
+                border-bottom-color:transparent; transform:scale(1.03);
+                box-shadow:0 8px 22px rgba(0,0,0,.5), 0 0 0 1px var(--acc); }
+  .scene.lift .scname { color:var(--acc); }
+  .scnsave { flex-wrap:nowrap; }
+  .scnsave button { flex:1 1 0; min-width:0; white-space:nowrap; }
+  .scnpick { margin-top:10px; flex-wrap:nowrap; }
+  .scnpick select { flex:1 1 0; min-width:0; align-self:stretch; background:var(--card2);
+                    color:var(--text); border:1px solid var(--line); border-radius:9px;
+                    padding:0 10px; font-size:14px; }
+  .scnpick button { flex:0 0 auto; }
   .scene.active { border-left:3px solid var(--acc); padding-left:8px; }
   .scene.active .scname { color:var(--acc); }
   .scfade { display:flex; align-items:center; gap:4px; font-size:12px;
@@ -720,14 +749,24 @@
 
   <div id="tab-scenes" class="tab hidden">
     <div class="card">
-      <div class="ctlrow">
-        <button id="btnSaveScene" class="primary">Save current as scene…</button>
+      <div class="ctlrow scnsave">
+        <button id="btnSaveScene" class="primary">Save scene…</button>
         <button id="btnCapture">Capture live</button>
       </div>
-      <div class="mini">Recall crossfades to the scene over the fade seconds
-      (0 = snap), always over that time from any state. Effects fade out (and
-      in) through a dip rather than snapping. Tap a scene's name to rename it.
-      Scenes live in this phone's browser.</div>
+      <!-- One pick + Delete at the top instead of a cross on every row; hold a
+           name to lift its scene and drag it into a new order (user, 2026-10-02). -->
+      <div class="ctlrow scnpick">
+        <select id="scnSel"></select>
+        <button id="btnScnDel" class="danger">Delete</button>
+      </div>
+      <div class="mini">Save and Capture keep the same thing: each port's
+      colour, level, effect and effect rate. Capture just skips the name.</div>
+      <div class="mini">An effect is kept as a setting, so it runs again from
+      the start on recall; tempo and spread are rig-wide, not part of a scene.</div>
+      <div class="mini">Recall crossfades over the fade seconds (0 = snap) from
+      wherever the rig is; effects dip out and in rather than snapping.</div>
+      <div class="mini">Tap a name to rename it. Hold a name to lift the scene,
+      then drag it up or down. Scenes live in this phone's browser.</div>
       <div id="sceneList"></div>
     </div>
   </div>
@@ -845,13 +884,13 @@
       <div class="ctitle"><label>Test sequences</label></div>
       <div class="ctlrow">
         <button id="tsStep">Step RGBW</button>
-        <button id="tsFade">Fade</button>
+        <button id="tsFade">Fade CMY</button>
         <button id="tsOff">Off</button>
       </div>
       <div class="mini"><b>Step RGBW</b> — R → G → B → White at full, 1 s each,
       gamma off. Flags a dead channel or weak output stage, and measures wiring
       (below).<br><br>
-      <b>Fade</b> — rainbow sweep, for dimming smoothness and colour blending.<br><br>
+      <b>Fade CMY</b> — rainbow sweep through the mixes, for dimming smoothness and colour blending.<br><br>
       Both drive all ports and override every source, including live DMX, until Off.</div>
       <div class="mini" id="wireChk" data-help style="margin-top:10px;white-space:pre-line;
            border-top:1px solid var(--line);padding-top:10px"></div>
@@ -871,6 +910,7 @@
         <div class="mini">The Bluetooth name changes at the controller's next restart.</div>
         <div class="row"><label>ID</label>
           <input type="number" id="setCid" min="0" max="9999">
+          <span class="unit" style="visibility:hidden">s</span>   <!-- keeps Apply in line with DMX hold's (user, 2026-10-02) -->
           <button id="btnCidApply">Apply</button>
           <span class="mini" style="margin:0">on screens, BLE name (next boot), RDM label</span>
         </div>
@@ -891,7 +931,8 @@
         <div class="row"><label>Current limit</label>
           <input type="number" id="setLim" min="0.5" max="6.75" step="0.5">
           <span class="unit">A</span>
-          <button id="btnLimLock" class="lock" title="Apply and lock / unlock the limit">🔓</button>
+          <!-- A drawn padlock: the shackle swings open when unlocked (user, 2026-10-02). -->
+          <button id="btnLimLock" class="lock" title="Apply and lock / unlock the limit"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path class="shackle" d="M8 11V7.5a4 4 0 0 1 8 0V11"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/></svg></button>
           <span class="mini" id="setLimNote" data-help style="margin:0"></span>   <!-- behind the hand (user, 2026-10-02) -->
         </div>
         <div class="row"><label>Current fold</label>
@@ -1411,7 +1452,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02aa.undostat";
+const APP_VER="2026-10-02ab.scenes";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2185,6 +2226,7 @@ function renderControl(){
     // carries the mark too (user, chore 41: "overspill not working").
     const pv=$("pvAddr"+(i+1));
     if(pv){ pv.classList.toggle("warn",clash); if(clash && !/⚠/.test(pv.textContent)) pv.textContent+=" ⚠"; }
+    const pb=$("pbA"+(i+1)); if(pb) pb.classList.toggle("warn",clash);
   }
 }
 // Every DMX channel a port listens on, sorted: a standard personality from its
@@ -2207,8 +2249,12 @@ function buildCard(p){
       <span class="badge off" id="on${p}">—</span>
     </div>
     <div class="rows">
+      <!-- A narrower Effect select leaves room for the DMX address and head
+           number, big and bold, at the row's end (user, 2026-10-02). -->
       <div class="row"><label>Effect</label>
-        <select id="x${p}" style="width:148px">${FX_NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join("")}</select>
+        <select id="x${p}" style="width:118px">${FX_NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join("")}</select>
+        <div class="pbig"><div><span class="pbl">DMX</span><span class="pbv" id="pbA${p}">—</span></div>
+                          <div><span class="pbl">Head</span><span class="pbv" id="pbH${p}">—</span></div></div>
       </div>
       <!-- One slider per output the personality uses, labelled and coloured by
            the function it carries (user, 2026-10-01: "the colour sliders need to
@@ -2514,20 +2560,39 @@ function saveScenes(s){
             if(el) el.textContent="Scene storage full — not saved."; }
 }
 let activeSceneIdx=-1;          // last-recalled scene this session
+// The pick list at the top: one select of every scene plus Delete (user,
+// 2026-10-02: "a select box and a delete button at the top which deletes
+// selected"). Keeps its pick across renders while that scene still exists.
+function renderScenePick(all){
+  const sel=$("scnSel"), del=$("btnScnDel"); if(!sel) return;
+  const keep=sel.value;
+  sel.innerHTML="";
+  if(!all.length){
+    const o=document.createElement("option"); o.value=""; o.textContent="No scenes yet";
+    sel.appendChild(o); sel.disabled=true; del.disabled=true; return;
+  }
+  all.forEach((sc,i)=>{ const o=document.createElement("option");
+    o.value=String(i); o.textContent=sc.name; sel.appendChild(o); });
+  sel.disabled=false; del.disabled=false;
+  sel.value=(keep!=="" && +keep<all.length)?keep:String(activeSceneIdx>=0?activeSceneIdx:0);
+}
 function renderScenes(){
   const list=$("sceneList"); list.innerHTML="";
-  loadScenes().forEach((sc,i)=>{
+  const all=loadScenes();
+  renderScenePick(all);
+  all.forEach((sc,i)=>{
     const row=document.createElement("div");
-    row.className="scene";
+    row.className="scene"; row.dataset.i=String(i);
     if(i===activeSceneIdx) row.classList.add("active");
     const fv=(sc.fade==null)?2:Math.min(60,Math.max(0,+sc.fade||0));   // sanitise
-    row.innerHTML=`<b class="scname" title="Tap to rename">${esc(sc.name)}</b>
+    row.innerHTML=`<b class="scname" title="Tap to rename, hold to move">${esc(sc.name)}</b>
       <span class="scfade">Fade
         <input type="number" min="0" max="60" step="0.5" value="${fv}"
                inputmode="decimal">s</span>
-      <button class="primary">Recall</button><button class="danger">✕</button>`;
+      <button class="primary">Recall</button>`;
     const fadeIn=row.querySelector("input");
-    const [btnGo,btnDel]=row.querySelectorAll("button");
+    const btnGo=row.querySelector("button");
+    sceneDragArm(row);
     // Persist the fade the MOMENT it changes — no more "only saved on Recall,
     // and via a whole-object overwrite" that let stale values slip in. Clamp
     // 0-60s. Also block wheel-scroll from silently nudging the number.
@@ -2540,18 +2605,66 @@ function renderScenes(){
     fadeIn.addEventListener("change",commitFade);
     fadeIn.addEventListener("wheel",e=>e.preventDefault(),{passive:false});
     row.querySelector(".scname").onclick=async()=>{
+      if(row.dataset.lifted){ delete row.dataset.lifted; return; }   // a hold, not a tap
       const v=await askText("",{title:"Rename scene",value:sc.name,ok:"Rename",maxlength:24});
       if(v===null) return;
       const nm=v.trim(); if(!nm) return;
       const all=loadScenes(); all[i].name=nm; saveScenes(all); renderScenes();
     };
     btnGo.onclick=()=>{ commitFade(); activeSceneIdx=i;
-                        recallScene(sc); renderScenes(); };
-    btnDel.onclick=()=>{ const all=loadScenes(); all.splice(i,1); saveScenes(all);
-      if(activeSceneIdx===i) activeSceneIdx=-1;
-      else if(activeSceneIdx>i) activeSceneIdx--;
-      renderScenes(); };
+                        recallScene(sc); const s=$("scnSel"); if(s) s.value=String(i);
+                        renderScenes(); };
     list.appendChild(row);
+  });
+}
+$("btnScnDel").onclick=async()=>{
+  const sel=$("scnSel"), i=+sel.value, all=loadScenes();
+  if(sel.disabled || !(i>=0 && i<all.length)) return;
+  if(!await askConfirm(`"${all[i].name}" goes for good.`,{title:"Delete scene?",ok:"Delete",danger:true})) return;
+  all.splice(i,1); saveScenes(all);
+  if(activeSceneIdx===i) activeSceneIdx=-1;
+  else if(activeSceneIdx>i) activeSceneIdx--;
+  sel.value=String(Math.min(i,all.length-1));
+  renderScenes(); toast("Scene deleted");
+};
+// Hold a scene's name (380 ms, no movement) to lift the row; drag it past the
+// row above or below to swap; let go to keep the order. Pointer capture holds
+// the stream once lifted; before that a move, a leave or a scroll cancels the
+// hold so a normal tap or page scroll is untouched.
+function sceneDragArm(row){
+  const handle=row.querySelector(".scname"), list=$("sceneList");
+  handle.addEventListener("contextmenu",e=>e.preventDefault());
+  handle.addEventListener("pointerdown",e=>{
+    if(e.button!==0) return;
+    const sx=e.clientX, sy=e.clientY; let lifted=false, timer=null;
+    const lift=()=>{ lifted=true; row.dataset.lifted="1"; row.classList.add("lift");
+      try{ handle.setPointerCapture(e.pointerId); }catch(_){}
+      try{ if(navigator.vibrate) navigator.vibrate(12); }catch(_){} };
+    const move=ev=>{
+      if(!lifted){ if(Math.hypot(ev.clientX-sx,ev.clientY-sy)>8) cancel(); return; }
+      ev.preventDefault();
+      const rows=[...list.children], k=rows.indexOf(row), y=ev.clientY;
+      const prev=rows[k-1], next=rows[k+1];
+      if(prev){ const r=prev.getBoundingClientRect(); if(y<r.top+r.height/2){ list.insertBefore(row,prev); return; } }
+      if(next){ const r=next.getBoundingClientRect(); if(y>r.top+r.height/2) list.insertBefore(next,row); }
+    };
+    const drop=()=>{
+      if(!lifted){ cancel(); return; }
+      cleanup(); row.classList.remove("lift");
+      const order=[...list.children].map(r=>+r.dataset.i), all=loadScenes();
+      const re=order.map(k=>all[k]).filter(Boolean);
+      if(activeSceneIdx>=0) activeSceneIdx=order.indexOf(activeSceneIdx);
+      saveScenes(re);
+      setTimeout(renderScenes,0);         // after the click this release raises
+    };
+    const cancel=()=>{ cleanup(); };
+    const cleanup=()=>{ clearTimeout(timer);
+      handle.removeEventListener("pointermove",move); handle.removeEventListener("pointerup",drop);
+      handle.removeEventListener("pointercancel",drop); handle.removeEventListener("pointerleave",leave); };
+    const leave=()=>{ if(!lifted) cancel(); };
+    handle.addEventListener("pointermove",move); handle.addEventListener("pointerup",drop);
+    handle.addEventListener("pointercancel",drop); handle.addEventListener("pointerleave",leave);
+    timer=setTimeout(lift,380);
   });
 }
 $("btnSaveScene").onclick=async()=>{
@@ -3831,7 +3944,7 @@ function renderSetup(){
     f.max=(clm/10).toString();
     if(document.activeElement!==f) f.value=(cl/10).toString();
     f.disabled=lock;
-    const lb=$("btnLimLock"); lb.textContent=lock?"🔒":"🔓"; lb.classList.toggle("on",lock);
+    const lb=$("btnLimLock"); lb.classList.toggle("on",lock);   // .on = locked; the shackle swings on the class
     $("setLimNote").textContent = lock
       ? `locked at ${cl/10} A · tap the padlock to unlock`
       : `total current the controller may draw · up to ${clm/10} A · the padlock applies and locks`;
@@ -3993,7 +4106,7 @@ $("btnLimLock").onclick=()=>{ setupTouched=Date.now();
   if(!locked) limApply();
   send("CLOCK="+(locked?0:1));
   $("setLim").disabled=!locked;
-  $("btnLimLock").textContent=locked?"🔓":"🔒"; $("btnLimLock").classList.toggle("on",!locked);
+  $("btnLimLock").classList.toggle("on",!locked);
   // Say it now rather than after the Setup paint guard lifts.
   $("setLimNote").textContent = locked
     ? `total current the controller may draw · up to ${+(kv.CLM||68)/10} A · the padlock applies and locks`
@@ -5213,8 +5326,13 @@ function pcPaintSet(p,m){
     // On a preset the port listens on the preset's own addresses: the card
     // shows their range and the Address field steps aside.
     put("pvAddr"+p, cp ? `Address ${cpdRange(cp)}` : `Address ${m.A??1}`);
-    const af=$("addr"+p); if(af){ af.disabled=!!cp; af.title=cp?"Set in the preset":""; } }
+    const af=$("addr"+p); if(af){ af.disabled=!!cp; af.title=cp?"Set in the preset":""; }
+    // The big pair beside the Effect select: a preset's address list is long,
+    // so it drops to the small size; the clash mark follows the Address line.
+    const ba=$("pbA"+p); if(ba){ const t=cp?cpdRange(cp):String(m.A??1);
+      ba.textContent=t; ba.classList.toggle("sm",t.length>4); } }
   put("pvHead"+p, `Head ${m.H??0}`);
+  { const bh=$("pbH"+p); if(bh) bh.textContent=String(m.H??0); }
   const slot=(m.PW??0)-3, c=slot>=0?pwCustom(slot):null;
   put("pvCrv"+p, CRV_NAMES[m.CV??0]||"Linear");
   const pf=+(m.PF||0), old=!!c && pf<PORT_FW_CUSTOM && m.O===1;

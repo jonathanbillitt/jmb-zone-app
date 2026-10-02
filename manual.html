@@ -225,10 +225,12 @@ whole rig's beat-effect speed to the music — tap the app's Tap button in time
 (or type a BPM, 60–240; 128 is the designed tempo). <strong>Spread</strong> offsets
 each port in time (0–100 %) so effects sweep across the rig as a wave
 instead of every port in lockstep. Both persist across reboots.</p>
-<p><strong>Capture to scene:</strong> the app's Scenes tab saves the current look — <strong>Save current
-as scene…</strong> (named) or <strong>Capture live</strong> (one tap, auto-named). A scene captures
-the whole programmer state (colour, or effect + speed), recalls with a crossfade,
-and rides in the show file. <strong>Up to 100 scenes per phone</strong> (they live in the
+<p><strong>Capture to scene:</strong> the app's Scenes tab saves the current look — <strong>Save
+scene…</strong> (named) or <strong>Capture live</strong> (one tap, auto-named). Both keep the same
+thing: each port's colour, level, effect and effect rate. An effect is kept as a
+setting, so it runs again from the start on recall; tempo and spread are rig-wide
+and not part of a scene. A scene recalls with a crossfade and rides in the show
+file. <strong>Up to 100 scenes per phone</strong> (they live in the
 phone's browser storage, and in any show file you export).</p>
 <hr />
 <h2>4. Global addressing (chain baton)</h2>
@@ -398,9 +400,11 @@ when you want to <em>choose</em> a colour rather than balance raw R/G/B by hand.
 <h3>Scenes — save and recall looks</h3>
 <p>Store the whole rig's current look as a <strong>scene</strong> and bring it back later, each
 with its own <strong>crossfade time</strong> (0 = snap). <strong>Capture live</strong> snapshots whatever
-the controller is outputting right now. Scenes live on the phone and travel
-inside the exported show file, so a saved show reopens identically on another
-phone. Tap a scene's name to rename it.</p>
+the controller is outputting right now, auto-named by the time. Scenes live on
+the phone and travel inside the exported show file, so a saved show reopens
+identically on another phone. Tap a scene's name to rename it; hold the name to
+lift the scene and drag it up or down into a new order. To remove one, pick it
+in the list at the top of the tab and tap <strong>Delete</strong>.</p>
 <h3>Telemetry — the health glance</h3>
 <p>A read-only status page — the same telemetry the port screens show, gathered in
 one place: each port's <strong>patch</strong>, <strong>output current</strong> (calibrated to within about
@@ -520,8 +524,8 @@ on the Control tab while a test runs, with its own <em>Stop test</em> button, an
 <li><strong>Step RGBW</strong> — full drive red → green → blue → white, one second each, gamma
   bypassed. Every channel at maximum and identical on all ports, so a dead
   channel or a weak output stage stands out immediately.</li>
-<li><strong>Fade</strong> — a smooth rainbow sweep, for judging dimming smoothness and colour
-  blending.</li>
+<li><strong>Fade CMY</strong> — a smooth rainbow sweep through the mixes, for judging dimming
+  smoothness and colour blending.</li>
 </ul>
 <p><strong>The wiring check</strong> runs automatically during Step RGBW. Because that test
 lights one colour at a time, and each port measures its own current, the reading
