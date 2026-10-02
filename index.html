@@ -645,8 +645,13 @@
      back to normal scrolling rather than trapping the card under the header
      (the 2026-09-13 lesson). The 64 px nav allowance goes too: no nav here. */
   @media (min-height:480px){
+    /* border-box: the safe-area inset sits INSIDE the 100dvh, so the wordmark
+       row ends above the system bar. With content-box the inset was added
+       below the fixed height and the row sat under the bar on an edge-to-edge
+       Android viewport (2026-10-03: "logos missing after an update, back after
+       a restart" — the wordmarks, not the badge). */
     body:has(#hello:not(.hidden)){ height:100vh; height:100dvh; overflow:hidden;
-      display:flex; flex-direction:column;
+      display:flex; flex-direction:column; box-sizing:border-box;
       padding-bottom:env(safe-area-inset-bottom); }
     body:has(#hello:not(.hidden)) main{ flex:1; min-height:0; width:100%;
       display:flex; flex-direction:column; padding-bottom:8px; }
@@ -1352,7 +1357,11 @@
   </div>
   <div class="mini">Spread offsets each port in time so effects sweep across
   the rig as a wave.</div>
-  <div class="ctlrow" style="margin-top:14px"><button id="fxClose" class="primary" style="flex:1;padding:12px">Done</button></div>
+  <!-- Default = the designed tempo and no spread (user, 2026-10-03). -->
+  <div class="ctlrow" style="margin-top:14px;flex-wrap:nowrap">
+    <button id="fxDefault" style="flex:1;padding:12px">Default</button>
+    <button id="fxClose" class="primary" style="flex:1;padding:12px">Done</button>
+  </div>
 </div></div>
 <div id="pwOv" class="hidden"><div class="box">
   <div class="wbhead"><b>PWM library · custom entries</b></div>
@@ -1540,7 +1549,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-03a.keys";
+const APP_VER="2026-10-03b.default";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -5632,6 +5641,13 @@ $("pwOv").addEventListener("click",e=>{ if(e.target===$("pwOv")) $("pwOv").class
 // Effects pop-up: rig-wide tempo and spread, from the Control tab's Effects… button.
 $("btnFx").onclick=()=>$("fxOv").classList.remove("hidden");
 $("fxClose").onclick=()=>$("fxOv").classList.add("hidden");
+// Default (user, 2026-10-03: "a default quick set button"): the designed tempo
+// and no spread, sent as the Tap / slider would send them.
+$("fxDefault").onclick=()=>{
+  tapTimes=[]; applyTempo(FX_BASE_BPM);
+  $("fxSpread").value=0; $("fxSpreadV").textContent="0%"; setupTouched=Date.now(); send("SPREAD=0");
+  toast(`Tempo ${FX_BASE_BPM} BPM, spread 0`);
+};
 $("fxOv").addEventListener("click",e=>{ if(e.target===$("fxOv")) $("fxOv").classList.add("hidden"); });
 
 // Port card, Output sheet: the library picker and the Custom… button. The
