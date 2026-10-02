@@ -106,6 +106,13 @@
   /* The head carries "Port n · label" beside up to three badges: a long label
      truncates with an ellipsis instead of wrapping the head (user, chore 5). */
   .port-head h2 { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* Port card head (user, 2026-10-02): the name group — name, then the online
+     badge right after it — takes the slack; the DMX / Head pair sits at the end. */
+  .port-head .swatch { flex:none; }            /* a long name squeezes the name, never the swatch */
+  .pname { flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:8px; }
+  .pname h2 { flex:0 1 auto; }
+  .pname .badge { flex:none; }
+  .port-head .pbig { flex:none; }
   .pilabel { font-weight:400; color:var(--dim); font-size:13px; }
   /* Port card settings (2026-10-01): three equal columns — Patch / Output /
      Protection — a button on top and every set value printed beneath it, so
@@ -168,8 +175,8 @@
   .pbig { margin-left:auto; display:flex; gap:14px; align-items:flex-end; }
   .pbig > div { display:flex; flex-direction:column; align-items:center; line-height:1; gap:3px; }
   .pbl { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
-  .pbv { font-size:22px; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums; white-space:nowrap; }
-  .pbv.sm { font-size:14px; font-weight:700; }   /* a preset's address list */
+  .pbv { font-size:26px; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .pbv.sm { font-size:15px; font-weight:700; }   /* a preset's address list */
   .pbv.warn { color:var(--warn); }
   .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .row label { width:52px; color:var(--dim); font-size:12.5px; flex-shrink:0; }
@@ -1452,7 +1459,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02ab.scenes";
+const APP_VER="2026-10-02ac.head";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2241,20 +2248,22 @@ function buildCard(p){
   const d=document.createElement("div");
   d.className="card"; d.id="port"+p;
   d.innerHTML=`
+    <!-- Head (user, 2026-10-02): swatch, name with the online badge right after
+         it, then the DMX address and head number big and bold at the end. -->
     <div class="port-head">
       <div class="swatch" id="sw${p}"></div>
-      <h2 id="ph${p}">Port ${p}</h2>
-      <span class="badge fault hidden" id="flt${p}"></span>
-      <span class="badge wb hidden" id="wbg${p}">WB</span>
-      <span class="badge off" id="on${p}">—</span>
+      <div class="pname">
+        <h2 id="ph${p}">Port ${p}</h2>
+        <span class="badge off" id="on${p}">—</span>
+        <span class="badge fault hidden" id="flt${p}"></span>
+        <span class="badge wb hidden" id="wbg${p}">WB</span>
+      </div>
+      <div class="pbig"><div><span class="pbl">DMX</span><span class="pbv" id="pbA${p}">—</span></div>
+                        <div><span class="pbl">Head</span><span class="pbv" id="pbH${p}">—</span></div></div>
     </div>
     <div class="rows">
-      <!-- A narrower Effect select leaves room for the DMX address and head
-           number, big and bold, at the row's end (user, 2026-10-02). -->
       <div class="row"><label>Effect</label>
         <select id="x${p}" style="width:118px">${FX_NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join("")}</select>
-        <div class="pbig"><div><span class="pbl">DMX</span><span class="pbv" id="pbA${p}">—</span></div>
-                          <div><span class="pbl">Head</span><span class="pbv" id="pbH${p}">—</span></div></div>
       </div>
       <!-- One slider per output the personality uses, labelled and coloured by
            the function it carries (user, 2026-10-01: "the colour sliders need to
@@ -5329,7 +5338,9 @@ function pcPaintSet(p,m){
     const af=$("addr"+p); if(af){ af.disabled=!!cp; af.title=cp?"Set in the preset":""; }
     // The big pair beside the Effect select: a preset's address list is long,
     // so it drops to the small size; the clash mark follows the Address line.
-    const ba=$("pbA"+p); if(ba){ const t=cp?cpdRange(cp):String(m.A??1);
+    // Always three digits (user, 2026-10-02: "to keep spacing"), so the head
+    // keeps its shape from address 1 to 512.
+    const ba=$("pbA"+p); if(ba){ const t=cp?cpdRange(cp):String(m.A??1).padStart(3,"0");
       ba.textContent=t; ba.classList.toggle("sm",t.length>4); } }
   put("pvHead"+p, `Head ${m.H??0}`);
   { const bh=$("pbH"+p); if(bh) bh.textContent=String(m.H??0); }
