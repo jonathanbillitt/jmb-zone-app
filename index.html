@@ -1385,7 +1385,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-02n.namelabel";
+const APP_VER="2026-10-02o.looks";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -4142,9 +4142,11 @@ $("btnTestStop").onclick=()=>send("TESTSEQ=0");   // banner's own way out
 $("tsFade").onclick=()=>send("TESTSEQ=1");
 $("tsStep").onclick=()=>send("TESTSEQ=2");
 $("tsOff").onclick =()=>send("TESTSEQ=0");
-$("chBlack").onclick=async()=>{ if(await askConfirm("This unit and every armed unit down the DMX line go dark.",{title:"Blackout the universe?",ok:"Blackout",danger:true})) send("CHLOOK=1"); };
-$("chFull").onclick=async()=>{ if(await askConfirm("This unit and every armed unit down the DMX line go to full.",{title:"Full on across the universe?",ok:"Full on"})) send("CHLOOK=9"); };
-$("chDmx").onclick=()=>send("CHLOOK=0");
+// Each look button says what it did (user, 2026-10-02: "DMX In seems to do
+// nothing" — it sent the baton with no sign of it).
+$("chBlack").onclick=async()=>{ if(await askConfirm("This unit and every armed unit down the DMX line go dark.",{title:"Blackout the universe?",ok:"Blackout",danger:true})){ send("CHLOOK=1"); toast("Universe: blackout sent"); } };
+$("chFull").onclick=async()=>{ if(await askConfirm("This unit and every armed unit down the DMX line go to full.",{title:"Full on across the universe?",ok:"Full on"})){ send("CHLOOK=9"); toast("Universe: full on sent"); } };
+$("chDmx").onclick=()=>{ send("CHLOOK=0"); toast("Universe: back to DMX in"); };
 // Settings down the universe (user, 2026-10-02, APP-25): everything except
 // what identifies or patches a unit. The firmware builds the baton from its
 // own config on CHSET=1; the list here is the contract in words.
@@ -5734,6 +5736,11 @@ function demoCmd(s){
   if(m=s.match(/^VARIANT=(\d)/)){ const v=+m[1]; if(v===1||v===4||v===8){ demoF.var=v; demoF.varm=1; demoState(); } return; }
   if(m=s.match(/^TESTSEQ=(\d)/)){ demoF.test=+m[1]; demoState(); return; }
   if(m=s.match(/^CHARM=(\d)/)){ demoF.chl=+m[1]; demoState(); return; }
+  // Looks across the universe: the demo's own ports show the look (blackout =
+  // dark, full = white, DMX In = back under the desk), as a real unit would.
+  if(m=s.match(/^CHLOOK=(\d+)/)){ const k=+m[1];
+    demoP.forEach(d=>{ if(k===1){ d.m=1; d.x=0; d.r=d.g=d.b=0; } else if(k===9){ d.m=1; d.x=0; d.r=d.g=d.b=100; d.d=100; } else d.m=0; });
+    demoState(); return; }
   if(s.startsWith("BTNAME=")){ demoF.btn=s.slice(7); demoState(); return; }
   if(m=s.match(/^CNAME=(.*)$/)){ demoF.cn=(m[1]==="0"||!m[1])?"":m[1]; demoState(); return; }   // the demo keeps a typed name
   if(m=s.match(/^BPM=(\d+)/)){ demoF.bpm=+m[1]; demoState(); return; }
