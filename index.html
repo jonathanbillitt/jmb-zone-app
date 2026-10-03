@@ -444,6 +444,16 @@
   .ctitle { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; }
   .ctitle label, .ctitle b { font-weight:600; font-size:15px; color:var(--text); width:auto; flex-shrink:0; white-space:nowrap; }
   .ctitle .mini { margin:0; text-align:right; }
+  /* Drop-down row: a full-width bar with a chevron that turns when open. */
+  .ddrow { display:flex; align-items:center; justify-content:space-between; width:100%;
+           padding:10px 12px; background:var(--card2); border:1px solid var(--line);
+           border-radius:10px; color:var(--text); font-size:14px; font-weight:600; text-align:left; }
+  .ddrow .chev { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2;
+                 stroke-linecap:round; stroke-linejoin:round; transition:transform .2s; }
+  .ddrow[aria-expanded="true"] .chev { transform:rotate(180deg); }
+  .ddrow[aria-expanded="true"] { border-color:var(--acc); }
+  #ctlSum { margin:7px 2px 0; }
+  #ctlRows { margin-top:12px; }
   .hashelp > .ctitle .mini { padding-right:34px; }   /* clear of the hand in the corner */
   .subhead { border-top:1px solid var(--line); margin-top:12px; padding-top:10px; font-weight:600; font-size:15px; }
   /* Setup's button rows are justified like column text (user, 2026-10-02):
@@ -984,7 +994,15 @@
     </div>
     <div class="card">
       <div class="ctitle"><label>Controller</label><span class="mini" id="ctlUp"></span></div>   <!-- powered hours as the card's status (user, 2026-10-02) -->
-      <div class="rows">
+      <!-- The settings fields sit behind a drop-down (user, 2026-10-03), closed
+           at every launch; closed, one line prints what is set, so nothing is
+           hidden that matters. The action buttons below stay in view. -->
+      <button type="button" class="ddrow" id="ctlDD" aria-expanded="false" aria-controls="ctlRows">
+        <span>Settings</span>
+        <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="mini" id="ctlSum"></div>
+      <div class="rows hidden" id="ctlRows">
         <!-- One name (user, 2026-10-02): it is the controller's name on the
              screens and in RDM, and the Bluetooth name from the next restart. -->
         <div class="row"><label style="width:auto">Controller and Bluetooth name</label>
@@ -1550,7 +1568,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-03e.vh";
+const APP_VER="2026-10-03f.ctldd";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -4139,6 +4157,10 @@ function renderSetup(){
   // vanishes ("ID / DMX hold refuse to change", bench 2026-08-28).
   if(document.activeElement!==$("setCid"))   $("setCid").value=kv.CID??"";
   if(document.activeElement!==$("setHold"))  $("setHold").value=kv.HOLD??"5";
+  // The closed drop-down's one line: what is set, read from the state.
+  { const s=$("ctlSum"); if(s){ const clm=+(kv.CLM||68), cl=+(kv.CL||clm), hold=+(kv.HOLD??5);
+      s.textContent=[hexDec(kv.CN)||"No name", "ID "+(kv.CID??"—"),
+        "hold "+(hold?hold+" s":"forever"), (cl/10)+" A"+(kv.CLK==="1"?" locked":"")].join(" · "); } }
   // Universe → Settings waits for a firmware that carries the settings baton.
   { const b=$("chSet"); if(b){ const ok=kv.CHS==="1"; b.disabled=!ok; b.title=ok?"":"Needs a firmware update"; } }
   // Factory reset waits for a firmware that takes it over Bluetooth (FR=1).
@@ -4311,6 +4333,14 @@ function limApply(){
 // The padlock is the only control (no Apply button, user 2026-10-01):
 // unlocked → apply what is in the field, then lock it; locked → unlock.
 // Enter in the field does the same as tapping it.
+// Controller settings drop-down (user, 2026-10-03): closed at every launch;
+// the summary line shows while it is closed, the fields while it is open.
+function ctlDD(open){
+  $("ctlDD").setAttribute("aria-expanded",open?"true":"false");
+  $("ctlRows").classList.toggle("hidden",!open);
+  $("ctlSum").classList.toggle("hidden",open);
+}
+$("ctlDD").onclick=()=>ctlDD($("ctlDD").getAttribute("aria-expanded")!=="true");
 $("setLim").onkeydown=e=>{ if(e.key==="Enter") $("btnLimLock").click(); };
 $("btnLimLock").onclick=()=>{ setupTouched=Date.now();
   const locked = kv.CLK==="1";
