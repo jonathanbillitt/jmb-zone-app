@@ -71,11 +71,13 @@
                    font-weight:600; }
   button.danger { border-color:#5c2e31; color:var(--bad); }
   button:disabled { opacity:.45; cursor:default; }
-  /* Sized so all six pills (DMX, CRMX, fps, ID, Cfold, Tfold) sit on one line
-     at 360 px, both folds lit included; wrapping stays as the fallback. */
+  /* Sized so all seven pills (DMX, CRMX, Test, ID, Cfold, Tfold, Fault) sit on
+     one line at 360 px, one fold lit included; wrapping stays as the fallback
+     for both folds lit at once on the narrowest phones. */
   #chips { display:flex; flex-wrap:wrap; gap:4px; padding:10px 16px 0; }
   .chip { background:var(--card); border:1px solid var(--line); border-radius:999px;
-          padding:3px 7px; font-size:11.5px; color:var(--dim); white-space:nowrap; }
+          padding:3px 6px; font-size:11px; color:var(--dim); white-space:nowrap; }
+  .chip.on-bad { border-color:var(--bad); color:var(--bad); font-weight:600; }
   /* A pill whose state is not active: there, but dark. Lit states take a colour. */
   .chip.unlit { opacity:.42; }
   .chip.on-ok { border-color:var(--ok); color:var(--ok); font-weight:600; }
@@ -777,15 +779,21 @@
 <div id="chips" class="hidden">
   <!-- Every pill that can appear is always here, unlit until its state is
        active (user, 2026-10-04: "show all pills … even if they're not lit"),
-       so the row never changes shape: DMX · CRMX · fps · ID · Cfold · Tfold. -->
+       so the row never changes shape. In order: what is driving the outputs
+       (DMX · CRMX · Test), which unit (ID), what is holding them back or wrong
+       (Cfold · Tfold · Fault). The row is state lights; fps is a number and
+       lives in Diagnostics (user's yes to the suggestion, 2026-10-04). -->
   <span class="chip" id="chipDmx">DMX <b>—</b></span>
   <span class="chip unlit" id="chipCrmx" title="CRMX wireless">CRMX</span>
-  <span class="chip" id="chipFps">fps <b>—</b></span>
+  <!-- Amber while a test sequence overrides every source; tap = its Stop. -->
+  <span class="chip unlit" id="chipTest" title="Test sequence">Test</span>
   <span class="chip" id="chipCid">ID <b>—</b></span>
   <!-- One pill per fold (user, 2026-10-04: "have Cfold and Tfold"): each lit
        only while that fold is scaling the outputs, with its scale. -->
   <span class="chip unlit" id="chipCfold" title="Current fold">Cfold</span>
   <span class="chip unlit" id="chipTfold" title="Thermal fold">Tfold</span>
+  <!-- Red while any port reports a fault; tap = that port's card. -->
+  <span class="chip unlit" id="chipFault" title="Port faults">Fault</span>
   <!-- No DEMO pill (user, 2026-10-04: "let's lose the demo pill"): Demo is
        marked by the header alone — the button reads Exit, the name Demo Rig. -->
 </div>
@@ -1597,7 +1605,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-04c.folds";
+const APP_VER="2026-10-04d.lights";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2197,8 +2205,18 @@ function onState(str){
     el.className="chip "+(cx===3?"on-crmx":cx===2?"on-crmx idle":cx===1?"on-warn":"unlit");   // purple when active
     el.title=["CRMX: not linked","CRMX: linking","CRMX: linked, no data","CRMX: linked, carrying DMX"][cx]||"CRMX: no status from this controller"; }
   renderTx();
-  setChip("chipFps","fps", kv.FPS??"—");
+  // Test pill: amber while a test sequence overrides every source (live DMX
+  // included). A tap goes to the Control tab, where its banner and Stop sit.
+  { const el=$("chipTest"), t=+(kv.TSEQ||0);
+    el.className="chip "+(t?"on-warn tap":"unlit");
+    el.title=t?`Test running: ${t===1?"Fade CMY":"Step RGBW"}. Tap for its Stop button`:"No test sequence running"; }
   setChip("chipCid","ID",  kv.CID??"—");
+  // Fault pill: red while any port reports a fault (the same bits as the port
+  // card's badge). A tap goes to the first such port's card.
+  { const el=$("chipFault"), bad=ports.map((m,i)=>(m&&m.F)?i+1:0).filter(Boolean);
+    el.className="chip "+(bad.length?"on-bad tap":"unlit");
+    el.dataset.port=bad.length?String(bad[0]):"";
+    el.title=bad.length?`Fault on port ${bad.join(", ")} (${faultWords(ports[bad[0]-1].F)}). Tap to go to it`:"No port faults"; }
   // FC / FT = the current / thermal fold scale in force (100 = none). A pill
   // each, always there: unlit with no fold, lit with its scale while it is on —
   // red for current fold, orange for thermal. A tap on a lit one opens the box.
@@ -2241,6 +2259,14 @@ function setChip(id,label,val,cls){
 const infoOpen={dmx:false,fold:false};
 $("chipDmx").onclick=()=>{ if(kv.DMX!=="1" || +(kv.TSEQ||0)) return;
   infoOpen.dmx=!infoOpen.dmx; $("dmxWarn").classList.toggle("hidden",!infoOpen.dmx); };
+// Test and Fault take you to where the thing is: the Control tab's test banner
+// (with its Stop), or the faulted port's card. They work from any tab.
+// Instant scrolls: a smooth one is dropped when the tab has only just been shown.
+$("chipTest").onclick=()=>{ if($("chipTest").classList.contains("unlit")) return;
+  selectTab("control"); scrollTo(0,0); };
+$("chipFault").onclick=()=>{ const p=+$("chipFault").dataset.port; if(!p) return;
+  selectTab("control");
+  const c=$("port"+p); if(c) c.scrollIntoView({block:"start"}); };   // the card's scroll-margin clears the pinned rows
 ["chipCfold","chipTfold"].forEach(id=>{ $(id).onclick=()=>{
   if($(id).classList.contains("unlit")) return;       // nothing to explain while that fold is off
   infoOpen.fold=!infoOpen.fold;
@@ -2272,7 +2298,7 @@ function renderControl(){
   const tw=$("testWarn");
   if(tw){
     tw.classList.toggle("hidden", !testOn);
-    if(testOn) $("testWarnName").textContent = (+kv.TSEQ===1) ? "Fade" : "Step RGBW";
+    if(testOn) $("testWarnName").textContent = (+kv.TSEQ===1) ? "Fade CMY" : "Step RGBW";
   }
   // Orange chips = something is overriding or scaling the outputs; the boxes
   // open only from a tap on the chip and drop away when the condition clears.

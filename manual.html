@@ -351,11 +351,17 @@ needs a firmware that carries the patch baton and is greyed until then), <strong
 <strong>Protection</strong> (Limit, Trip, faults). <strong>Clear all</strong> returns
 every port to a clean base — full white, effects off, dimmer down — after a
 confirmation.</p>
-<p>Under the header sits a row of <strong>pills</strong>: <strong>DMX</strong>, <strong>CRMX</strong>, <strong>fps</strong>, <strong>ID</strong>,
-<strong>Cfold</strong> and <strong>Tfold</strong>. They are always there; a pill is dark until its state
-is active and lights when it is — DMX green while a signal drives the rig, CRMX
-purple while the radio carries it, Cfold red while the current fold is scaling
-the outputs and Tfold orange while the thermal fold is, each with its scale. On the Control tab the pills and the buttons beneath them (<strong>Clear
+<p>Under the header sits a row of <strong>pills</strong>: <strong>DMX</strong>, <strong>CRMX</strong>, <strong>Test</strong>, <strong>ID</strong>,
+<strong>Cfold</strong>, <strong>Tfold</strong> and <strong>Fault</strong>. They are always there; a pill is dark until
+its state is active and lights when it is. The first three say what is driving
+the outputs: DMX green while a signal drives the rig, CRMX purple while the
+radio carries it, Test amber while a test sequence overrides everything. ID is
+the controller's number. The last three say what is holding the outputs back or
+wrong: Cfold red while the current fold is scaling them and Tfold orange while
+the thermal fold is, each with its scale, and Fault red while any port reports
+a fault. A lit pill is a shortcut: Test takes you to its Stop button, Fault to
+the port concerned, DMX and the folds to their detail box. The frame rate is in
+Diagnostics. On the Control tab the pills and the buttons beneath them (<strong>Clear
 all</strong>, <strong>Undo</strong>, <strong>Tempo</strong>, <strong>Reset WB</strong>) stay pinned under the header while
 the port cards scroll, so they are always in reach.</p>
 <p>An <strong>orange outline on a DMX address box</strong> means that port's channels overlap
