@@ -1620,7 +1620,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-04f.pillinfo";
+const APP_VER="2026-10-04g.pin";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -5397,7 +5397,8 @@ async function runOta(file, opts){
 $("btnDisc").onclick=()=>{ if(NBLE()){ NBLE().disconnect(); onDisconnected(); return; }
   const d0=dev; dev=null; if(d0&&d0.gatt.connected) d0.gatt.disconnect(); };
 $("btnPin").onclick=async()=>{
-  const v=await askText("4\u201316 characters, no spaces.",{title:"New PIN",ok:"Set PIN",maxlength:16});
+  // "Default: 0123" (user, 2026-10-04): the factory PIN, so it can be put back.
+  const v=await askText("4\u201316 characters, no spaces. Default: 0123",{title:"New PIN",ok:"Set PIN",maxlength:16});
   if(v&&v.trim().length>=4){
     send("NEWPIN="+v.trim());
     savePin(v.trim());
