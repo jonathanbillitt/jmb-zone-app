@@ -351,6 +351,13 @@ needs a firmware that carries the patch baton and is greyed until then), <strong
 <strong>Protection</strong> (Limit, Trip, faults). <strong>Clear all</strong> returns
 every port to a clean base — full white, effects off, dimmer down — after a
 confirmation.</p>
+<p>Under the header sits a row of <strong>pills</strong>: <strong>DMX</strong>, <strong>CRMX</strong>, <strong>fps</strong>, <strong>ID</strong>
+and <strong>Fold</strong>. They are always there; a pill is dark until its state is active
+and lights when it is — DMX green while a signal drives the rig, CRMX purple
+while the radio carries it, Fold orange or red while a fold is scaling the
+outputs. On the Control tab the pills and the buttons beneath them (<strong>Clear
+all</strong>, <strong>Undo</strong>, <strong>Tempo</strong>, <strong>Reset WB</strong>) stay pinned under the header while
+the port cards scroll, so they are always in reach.</p>
 <p>An <strong>orange outline on a DMX address box</strong> means that port's channels overlap
 another port's: its start address plus footprint runs into a different start
 address on the same controller. It is a nudge, not a block — overlapping can be
@@ -604,7 +611,7 @@ all ports loaded at once, at 25 °C ambient, with the air filter clean and the
 vents clear. In a hot rack, a sealed flight case or a sunlit truss, the
 controller protects itself: thermal fold eases the outputs before anything
 trips, and the power supply derates above its rated temperature. If the <em>Fold</em>
-chip appears on the header in normal use, give the unit air. Keep the intake
+pill lights under the header in normal use, give the unit air. Keep the intake
 filter clean and never block the side slots. (The ambient at which fold first
 engages at full load is recorded on the bench per product and printed here once
 measured.)</p>
@@ -624,10 +631,11 @@ brightness down — until the draw sits under the limit, then eases back up. Wit
 Current Fold off the limit is only <em>reported</em> and the per-port trips remain the
 protection.</p>
 <p>While either fold is scaling the outputs the panel footer reads <strong>FOLD C</strong> /
-<strong>FOLD T</strong> (the port screens show <code>CFOLD 82%</code> / <code>TFOLD 70%</code>), the app shows a
-<em>Fold</em> chip in the header — <strong>red</strong> for current fold, <strong>orange</strong> for thermal —
-and the live percentage under the limit field. Tap a chip for its detail box
-(the green <em>DMX live</em> chip works the same way).</p>
+<strong>FOLD T</strong> (the port screens show <code>CFOLD 82%</code> / <code>TFOLD 70%</code>), the app lights
+the <em>Fold</em> pill under the header with the scale in force — <strong>red</strong> for current
+fold, <strong>orange</strong> for thermal — and prints the live percentage under the limit
+field. Tap the lit pill for its detail box (the green <em>DMX</em> pill works the same
+way).</p>
 <hr />
 <h2>8. Camera &amp; slow-motion work</h2>
 <p>Each port dims with a high-frequency PWM carrier, picked per port from the <strong>PWM

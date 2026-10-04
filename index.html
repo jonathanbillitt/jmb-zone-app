@@ -71,9 +71,19 @@
                    font-weight:600; }
   button.danger { border-color:#5c2e31; color:var(--bad); }
   button:disabled { opacity:.45; cursor:default; }
-  #chips { display:flex; flex-wrap:wrap; gap:7px; padding:10px 16px 0; }
+  /* Sized so all six pills (DMX, CRMX, fps, ID, Fold and DEMO) sit on one line
+     at 360 px; wrapping stays as the fallback for a rare long combination. */
+  #chips { display:flex; flex-wrap:wrap; gap:5px; padding:10px 16px 0; }
   .chip { background:var(--card); border:1px solid var(--line); border-radius:999px;
-          padding:3px 11px; font-size:12px; color:var(--dim); }
+          padding:3px 8px; font-size:11.5px; color:var(--dim); white-space:nowrap; }
+  /* A pill whose state is not active: there, but dark. Lit states take a colour. */
+  .chip.unlit { opacity:.42; }
+  .chip.on-ok { border-color:var(--ok); color:var(--ok); font-weight:600; }
+  .chip.on-acc { border-color:var(--acc); color:var(--acc); font-weight:600; }
+  .chip.on-warn { border-color:var(--warn); color:var(--warn); font-weight:600; }
+  /* CRMX is purple when active (user, 2026-10-04); linked but idle = the same purple, quieter. */
+  .chip.on-crmx { border-color:#b16aff; color:#b16aff; font-weight:600; }
+  .chip.on-crmx.idle { opacity:.62; }
   .chip b { color:var(--text); font-weight:600; }
   .chip.ok b { color:var(--ok); } .chip.bad b { color:var(--bad); }
   .chip.warn { border-color:var(--warn); } .chip.warn b { color:var(--warn); }
@@ -336,6 +346,20 @@
   /* Dashboard row under the chips: equal bare buttons, lit (.glow) while their
      state is active (user, 2026-10-02: "visible and lit when active"). */
   .dash { display:flex; gap:8px; padding:10px 16px 0; }
+  /* Control tab: the status chips and the dashboard are pinned under the
+     header, so the DMX state and Clear all / Undo / Tempo / Reset WB stay on
+     hand while the port cards scroll (user, 2026-10-04). The offsets are the
+     MEASURED heights (pinPlace), never assumed. Short windows (a phone on its
+     side) keep both rows in the flow: pinned, they would leave no room. */
+  @media (min-height:560px){
+    body[data-tab="control"] #chips { position:sticky; top:var(--hdrH,64px); z-index:4; padding-bottom:8px;
+      background:rgba(22,27,35,.92); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
+    body[data-tab="control"] main { padding-top:0; }
+    body[data-tab="control"] .dash { position:sticky; top:calc(var(--hdrH,64px) + var(--chipsH,42px)); z-index:4;
+      margin:0 -16px; padding:8px 32px 10px; border-bottom:1px solid var(--line);
+      background:rgba(22,27,35,.92); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
+    body[data-tab="control"] #ports .card { scroll-margin-top:calc(var(--hdrH,64px) + var(--chipsH,42px) + 72px); }
+  }
   .dash button { flex:1; min-width:0; padding:11px 6px; font-size:13.5px; line-height:1.2;
                  white-space:nowrap; border-radius:10px; }
   .dash button.glow { border-color:var(--acc); color:var(--acc);
@@ -753,11 +777,15 @@
 
 
 <div id="chips" class="hidden">
+  <!-- Every pill that can appear is always here, unlit until its state is
+       active (user, 2026-10-04: "show all pills … even if they're not lit"),
+       so the row never changes shape: DMX · CRMX · fps · ID · Fold. -->
   <span class="chip" id="chipDmx">DMX <b>—</b></span>
+  <span class="chip unlit" id="chipCrmx" title="CRMX wireless">CRMX</span>
   <span class="chip" id="chipFps">fps <b>—</b></span>
   <span class="chip" id="chipCid">ID <b>—</b></span>
-  <!-- Only while a current / thermal fold is scaling the outputs. -->
-  <span class="chip warn hidden" id="chipFold">Fold <b>—</b></span>
+  <!-- Lit only while a current / thermal fold is scaling the outputs. -->
+  <span class="chip unlit" id="chipFold" title="Current / thermal fold">Fold</span>
   <!-- Demo marker: a chip at the right end of this row (user, 2026-10-02; the
        banner above the cards pushed the ports down). Connect reads "Exit". -->
   <span class="chip demo hidden" id="demoPill" title="Example data, not a live controller"><b>DEMO</b></span>
@@ -1570,7 +1598,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-04a.swap";
+const APP_VER="2026-10-04b.pin";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1702,6 +1730,8 @@ function selectTab(name){
     el.classList.remove("hidden");
   }
   movePill();
+  document.body.dataset.tab=name;      // the Control tab pins the chips and the dashboard (CSS)
+  pinPlace();
   { const bar=$("scnBar"); if(bar){ bar.classList.toggle("hidden", name!=="scenes"); scnBarPlace(); } }
   if(name==="control" && typeof fxPreviewKick==="function") fxPreviewKick();
   if(name==="colour" && typeof fitCols==="function") fitCols();
@@ -1715,6 +1745,18 @@ function scnBarPlace(){
   if(h>0) bar.style.bottom=Math.ceil(h)+"px";
 }
 ["resize","orientationchange","load"].forEach(ev=>addEventListener(ev,scnBarPlace));
+// Pinned rows on the Control tab (chips, then the dashboard) hang off the
+// header's and the chips' measured heights; floor, so a row tucks a fraction
+// under the one above rather than leaving a hairline for the cards to show in.
+function pinPlace(){
+  const h=document.querySelector("header"), c=$("chips"); if(!h||!c) return;
+  const r=document.documentElement.style, hh=h.getBoundingClientRect().height, ch=c.getBoundingClientRect().height;
+  if(hh>0) r.setProperty("--hdrH",Math.floor(hh)+"px");
+  if(ch>0) r.setProperty("--chipsH",Math.floor(ch)+"px");
+}
+["resize","orientationchange","load"].forEach(ev=>addEventListener(ev,pinPlace));
+if(window.ResizeObserver){ try{ const ro=new ResizeObserver(()=>pinPlace());
+  ro.observe(document.querySelector("header")); ro.observe($("chips")); }catch(_){} }
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(scnBarPlace).catch(()=>{});
 // Colour tab: the picker columns stretch to the screen (user, 2026-10-01:
 // "always stretch the colour tab to fit"). Measure the room left above the
@@ -1769,6 +1811,7 @@ function showApp(){
 function hideApp(){
   $("chips").classList.add("hidden");
   $("nav").classList.add("hidden");
+  delete document.body.dataset.tab;     // no pinned rows (or their spacing) on the connect screen
   { const bar=$("scnBar"); if(bar) bar.classList.add("hidden"); }
   document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
 }
@@ -2145,15 +2188,26 @@ function onState(str){
     ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
   }
   // DI= which input the receiver follows: 1 = the CRMX line (wired quiet).
-  setChip("chipDmx","DMX", kv.DMX==="1"?(kv.DI==="1"?"live · CRMX":"live"):"none", kv.DMX==="1"?"ok tap":"bad");
+  // DMX pill: lit green (tap for the detail box) while a signal drives the rig,
+  // unlit with none — the same lit / unlit language as the other pills.
+  { const el=$("chipDmx"), live=kv.DMX==="1";
+    el.textContent="DMX"; el.className="chip "+(live?"on-ok tap":"unlit");
+    el.title=live?"DMX: live. Tap for detail":"DMX: no signal"; }
+  // CRMX pill: always there. CX 0 not linked · 1 linking · 2 linked, no data · 3 linked and carrying DMX.
+  { const cx=kv.CX==null?-1:+kv.CX, el=$("chipCrmx");
+    el.className="chip "+(cx===3?"on-crmx":cx===2?"on-crmx idle":cx===1?"on-warn":"unlit");   // purple when active
+    el.title=["CRMX: not linked","CRMX: linking","CRMX: linked, no data","CRMX: linked, carrying DMX"][cx]||"CRMX: no status from this controller"; }
   renderTx();
   setChip("chipFps","fps", kv.FPS??"—");
   setChip("chipCid","ID",  kv.CID??"—");
-  // FC / FT = the current / thermal fold scale in force (100 = none).
+  // FC / FT = the current / thermal fold scale in force (100 = none). The pill
+  // is always there: unlit with no fold, lit with the scale while one is on.
   { const fc=+(kv.FC??100), ft=+(kv.FT??100), on=fc<100||ft<100;
-    if(on) setChip("chipFold","Fold",(fc<100?`C ${fc}%`:"")+(fc<100&&ft<100?" · ":"")+(ft<100?`T ${ft}%`:""),
-                   fc<100?"bad tap":"warn tap");   // red = current, orange = thermal
-    $("chipFold").classList.toggle("hidden",!on); }
+    // Lit: one figure, the scale in force (the lower of the two); the colour
+    // says which fold — red = current, orange = thermal — and a tap gives both.
+    if(on){ setChip("chipFold","Fold",Math.min(fc,ft)+"%", fc<100?"bad tap":"warn tap");
+            $("chipFold").title=(fc<100?`Current fold ${fc}%`:"")+(fc<100&&ft<100?" · ":"")+(ft<100?`Thermal fold ${ft}%`:"")+". Tap for detail"; }
+    else { const el=$("chipFold"); el.textContent="Fold"; el.className="chip unlit"; el.title="No fold in force"; } }
   if(n){ const cn=hexDec(kv.CN);
     $("title").textContent=(cn||devName()||"JMB Lighting")+" · "+n+"-port"; }
   if(n && n!==colPortsN){ renderColourTargets(n); colPortsN=n; }
@@ -2187,7 +2241,8 @@ function setChip(id,label,val,cls){
 const infoOpen={dmx:false,fold:false};
 $("chipDmx").onclick=()=>{ if(kv.DMX!=="1" || +(kv.TSEQ||0)) return;
   infoOpen.dmx=!infoOpen.dmx; $("dmxWarn").classList.toggle("hidden",!infoOpen.dmx); };
-$("chipFold").onclick=()=>{ infoOpen.fold=!infoOpen.fold;
+$("chipFold").onclick=()=>{ if($("chipFold").classList.contains("unlit")) return;   // nothing to explain while no fold is on
+  infoOpen.fold=!infoOpen.fold;
   $("foldWarn").classList.toggle("hidden",!infoOpen.fold); };
 $("dmxWarn").onclick=()=>{ infoOpen.dmx=false; $("dmxWarn").classList.add("hidden"); };
 $("foldWarn").onclick=()=>{ infoOpen.fold=false; $("foldWarn").classList.add("hidden"); };
