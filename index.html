@@ -81,7 +81,20 @@
      another"): every pill takes an equal share of the slack on top of its own
      width, so the row always runs from the left gutter to the right one,
      whatever the phone's width, and a lit pill's value still fits. */
-  #chips .chip { flex:1 1 auto; text-align:center; max-width:120px; }   /* the cap keeps a lone wrapped pill from spanning the row */
+  #chips .chip { flex:1 1 auto; text-align:center; max-width:120px; cursor:pointer; }   /* the cap keeps a lone wrapped pill from spanning the row */
+  /* The pill's explanation box: hung from the row (so it follows it, pinned or
+     not), over whatever is below, in the pill's own colour. */
+  #chips { position:relative; z-index:5; }
+  .pinfo { position:absolute; left:16px; right:16px; top:calc(100% + 6px); z-index:6; text-align:left;
+           border:1px solid; border-radius:12px; padding:11px 13px; font-size:13.5px; line-height:1.45;
+           box-shadow:0 12px 28px rgba(0,0,0,.6); cursor:pointer; }
+  .pinfo strong { display:block; font-size:15px; margin-bottom:3px; }
+  .pinfo button { display:block; margin-top:10px; }
+  .pinfo.c-ok   { background:#12301c; border-color:var(--ok);   color:var(--ok); }
+  .pinfo.c-crmx { background:#261a3b; border-color:#b16aff;     color:#cda6ff; }
+  .pinfo.c-warn { background:#3d2f14; border-color:var(--warn); color:var(--warn); }
+  .pinfo.c-bad  { background:#3a1518; border-color:var(--bad);  color:var(--bad); }
+  .pinfo.c-acc  { background:#12263d; border-color:var(--acc);  color:var(--acc); }
   .chip.on-bad { border-color:var(--bad); color:var(--bad); font-weight:600; }
   /* A pill whose state is not active: there, but dark. Lit states take a colour. */
   .chip.unlit { opacity:.42; }
@@ -359,7 +372,7 @@
      MEASURED heights (pinPlace), never assumed. Short windows (a phone on its
      side) keep both rows in the flow: pinned, they would leave no room. */
   @media (min-height:560px){
-    body[data-tab="control"] #chips { position:sticky; top:var(--hdrH,64px); z-index:4; padding-bottom:8px;
+    body[data-tab="control"] #chips { position:sticky; top:var(--hdrH,64px); z-index:5; padding-bottom:8px;   /* 5: its info box must sit over the dashboard (4) */
       background:rgba(22,27,35,.92); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
     body[data-tab="control"] main { padding-top:0; }
     body[data-tab="control"] .dash { position:sticky; top:calc(var(--hdrH,64px) + var(--chipsH,42px)); z-index:4;
@@ -799,6 +812,16 @@
   <span class="chip unlit" id="chipTfold" title="Thermal fold">Tfold</span>
   <!-- Red while any port reports a fault; tap = that port's card. -->
   <span class="chip unlit" id="chipFault" title="Port faults">Fault</span>
+  <!-- Every pill explains itself (user, 2026-10-04: "each pill needs to bring
+       up its meaning in its native colour just like dmx"): a tap opens this
+       box under the row, in that pill's colour, lit or not; a tap on the box
+       or the pill closes it. It hangs from the row, so it shows wherever the
+       row is, pinned or not, and pushes nothing down. -->
+  <div id="pillInfo" class="pinfo hidden" role="status">
+    <strong id="pillInfoTitle"></strong>
+    <span id="pillInfoTxt"></span>
+    <button id="pillInfoAct" class="hidden"></button>
+  </div>
   <!-- No DEMO pill (user, 2026-10-04: "let's lose the demo pill"): Demo is
        marked by the header alone — the button reads Exit, the name Demo Rig. -->
 </div>
@@ -821,21 +844,8 @@
   <div id="connectSplash"><img src="jmb-splash.png" alt="JMB Lighting" fetchpriority="high"></div>
   <div id="connectMarks" aria-label="JMB Zone, 4our and 8ight"></div>
 
-  <!-- Info boxes for the orange header chips (user, 2026-09-24): the chip
-       carries the state; tapping it opens the box on whichever tab is showing,
-       tapping again or tapping the box closes it. -->
-  <div id="dmxWarn" class="dmxwarn good hidden">
-    <strong>Live DMX in control</strong>
-    <span id="dmxWarnSrc"></span> is driving the outputs — manual colour, dimmer
-    and effects here are <em>overridden</em> until the signal stops.
-  </div>
-  <!-- Current / thermal fold in force: the controller is scaling brightness
-       back to hold the current limit (Setup → controller card) or ride out a
-       hot port. Same wording as the FOLD C / FOLD T footer on the screen. -->
-  <div id="foldWarn" class="dmxwarn hidden">
-    <strong id="foldWarnTitle">Fold active</strong>
-    <span id="foldWarnTxt"></span>
-  </div>
+  <!-- The pills' explanation box is #pillInfo, hung from the pill row itself
+       (it replaced the separate DMX and fold boxes here, 2026-10-04). -->
 
   <div id="tab-control" class="tab hidden">
     <div id="testWarn" class="testwarn hidden">
@@ -1610,7 +1620,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-04e.spread";
+const APP_VER="2026-10-04f.pillinfo";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1744,6 +1754,7 @@ function selectTab(name){
   movePill();
   document.body.dataset.tab=name;      // the Control tab pins the chips and the dashboard (CSS)
   pinPlace();
+  try{ pillInfoClose(); }catch(_){}    // a pill's box does not follow you to another tab
   { const bar=$("scnBar"); if(bar){ bar.classList.toggle("hidden", name!=="scenes"); scnBarPlace(); } }
   if(name==="control" && typeof fxPreviewKick==="function") fxPreviewKick();
   if(name==="colour" && typeof fitCols==="function") fitCols();
@@ -1824,6 +1835,7 @@ function hideApp(){
   $("chips").classList.add("hidden");
   $("nav").classList.add("hidden");
   delete document.body.dataset.tab;     // no pinned rows (or their spacing) on the connect screen
+  try{ pillInfoClose(); }catch(_){}
   { const bar=$("scnBar"); if(bar) bar.classList.add("hidden"); }
   document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
 }
@@ -2221,7 +2233,8 @@ function onState(str){
   { const el=$("chipFault"), bad=ports.map((m,i)=>(m&&m.F)?i+1:0).filter(Boolean);
     el.className="chip "+(bad.length?"on-bad tap":"unlit");
     el.dataset.port=bad.length?String(bad[0]):"";
-    el.title=bad.length?`Fault on port ${bad.join(", ")} (${faultWords(ports[bad[0]-1].F)}). Tap to go to it`:"No port faults"; }
+    el.title=bad.length?`Fault on port ${bad.join(", ")} (${faultWords(ports[bad[0]-1].F)}). Tap for detail`:"No port faults"; }
+  pillInfoPaint();                         // an open pill box follows the state
   // FC / FT = the current / thermal fold scale in force (100 = none). A pill
   // each, always there: unlit with no fold, lit with its scale while it is on —
   // red for current fold, orange for thermal. A tap on a lit one opens the box.
@@ -2260,24 +2273,75 @@ function setChip(id,label,val,cls){
   el.innerHTML=esc(label)+" <b>"+esc(val)+"</b>";
   el.className="chip"+(cls?" "+cls:"");
 }
-// Tap an orange chip for its info box; the next state line keeps it in step.
-const infoOpen={dmx:false,fold:false};
-$("chipDmx").onclick=()=>{ if(kv.DMX!=="1" || +(kv.TSEQ||0)) return;
-  infoOpen.dmx=!infoOpen.dmx; $("dmxWarn").classList.toggle("hidden",!infoOpen.dmx); };
-// Test and Fault take you to where the thing is: the Control tab's test banner
-// (with its Stop), or the faulted port's card. They work from any tab.
-// Instant scrolls: a smooth one is dropped when the tab has only just been shown.
-$("chipTest").onclick=()=>{ if($("chipTest").classList.contains("unlit")) return;
-  selectTab("control"); scrollTo(0,0); };
-$("chipFault").onclick=()=>{ const p=+$("chipFault").dataset.port; if(!p) return;
-  selectTab("control");
-  const c=$("port"+p); if(c) c.scrollIntoView({block:"start"}); };   // the card's scroll-margin clears the pinned rows
-["chipCfold","chipTfold"].forEach(id=>{ $(id).onclick=()=>{
-  if($(id).classList.contains("unlit")) return;       // nothing to explain while that fold is off
-  infoOpen.fold=!infoOpen.fold;
-  $("foldWarn").classList.toggle("hidden",!infoOpen.fold); }; });
-$("dmxWarn").onclick=()=>{ infoOpen.dmx=false; $("dmxWarn").classList.add("hidden"); };
-$("foldWarn").onclick=()=>{ infoOpen.fold=false; $("foldWarn").classList.add("hidden"); };
+// ---- Pill info (user, 2026-10-04: "each pill needs to bring up its meaning in
+// its native colour just like dmx") ----
+// One box for all seven pills. A tap on a pill opens it in that pill's colour,
+// lit or not, saying what the pill means and where things stand now; a tap on
+// the pill or the box closes it. Each state line repaints it, so it stays in
+// step. Where there is something to do it carries the button: Stop test, or
+// Go to the faulted port (these replaced the pills' own jumps).
+let pillOpen="";
+const PILL_COL={chipDmx:"c-ok",chipCrmx:"c-crmx",chipTest:"c-warn",chipCid:"c-acc",
+                chipCfold:"c-bad",chipTfold:"c-warn",chipFault:"c-bad"};
+function pillInfoClose(){ pillOpen=""; pillInfoPaint(); }
+function pillInfoPaint(){
+  const box=$("pillInfo"); if(!box) return;
+  if(!pillOpen){ box.classList.add("hidden"); return; }
+  let title="", txt="", act=null;
+  const fc=+(kv.FC??100), ft=+(kv.FT??100), t=+(kv.TSEQ||0);
+  switch(pillOpen){
+    case "chipDmx": { const live=kv.DMX==="1";
+      let src=["a network source","DMX","sACN","Art-Net","CRMX"][+(kv.SRC||1)]||"DMX";
+      if(src==="DMX" && kv.DI==="1") src="CRMX";
+      title=live?"Live DMX in control":"DMX: no signal";
+      txt=live?`${src}${kv.FPS?` (${kv.FPS} fps)`:""} is driving the outputs. Manual colour, dimmer and effects here are overridden until the signal stops.`
+              :"Lights green while a desk drives the rig. With no signal the controls here are yours.";
+      break; }
+    case "chipCrmx": { const cx=kv.CX==null?-1:+kv.CX;
+      title="CRMX wireless";
+      txt=cx===3?`Linked and carrying DMX${kv.FPS?` at ${kv.FPS} fps`:""}.`
+         :cx===2?(kv.CXF==="1"?"Linked, but the transmitter is sending no data.":"Linked, but no radio signal from the transmitter.")
+         :cx===1?"Linking to a transmitter…"
+         :cx===0?"Not linked. Start the link from the transmitter; this receiver joins the first one that links."
+         :"No radio status from this controller.";
+      break; }
+    case "chipTest":
+      title=t?"Test sequence running":"Test";
+      txt=t?`${t===1?"Fade CMY":"Step RGBW"} is driving every port and overrides every source, live DMX included.`
+           :"Lights while a test sequence (Setup → Test sequences) is overriding the outputs. None is running.";
+      if(t) act={label:"Stop test", run:()=>send("TESTSEQ=0")};
+      break;
+    case "chipCid":
+      title="Controller ID "+(kv.CID??"—");
+      txt="This unit's number: on its screens, in its Bluetooth name and in its RDM label. Change it in Setup → Controller → Settings.";
+      break;
+    case "chipCfold":
+      title=fc<100?"Current fold active":"Current fold";
+      txt=fc<100?`Every output is scaled to ${fc}% to hold the ${(+(kv.CL||0)/10).toFixed(1)} A limit.`
+               :"Lights when the total draw reaches the controller's limit and every output is scaled back together. Not in force.";
+      break;
+    case "chipTfold":
+      title=ft<100?"Thermal fold active":"Thermal fold";
+      txt=ft<100?`The hottest port is scaled to ${ft}% to ride out its temperature.`
+               :"Lights when a hot port is dimmed over its last 10 °C instead of tripping. Not in force.";
+      break;
+    case "chipFault": { const bad=ports.map((m,i)=>(m&&m.F)?i+1:0).filter(Boolean);
+      title=!bad.length?"Fault":bad.length===1?"Fault on port "+bad[0]:"Faults on ports "+bad.join(", ");
+      txt=bad.length?bad.map(p=>`Port ${p}: ${faultWords(ports[p-1].F)}`).join(" · ")+". Clear it in the port's Protection sheet."
+                   :"Lights when any port trips or reports a fault. No faults.";
+      // Instant scroll: a smooth one is dropped when the tab has only just been
+      // shown; the card's scroll-margin clears the pinned rows.
+      if(bad.length) act={label:"Go to port "+bad[0], run:()=>{ selectTab("control");
+        const c=$("port"+bad[0]); if(c) c.scrollIntoView({block:"start"}); }};
+      break; }
+  }
+  $("pillInfoTitle").textContent=title; $("pillInfoTxt").textContent=txt;
+  const b=$("pillInfoAct"); b.classList.toggle("hidden",!act);
+  if(act){ b.textContent=act.label; b.onclick=e=>{ e.stopPropagation(); act.run(); pillInfoClose(); }; }
+  box.className="pinfo "+(PILL_COL[pillOpen]||"c-acc");
+}
+Object.keys(PILL_COL).forEach(id=>{ $(id).onclick=()=>{ pillOpen = pillOpen===id ? "" : id; pillInfoPaint(); }; });
+$("pillInfo").onclick=pillInfoClose;
 function faultWords(f){ return FAULTS.filter(([b])=>f&b).map(([,t])=>t).join("+")||""; }
 function setIf(p,key,apply){
   const el=$(key.toLowerCase()+p);
@@ -2305,33 +2369,7 @@ function renderControl(){
     tw.classList.toggle("hidden", !testOn);
     if(testOn) $("testWarnName").textContent = (+kv.TSEQ===1) ? "Fade CMY" : "Step RGBW";
   }
-  // Orange chips = something is overriding or scaling the outputs; the boxes
-  // open only from a tap on the chip and drop away when the condition clears.
-  const w=$("dmxWarn");
-  if(w){
-    const on=dmxLive && !testOn; if(!on) infoOpen.dmx=false;
-    w.classList.toggle("hidden", !(on && infoOpen.dmx));
-    if(dmxLive){
-      let src=["a network source","DMX","sACN","Art-Net","CRMX"][+(kv.SRC||1)]||"DMX";
-      if(src==="DMX" && kv.DI==="1") src="CRMX";
-      $("dmxWarnSrc").textContent=src+(kv.FPS?` (${kv.FPS} fps)`:"");
-    }
-  }
-  const fw=$("foldWarn");
-  if(fw){
-    const fc=+(kv.FC??100), ft=+(kv.FT??100), on=fc<100||ft<100;
-    if(!on) infoOpen.fold=false;
-    fw.classList.toggle("hidden", !(on && infoOpen.fold));
-    fw.classList.toggle("bad", fc<100);          // red = current fold, orange = thermal only
-    if(on){
-      $("foldWarnTitle").textContent = fc<100 ? "Current fold active" : "Thermal fold active";
-      const lim=(+(kv.CL||0)/10).toFixed(1);
-      $("foldWarnTxt").innerHTML = fc<100
-        ? `Current fold — every output is scaled to <em>${fc}%</em> to hold the ${lim} A limit`
-          + (ft<100 ? `; thermal fold has the hottest port at <em>${ft}%</em>.` : ".")
-        : `Thermal fold — the hottest port is scaled to <em>${ft}%</em> to ride out its temperature.`;
-    }
-  }
+  // (The DMX and fold detail boxes are the pills' own box now: pillInfoPaint.)
   const lk=(dmxLive||testOn) && !demoOn;
   const bp=$("btnPrep"); if(bp){ bp.disabled=lk; bp.style.opacity=lk?".45":"";
     // Blue (the app's primary) only while there is something to clear — any
