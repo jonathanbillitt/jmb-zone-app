@@ -812,8 +812,9 @@
     <div class="dash" id="prepGrid">
       <button id="btnPrep" title="Every port to full white, effects off, dimmer down">Clear all</button>
       <button id="btnUndo" title="Put back the looks from before the last Clear all">Undo</button>
-      <button id="btnWbReset" class="hidden" title="Every colour of every port back to full">Reset WB</button>
+      <!-- Tempo before Reset WB (user, 2026-10-04). -->
       <button id="btnFx" title="Tempo and spread for the whole rig">Tempo</button>   <!-- was Effects (user, 2026-10-02: "not really effects") -->
+      <button id="btnWbReset" class="hidden" title="Every colour of every port back to full">Reset WB</button>
     </div>
     <div id="ports"></div>
   </div>
@@ -1140,8 +1141,9 @@
       </div>
       <div class="row devonly"><span class="mini" id="crmxRaw" style="margin:0;flex:1"></span></div>
       <div class="ctlrow" style="margin-top:6px">
-        <button id="crmxLink" class="primary">Link</button>
+        <!-- Unlink first, Link second (user, 2026-10-04). -->
         <button id="crmxUnlink" class="danger">Unlink</button>
+        <button id="crmxLink" class="primary">Link</button>
       </div>
       <!-- No antenna select (user, 2026-10-02): the external antenna is locked
            on in firmware since 2026-09-25. -->
@@ -1568,7 +1570,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-03f.ctldd";
+const APP_VER="2026-10-04a.swap";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
