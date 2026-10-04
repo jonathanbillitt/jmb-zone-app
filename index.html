@@ -1620,7 +1620,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-04g.pin";
+const APP_VER="2026-10-04h.demolink";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -6162,7 +6162,7 @@ function demoState(){
     `VAR=${demoF.var};VARM=${demoF.varm};BTN=${demoF.btn};`+
     `FLKON=${demoF.flkon};FLKL=0;`+
     `NET=${demoF.net};NW=${demoF.net};NUN=${demoF.nun};SRC=${demoF.net?1:0};`+
-    `NIP=192.168.1.42;NRS=-52;TF=${demoF.tf};PB=${demoF.cl};`+demoLimits()+"CX=3;CA=1;"+
+    `NIP=192.168.1.42;NRS=-52;TF=${demoF.tf};PB=${demoF.cl};`+demoLimits()+`CX=${demoF.cx??3};CXF=${(demoF.cx??3)>=2?1:0};CA=1;`+   // CX follows Link / Unlink (user, 2026-10-04)
     `SH=${demoF.sh||5};SHM=${demoF.sh?1:0};`+     // 5 mΩ on every product since 2026-09-23: the ceiling reads 6.75 A
     "NCH=5;CHP=1;CHS=1;FR=1;"+                  // the demo is a five-channel unit with the universe batons and a factory reset: no firmware greying
     "PWLIM=2000,25000;"+PWC+demoF.cpd.map((c,k)=>`CPD${k+1}=${c||"0"};`).join("")+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)).join("")+
@@ -6289,6 +6289,13 @@ function demoCmd(s){
   if(m=s.match(/^CNAME=(.*)$/)){ demoF.cn=(m[1]==="0"||!m[1])?"":m[1]; demoState(); return; }   // the demo keeps a typed name
   if(m=s.match(/^BPM=(\d+)/)){ demoF.bpm=+m[1]; demoState(); return; }
   if(m=s.match(/^SPREAD=(\d+)/)){ demoF.spr=+m[1]; demoState(); return; }   // was never echoed: the next state line put the slider back (2026-10-03)
+  // CRMX Link / Unlink (user, 2026-10-04: "make sure the pills and prompts say
+  // unlinked if I select CRMX unlink"): Unlink reads not linked everywhere;
+  // Link shows linking for a moment, then linked and carrying DMX. Held for
+  // the session like every other demo edit.
+  if(s==="CRMXUNLINK"){ clearTimeout(demoF.cxT); demoF.cx=0; demoState(); return; }
+  if(s==="CRMXLINK"){ clearTimeout(demoF.cxT); demoF.cx=1; demoState();
+    demoF.cxT=setTimeout(()=>{ if(demoOn && demoF.cx===1){ demoF.cx=3; demoState(); } },2200); return; }
   if(m=s.match(/^SHUNT=(\d+)/)){ demoF.sh=+m[1]; demoState(); return; }
   if(m=s.match(/^PSUDA=(\d+)/)){ if(!demoF.clk) demoF.cl=+m[1]; demoState(); return; }
   if(m=s.match(/^CLOCK=(\d)/)){ demoF.clk=+m[1]; demoState(); return; }
