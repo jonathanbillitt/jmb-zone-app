@@ -76,7 +76,12 @@
      for both folds lit at once on the narrowest phones. */
   #chips { display:flex; flex-wrap:wrap; gap:4px; padding:10px 16px 0; }
   .chip { background:var(--card); border:1px solid var(--line); border-radius:999px;
-          padding:3px 6px; font-size:11px; color:var(--dim); white-space:nowrap; }
+          padding:3px 4px; font-size:11px; color:var(--dim); white-space:nowrap; }   /* 4 px is the floor; the spread below adds the rest */
+  /* Spread edge to edge (user, 2026-10-04: "spread evenly from one side to
+     another"): every pill takes an equal share of the slack on top of its own
+     width, so the row always runs from the left gutter to the right one,
+     whatever the phone's width, and a lit pill's value still fits. */
+  #chips .chip { flex:1 1 auto; text-align:center; max-width:120px; }   /* the cap keeps a lone wrapped pill from spanning the row */
   .chip.on-bad { border-color:var(--bad); color:var(--bad); font-weight:600; }
   /* A pill whose state is not active: there, but dark. Lit states take a colour. */
   .chip.unlit { opacity:.42; }
@@ -1605,7 +1610,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-04d.lights";
+const APP_VER="2026-10-04e.spread";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
