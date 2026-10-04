@@ -71,11 +71,11 @@
                    font-weight:600; }
   button.danger { border-color:#5c2e31; color:var(--bad); }
   button:disabled { opacity:.45; cursor:default; }
-  /* Sized so all six pills (DMX, CRMX, fps, ID, Fold and DEMO) sit on one line
-     at 360 px; wrapping stays as the fallback for a rare long combination. */
-  #chips { display:flex; flex-wrap:wrap; gap:5px; padding:10px 16px 0; }
+  /* Sized so all six pills (DMX, CRMX, fps, ID, Cfold, Tfold) sit on one line
+     at 360 px, both folds lit included; wrapping stays as the fallback. */
+  #chips { display:flex; flex-wrap:wrap; gap:4px; padding:10px 16px 0; }
   .chip { background:var(--card); border:1px solid var(--line); border-radius:999px;
-          padding:3px 8px; font-size:11.5px; color:var(--dim); white-space:nowrap; }
+          padding:3px 7px; font-size:11.5px; color:var(--dim); white-space:nowrap; }
   /* A pill whose state is not active: there, but dark. Lit states take a colour. */
   .chip.unlit { opacity:.42; }
   .chip.on-ok { border-color:var(--ok); color:var(--ok); font-weight:600; }
@@ -460,8 +460,6 @@
   .pill { font-size:12px; font-weight:600; padding:3px 12px; border-radius:999px;
           background:#3a2325; color:var(--bad); }
   .pill.live { background:#12351c; color:var(--ok); }
-  .chip.demo { background:#1e2a3d; border-color:#4a6da8; color:#9cc0f5; margin-left:auto; }
-  .chip.demo b { color:#9cc0f5; }
   header #btnConnect { white-space:nowrap; flex-shrink:0; }
   /* Every Setup card titles itself the same way (user, 2026-10-02): bold
      title left, any status right; a section inside a card matches the size. */
@@ -779,16 +777,17 @@
 <div id="chips" class="hidden">
   <!-- Every pill that can appear is always here, unlit until its state is
        active (user, 2026-10-04: "show all pills … even if they're not lit"),
-       so the row never changes shape: DMX · CRMX · fps · ID · Fold. -->
+       so the row never changes shape: DMX · CRMX · fps · ID · Cfold · Tfold. -->
   <span class="chip" id="chipDmx">DMX <b>—</b></span>
   <span class="chip unlit" id="chipCrmx" title="CRMX wireless">CRMX</span>
   <span class="chip" id="chipFps">fps <b>—</b></span>
   <span class="chip" id="chipCid">ID <b>—</b></span>
-  <!-- Lit only while a current / thermal fold is scaling the outputs. -->
-  <span class="chip unlit" id="chipFold" title="Current / thermal fold">Fold</span>
-  <!-- Demo marker: a chip at the right end of this row (user, 2026-10-02; the
-       banner above the cards pushed the ports down). Connect reads "Exit". -->
-  <span class="chip demo hidden" id="demoPill" title="Example data, not a live controller"><b>DEMO</b></span>
+  <!-- One pill per fold (user, 2026-10-04: "have Cfold and Tfold"): each lit
+       only while that fold is scaling the outputs, with its scale. -->
+  <span class="chip unlit" id="chipCfold" title="Current fold">Cfold</span>
+  <span class="chip unlit" id="chipTfold" title="Thermal fold">Tfold</span>
+  <!-- No DEMO pill (user, 2026-10-04: "let's lose the demo pill"): Demo is
+       marked by the header alone — the button reads Exit, the name Demo Rig. -->
 </div>
 
 <main>
@@ -1598,7 +1597,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-04b.pin";
+const APP_VER="2026-10-04c.folds";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2200,14 +2199,15 @@ function onState(str){
   renderTx();
   setChip("chipFps","fps", kv.FPS??"—");
   setChip("chipCid","ID",  kv.CID??"—");
-  // FC / FT = the current / thermal fold scale in force (100 = none). The pill
-  // is always there: unlit with no fold, lit with the scale while one is on.
-  { const fc=+(kv.FC??100), ft=+(kv.FT??100), on=fc<100||ft<100;
-    // Lit: one figure, the scale in force (the lower of the two); the colour
-    // says which fold — red = current, orange = thermal — and a tap gives both.
-    if(on){ setChip("chipFold","Fold",Math.min(fc,ft)+"%", fc<100?"bad tap":"warn tap");
-            $("chipFold").title=(fc<100?`Current fold ${fc}%`:"")+(fc<100&&ft<100?" · ":"")+(ft<100?`Thermal fold ${ft}%`:"")+". Tap for detail"; }
-    else { const el=$("chipFold"); el.textContent="Fold"; el.className="chip unlit"; el.title="No fold in force"; } }
+  // FC / FT = the current / thermal fold scale in force (100 = none). A pill
+  // each, always there: unlit with no fold, lit with its scale while it is on —
+  // red for current fold, orange for thermal. A tap on a lit one opens the box.
+  { const fc=+(kv.FC??100), ft=+(kv.FT??100);
+    const fold=(id,label,v,cls,name)=>{ const el=$(id);
+      if(v<100){ setChip(id,label,v+"%",cls+" tap"); el.title=`${name} fold: outputs at ${v}%. Tap for detail`; }
+      else { el.textContent=label; el.className="chip unlit"; el.title=`${name} fold: not in force`; } };
+    fold("chipCfold","Cfold",fc,"bad","Current");
+    fold("chipTfold","Tfold",ft,"warn","Thermal"); }
   if(n){ const cn=hexDec(kv.CN);
     $("title").textContent=(cn||devName()||"JMB Lighting")+" · "+n+"-port"; }
   if(n && n!==colPortsN){ renderColourTargets(n); colPortsN=n; }
@@ -2241,9 +2241,10 @@ function setChip(id,label,val,cls){
 const infoOpen={dmx:false,fold:false};
 $("chipDmx").onclick=()=>{ if(kv.DMX!=="1" || +(kv.TSEQ||0)) return;
   infoOpen.dmx=!infoOpen.dmx; $("dmxWarn").classList.toggle("hidden",!infoOpen.dmx); };
-$("chipFold").onclick=()=>{ if($("chipFold").classList.contains("unlit")) return;   // nothing to explain while no fold is on
+["chipCfold","chipTfold"].forEach(id=>{ $(id).onclick=()=>{
+  if($(id).classList.contains("unlit")) return;       // nothing to explain while that fold is off
   infoOpen.fold=!infoOpen.fold;
-  $("foldWarn").classList.toggle("hidden",!infoOpen.fold); };
+  $("foldWarn").classList.toggle("hidden",!infoOpen.fold); }; });
 $("dmxWarn").onclick=()=>{ infoOpen.dmx=false; $("dmxWarn").classList.add("hidden"); };
 $("foldWarn").onclick=()=>{ infoOpen.fold=false; $("foldWarn").classList.add("hidden"); };
 function faultWords(f){ return FAULTS.filter(([b])=>f&b).map(([,t])=>t).join("+")||""; }
@@ -5340,11 +5341,11 @@ $("btnConnect").onclick=()=>{
   if(demoOn){ exitDemo(); return; }
   connect();
 };
-// The header in demo: DEMO pill where the name sits, Connect reads Exit demo.
+// Demo is marked by the header alone (the DEMO pill went on the user's word,
+// 2026-10-04): Connect reads Exit and the name reads Demo Rig.
 function setDemoUi(on){
   document.body.classList.toggle("demo",on);
-  const p=$("demoPill"); if(p) p.classList.toggle("hidden",!on);
-  $("btnConnect").textContent=on?"Exit":"Connect";   // "Exit" beside the DEMO pill; "Exit demo" wrapped at 360 px
+  $("btnConnect").textContent=on?"Exit":"Connect";   // "Exit demo" wrapped at 360 px
 }
 function exitDemo(){
   clearInterval(demoTimer); demoTimer=null;
