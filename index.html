@@ -372,7 +372,8 @@
      screen. The offsets are the MEASURED heights (pinPlace), never assumed.
      Anything scrolled into view lands clear of the pinned rows. */
   body[data-tab] #chips { position:sticky; top:var(--hdrH,64px); z-index:5; padding-bottom:8px;   /* 5: its info box must sit over the dashboard (4) */
-    background:rgba(22,27,35,.92); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
+    background:rgba(22,27,35,.92); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line); }   /* the same closing edge as Control's pinned block, so the row reads as part of the header */
   body[data-tab] main { padding-top:0; }
   html { scroll-padding-top:calc(var(--hdrH,64px) + var(--chipsH,42px) + 8px); }
   /* Control tab: the dashboard is pinned beneath the pills as well, so Clear
@@ -380,6 +381,7 @@
      (user, 2026-10-04). Short windows (a phone on its side) keep the dashboard
      in the flow: pinned too, the two rows would leave no room for the cards. */
   @media (min-height:560px){
+    body[data-tab="control"] #chips { border-bottom-color:transparent; }   /* the pinned dashboard below carries the edge line */
     body[data-tab="control"] .dash { position:sticky; top:calc(var(--hdrH,64px) + var(--chipsH,42px)); z-index:4;
       margin:0 -16px; padding:8px 32px 10px; border-bottom:1px solid var(--line);
       background:rgba(22,27,35,.92); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
@@ -1625,7 +1627,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-05a.pinall";
+const APP_VER="2026-10-05b.pinedge";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
