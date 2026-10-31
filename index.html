@@ -1045,14 +1045,14 @@
     <div class="card">
       <div class="ctitle"><label>Test sequences</label></div>
       <div class="ctlrow">
-        <button id="tsStep">Step RGBW</button>
-        <button id="tsFade">Fade CMY</button>
+        <button id="tsStep">Step</button>
+        <button id="tsFade">Fade</button>
         <button id="tsOff">Off</button>
       </div>
-      <div class="mini"><b>Step RGBW</b> — R → G → B → White at full, 1 s each,
-      gamma off. Flags a dead channel or weak output stage, and measures wiring
-      (below).<br><br>
-      <b>Fade CMY</b> — rainbow sweep through the mixes, for dimming smoothness and colour blending.<br><br>
+      <div class="mini"><b>Step</b> — every output on its own at full, R → G → B → W → A,
+      then all, 1 s each, curve and trims off. Flags a dead output, and measures
+      wiring (below).<br><br>
+      <b>Fade</b> — a smooth sweep through the colours each port's Mode drives, for dimming smoothness and colour blending.<br><br>
       Both drive all ports and override every source, including live DMX, until Off.</div>
       <div class="mini" id="wireChk" data-help style="margin-top:10px;white-space:pre-line;
            border-top:1px solid var(--line);padding-top:10px"></div>
@@ -1647,7 +1647,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-29a.review";
+const APP_VER="2026-10-31a.tests";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2531,7 +2531,7 @@ function onState(str){
   // every tab (app review 2026-10-29, D1).
   { const el=$("chipTest"), t=+(kv.TSEQ||0), tx=kv.TXA==="1";
     el.className="chip "+((t||tx)?"on-warn tap":"unlit");
-    el.title=t?`Test running: ${t===1?"Fade CMY":"Step RGBW"}. Tap for its Stop button`
+    el.title=t?`Test running: ${t===1?"Fade":"Step"}. Tap for its Stop button`
             :tx?"DMX test transmitter on. Tap for its Stop button":"No test sequence running"; }
   setChip("chipCid","ID",  kv.CID??"—");
   // Fault pill: red while any port reports a fault (the same bits as the port
@@ -2619,7 +2619,7 @@ function pillInfoPaint(){
         break;
       }
       title=t?"Test sequence running":"Test";
-      txt=t?`${t===1?"Fade CMY":"Step RGBW"} is driving every port and overrides every source, live DMX included.`
+      txt=t?`${t===1?"Fade":"Step"} is driving every port and overrides every source, live DMX included.`
            :"Lights while a test sequence (Setup → Test sequences) or the DMX test transmitter is running. Neither is.";
       if(t) act={label:"Stop test", run:()=>send("TESTSEQ=0")};
       break;
@@ -2679,7 +2679,7 @@ function renderControl(){
   const tw=$("testWarn");
   if(tw){
     tw.classList.toggle("hidden", !testOn);
-    if(testOn) $("testWarnName").textContent = (+kv.TSEQ===1) ? "Fade CMY" : "Step RGBW";
+    if(testOn) $("testWarnName").textContent = (+kv.TSEQ===1) ? "Fade" : "Step";
   }
   // (The DMX and fold detail boxes are the pills' own box now: pillInfoPaint.)
   const lk=(dmxLive||testOn) && !demoOn;
@@ -4975,9 +4975,9 @@ $("chArm").addEventListener("change",async e=>{
   st.textContent = on ? "ARMED — waiting for baton" : "off";
   st.style.color = on ? "var(--warn)" : "var(--dim)";
 });
-// WIRING CHECK — measured during Step RGBW, which drives one channel at a time.
-// The port's current sense is a total, so each step's reading IS that channel's
-// current; comparing the three finds mistakes the protection cannot see (two
+// WIRING CHECK — measured during Step, which drives one output at a time.
+// The port's current sense is a total, so each step's reading IS that output's
+// current; comparing them finds mistakes the protection cannot see (two
 // colours on one terminal draws a perfectly normal port total). Advisory only —
 // a CCT fixture genuinely has an unused output, so this never asserts a fault.
 const WC_VERDICT=[
@@ -5065,7 +5065,8 @@ function renderLink(){
       : "expect dropouts; move closer to the controller.");
 }
 
-const WC_COLOUR={R:"red",G:"green",B:"blue"};
+const WC_COLOUR={R:"red",G:"green",B:"blue",W:"white",A:"amber"};
+const WC_OUT=["R","G","B","W","A"];
 function renderWiring(){
   const el=$("wireChk"); if(!el) return;
   const A=x=>(x/1000).toFixed(2)+"A";
@@ -5081,14 +5082,16 @@ function renderWiring(){
         +`Output off until fixed.`);
     }
     const v=kv["WC"+p]; if(!v) continue;
+    // One reading per physical output in R G B W A order, the verdict last
+    // (FW-63: five readings on a 3.x module; 2.0.0 sends four).
     const n=v.split(",").map(Number);
-    if(n.length<5||n.some(isNaN)) continue;
-    rows.push(`Port ${p}:  R ${A(n[0])} · G ${A(n[1])} · B ${A(n[2])} · W ${A(n[3])}`
-      +`\n   ${WC_VERDICT[n[4]]||""}`);
+    if(n.length<4||n.length>6||n.some(isNaN)) continue;
+    const vd=n.pop();
+    rows.push(`Port ${p}:  `+n.map((x,i)=>`${WC_OUT[i]} ${A(x)}`).join(" · ")
+      +`\n   ${WC_VERDICT[vd]||""}`);
   }
   const body = rows.length ? rows.join("\n\n")
-    : "Run Step RGBW for one cycle (4 s). Each output's current is measured and "
-      +"compared here — relative, so a short off-cut works too.";
+    : "Run Step for one full cycle. Each output's current is measured and compared here — relative, so a short off-cut works too.";
   el.textContent = faults.length ? faults.join("\n\n")+"\n\n"+body : body;
   el.style.color = faults.length ? "var(--bad)" : "";
   if(rows.length || faults.length) reveal("wireChk");   // results are status, not help
@@ -5098,7 +5101,7 @@ function renderWiring(){
 $("btnWireClear").onclick=async()=>{
   if(!await askConfirm("The port is re-enabled and the measurement is discarded. "
     +"If the wiring is still crossed it will latch again next time you run "
-    +"Step RGBW.",{title:"Clear wiring fault?",ok:"Clear & re-enable"})) return;
+    +"Step.",{title:"Clear wiring fault?",ok:"Clear & re-enable"})) return;
   send("WIRECLR");
 };
 $("btnTestStop").onclick=()=>send("TESTSEQ=0");   // banner's own way out
@@ -5106,7 +5109,7 @@ $("btnTestStop").onclick=()=>send("TESTSEQ=0");   // banner's own way out
 // closes: with a desk driving the rig it asks first (app review 2026-10-29, D9).
 async function testSeq(n){
   if(kv.DMX==="1" && !demoOn &&
-     !await askConfirm(`${n===1?"Fade CMY":"Step RGBW"} takes over every port from the desk until you stop it, and keeps running if the app closes.`,
+     !await askConfirm(`${n===1?"Fade":"Step"} takes over every port from the desk until you stop it, and keeps running if the app closes.`,
                        {title:"Override live DMX?",ok:"Start test",danger:true})) return;
   send("TESTSEQ="+n);
 }
@@ -6887,7 +6890,7 @@ if(!bleAvailable()){
 // is available before you connect to anything. Failure is silent and harmless:
 // renderOta falls back to "no hosted firmware" and the manual picker still works.
 loadOtaManifest();
-renderWiring();   // show the "run Step RGBW" hint before anything connects
+renderWiring();   // show the "run Step" hint before anything connects
 
 // The installed app is a cache-first PWA, so "am I even running the new build?"
 // is a real question with no obvious answer. Show it before connecting, and

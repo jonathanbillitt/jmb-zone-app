@@ -60,7 +60,7 @@ never masquerade as a live source.</p>
 <tbody>
 <tr>
 <td>Test Mode</td>
-<td>Fade CMY / Step RGBWA output tests (click cycles, hold exits)</td>
+<td>Step / Fade output tests (click cycles, hold exits)</td>
 </tr>
 <tr>
 <td>Ports</td>
@@ -615,15 +615,22 @@ the app asks before starting one. A banner appears
 on the Control tab while a test runs, with its own <em>Stop test</em> button, and the
 <strong>Off</strong> button lights when nothing is running so you can tell at a glance.</p>
 <ul>
-<li><strong>Step RGBWA</strong> — full drive red → green → blue → white → amber → all, one
-  second each, gamma bypassed. Every channel at maximum and identical on all
-  ports, so a dead channel or a weak output stage stands out immediately.</li>
-<li><strong>Fade CMY</strong> — a smooth rainbow sweep through the mixes, for judging dimming
-  smoothness and colour blending.</li>
+<li><strong>Step</strong> — the hardware test. Every output on its own at full drive: red →
+  green → blue → white → amber, then all five, one second each, with the Mode,
+  curve and white balance bypassed. Identical on every port and in step across
+  the rig, so a dead output or a weak output stage stands out immediately. An
+  output the port's Mode does not use still lights, which shows up tape wired
+  for a different Mode.</li>
+<li><strong>Fade</strong> — the look test. A smooth sweep through the colours each port's Mode
+  drives, through its curve and white balance, for judging dimming smoothness
+  and colour blending: a rainbow on RGB, carried on through white (and amber) on
+  RGBW and RGBWA, warm ↔ cool on a tuneable-white port, and a breathe on a
+  dimmer port. About three seconds round the rainbow, a second longer for each
+  extra colour; a dimmer port breathes once a second.</li>
 </ul>
-<p><strong>The wiring check</strong> runs automatically during Step RGBWA. Because that test
-lights one colour at a time, and each port measures its own current, the reading
-during each step <em>is</em> that channel's current. After one full six-second cycle
+<p><strong>The wiring check</strong> runs automatically during Step. Because that test lights
+one output at a time, and each port measures its own current, the reading
+during each step <em>is</em> that output's current. After one full six-second cycle
 the app lists them per port:</p>
 <p><code>Port 1:  R 1.90A · G 1.60A · B 1.50A · W 1.80A · A 1.40A
    ✓ consistent</code></p>
@@ -668,7 +675,7 @@ learning the app or showing it off before the hardware is in front of you.</p>
 Latched ports show a flashing fault banner on their screen, the fault word
 appears in the menu and the app, and Clear Faults / Port Reset re-arms.</p>
 <p><strong>Wiring fault.</strong> Separate from the electrical faults above, and raised by the
-controller rather than the port. Running <strong>Step RGBWA</strong> measures each output's
+controller rather than the port. Running <strong>Step</strong> measures each output's
 current one colour at a time; if one output draws roughly double while another
 draws nothing, two colours are almost certainly sharing a terminal. The port is
 <strong>inhibited</strong> and both the panel and the app name the pair — <em>P1 WIRE R+B</em> means
