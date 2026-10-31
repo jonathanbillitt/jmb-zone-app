@@ -20,6 +20,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Second line of defence (app review 2026-10-29, E2): the app loads nothing
+     from anywhere but its own host, so script injected through a device string
+     could not send anything (saved PINs included) elsewhere. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0e1116">
 <!-- Full-screen home-screen app (no browser chrome). Android reads the manifest
@@ -203,6 +207,7 @@
   .badge.on   { background:#12351c; color:var(--ok); }
   .badge.off  { background:#3a2325; color:var(--bad); }
   .badge.fault{ background:#3d2f14; color:var(--warn); }
+  .card.quiet table{ opacity:.45; }      /* no data from the port: last figures, not live */
   .swatch { width:26px; height:26px; border-radius:7px; border:1px solid var(--line); }
   .rows { display:flex; flex-direction:column; gap:9px; }
   .chrows { display:flex; flex-direction:column; gap:9px; }   /* the card's channel sliders, rebuilt per personality */
@@ -668,7 +673,7 @@
      button sits centred and back-lit in the accent so it reads as the second
      way in, not a footnote. */
   #hello{ text-align:center; padding:18px 16px 16px; }
-  #hello > b{ display:block; font-size:19px; font-weight:600; letter-spacing:.2px; }
+  #helloMsg > b{ display:block; font-size:19px; font-weight:600; letter-spacing:.2px; }
   #hello .mini{ margin-top:8px; }
   #hello .ctlrow{ justify-content:center; margin-top:14px; }
   #btnDemo{ color:var(--acc); border-color:rgba(77,163,255,.55);
@@ -837,10 +842,15 @@
   <!-- Connect card (tidied 2026-09-19): one centred headline, one line of
        how-to, and a lit Demo button with no explainer — demo speaks for itself. -->
   <div id="hello" class="card">
+    <!-- Messages go into helloMsg; the Demo row sits outside it, so a
+         "Couldn't reach" or "no Web Bluetooth" line can never delete the one
+         thing a phone without a controller can use (app review 2026-10-29). -->
+    <div id="helloMsg">
     <b>Not connected</b>
     <div class="mini">Tap Connect and pick your controller (“JMB Zone #ID-XXXX”).
     Chrome/Edge only — on iPhone use the Bluefy browser. Bluetooth on.</div>
-    <div class="ctlrow">
+    </div>
+    <div class="ctlrow" id="helloRow">
       <button id="btnDemo">Demo mode</button>
     </div>
   </div>
@@ -1088,14 +1098,17 @@
              output back to hold the cap; thermal fold moved here from its own
              card so all protection sits under the controller's name, as on
              the screen's Setup menu. -->
-        <div class="row"><label>Current limit</label>
+        <div class="row"><label id="setLimLbl">Current limit</label>
           <input type="number" id="setLim" min="0.5" max="6.75" step="0.5">
           <span class="unit">A</span>
           <!-- A drawn padlock: the shackle swings open when unlocked (user, 2026-10-02). -->
           <button id="btnLimLock" class="lock" title="Apply and lock / unlock the limit"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path class="shackle" d="M8 11V7.5a4 4 0 0 1 8 0V11"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/></svg></button>
           <span class="mini" id="setLimNote" data-help style="margin:0"></span>   <!-- behind the hand (user, 2026-10-02) -->
         </div>
-        <div class="row"><label>Current fold</label>
+        <!-- Power link counts (BOX-24, docs/POWER_LINK_INRUSH.md): a hardware
+             fact, so shown whatever the firmware; behind the hand (user, 2026-10-29). -->
+        <div class="mini" style="margin:2px 0 6px">Power link: up to 16 Zones, 4 4ours or 2 8ights on one 16&nbsp;A supply.</div>
+        <div class="row" id="cfoldRow"><label>Current fold</label>
           <select id="setCfold" style="width:90px"><option value="1">On</option>
             <option value="0">Off</option></select>
           <span class="mini" style="margin:0">scale all outputs back to hold the limit</span>
@@ -1242,7 +1255,8 @@
         <a class="dbtn" href="./safety.html" target="_blank" rel="noopener">Safety guide</a>
       </div>
       <div class="mini">The full user manual and DMX channel chart. Bundled with
-        the app — they open even with no internet, once the app has loaded once.</div>
+        the app — they open even with no internet, once the app has loaded once.
+        <a href="./privacy.html" target="_blank" rel="noopener">Privacy policy</a></div>
     </div>
     <!-- Network DMX (sACN/Art-Net over Wi-Fi) PARKED 2026-08-20 — hidden; the
          controller no longer starts WiFi. Elements kept so existing JS is inert
@@ -1487,7 +1501,8 @@
   <div class="wbhead"><b>Support</b></div>
   <div class="mini" style="margin-top:4px">Say what happened. A status report goes with it to
     support@jmblighting.co.uk, from your own mail app, only when you send it.
-    Never included: PIN, network address, location.</div>
+    Never included: PIN, network address, location.
+    <a href="./privacy.html" target="_blank" rel="noopener">Privacy policy</a></div>
   <textarea id="supText" rows="5" maxlength="1500" placeholder="What were you doing, and what went wrong?"></textarea>
   <label class="suprow"><input type="checkbox" id="supNames"> Include controller name, ID and port labels</label>
   <details id="supDet"><summary>What the report contains</summary><pre id="supPre"></pre></details>
@@ -1513,6 +1528,9 @@
          border:1px solid var(--acc);border-radius:8px;color:var(--acc)">
       Firmware update available — unlock, then Setup → Update Firmware.</div>
     <div class="err" id="pinErr"></div>
+    <!-- A way out: the wrong unit, or a link that died here, used to mean
+         killing the app (app review 2026-10-29, A8). -->
+    <button id="pinCancel" style="width:100%;margin-top:8px">Disconnect</button>
   </div>
 </div>
 
@@ -1598,9 +1616,11 @@ const PERS_CH = [3,6,2,4,10,1,2, 4,8,5,10,12,14, 5,5,5,5];   // customs: five un
 // counts the first seven 1-7).
 const PERS_ORDER = [5,6,2,3,0,1,4,7,8,11,9,10,12,13,14,15,16];
 // Can the connected firmware run this personality? Today's codes always;
-// the five-channel set once the state carries NCH=5; a custom preset once its
-// CPD<k> record says it is set. Demo mode is a three-channel unit.
-const persAvail = c => c<=6 || (c<=12 && +(kv.NCH||3)>=5) || (c>=13 && !!cpdOf(c-12));
+// the five-channel set once the state carries NCH=5. A custom preset (13-16)
+// only in the demo: no firmware runs one yet (FW-52), and 2.0.0 clamps any
+// code it doesn't know to 6, Dim 2ch 16-bit (app review 2026-10-29, B1).
+// Demo mode is a three-channel unit.
+const persAvail = c => c<=6 || (c<=12 && +(kv.NCH||3)>=5) || (c>=13 && demoOn && !!cpdOf(c-12));
 const maxAddr = pe => 513 - (PERS_CH[pe] ?? 1);
 function persOptionText(c){
   const n=PERS_ORDER.indexOf(c)+1;
@@ -1627,7 +1647,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-05b.pinedge";
+const APP_VER="2026-10-29a.review";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1654,8 +1674,13 @@ function diagMask(s){
   s=String(s);
   let m=s.match(/^(PIN|NEWPIN|WSSID|WPASS)=/);
   if(m) return m[1]+"=***";
-  m=s.match(/^((?:P\d+\.LABEL|CNAME|BTNAME)=)(.*)$/);
+  m=s.match(/^((?:P\d+\.LABEL|CNAME|BTNAME|RDM\.[0-9A-Fa-f]+\.LABEL)=)(.*)$/);
   if(m) return m[1]+(m[2]==="0"?"0":"<"+Math.ceil(m[2].length/2)+" chars>");
+  // The ID and a preset's name are "names" too: out unless the box is ticked,
+  // which a log line cannot know, so they are always masked here (E5).
+  if(/^CID=/.test(s)) return "CID=***";
+  m=s.match(/^(CPD\d=)([0-9A-F]+)(,.*)$/);
+  if(m) return m[1]+"<"+Math.ceil(m[2].length/2)+" chars>"+m[3];
   return s;
 }
 function diagCmd(s){
@@ -1707,14 +1732,22 @@ if("serviceWorker" in navigator){
   navigator.serviceWorker.ready.then(reg=>setTimeout(()=>{
     try{ (navigator.serviceWorker.controller||reg.active).postMessage("precache-docs"); }catch(_){}
   },6000)).catch(()=>{});
+  // Ask the browser to keep that offline copy when the phone runs short of
+  // space; an installed app gets it without a prompt. Installed only, so a
+  // browser tab is never asked (2026-10-29).
+  try{ if(matchMedia("(display-mode: standalone)").matches && navigator.storage && navigator.storage.persist)
+    navigator.storage.persist().catch(()=>{}); }catch(_){}
 }
 let ports=[], kv={};
+let shuntAsking=false;     // the shunt confirm is open (setShunt); read by renderSetup
 const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
 const enc=new TextEncoder(), dec=new TextDecoder();
 const $=id=>document.getElementById(id);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-function hello(html){ $("hello").classList.remove("hidden"); $("hello").innerHTML=html;
+// busy = a connection is under way: the Demo row steps aside until it ends.
+function hello(html,busy){ $("hello").classList.remove("hidden"); $("helloMsg").innerHTML=html;
+  $("helloRow").classList.toggle("hidden",!!busy);
   try{ window.scrollTo(0,0); }catch(_){} }     // the connect screen always starts at the top
 // The connect screen is a fixed column that cannot be scrolled by hand, so a
 // stale scroll offset is a trap: Chrome restores the old position on a reload
@@ -1727,6 +1760,11 @@ try{ history.scrollRestoration="manual"; }catch(_){}
 function connectTop(){ if(!$("hello").classList.contains("hidden")) try{ window.scrollTo(0,0); }catch(_){} }
 ["load","pageshow","resize","orientationchange"].forEach(ev=>addEventListener(ev,connectTop));
 document.addEventListener("visibilitychange",connectTop);   // either way: to the top is always right here
+// The app going to the background (or closing) ends the DMX test transmitter,
+// an RDM session and the universe viewer's polling: none may outlive the screen
+// that shows its Stop button (app review 2026-10-29).
+document.addEventListener("visibilitychange",()=>{ if(document.hidden){ try{ diagRelease(); univStop(); }catch(_){} } });
+addEventListener("pagehide",()=>{ try{ diagRelease(); }catch(_){} });
 
 // ---------- tabs ----------
 // Nav highlight and visible tab must be set together. showApp() used to unhide
@@ -1747,6 +1785,7 @@ function movePill(){
 addEventListener("resize",movePill);
 function selectTab(name){
   const prev=activeTabName();
+  if(prev==="diag" && name!=="diag" && typeof diagRelease==="function") diagRelease();   // transmitter / RDM end with the tab
   document.querySelectorAll("#nav button").forEach(b=>
     b.classList.toggle("active", b.dataset.tab===name));
   document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
@@ -1906,15 +1945,24 @@ async function gattSetup(){
 }
 async function connect(){
   if(busy) return;
-  busy=true;
+  busy=true; userDisc=false;
   $("btnConnect").disabled=true;
   try{
     try{
       if(NBLE()){ await NBLE().requestDevice(); }
       else dev=await navigator.bluetooth.requestDevice({
         filters:[{services:[SVC]}], optionalServices:[SVC]});
-    }catch(e){ return; }                    // user cancelled the chooser
-    hello("<b>Connecting…</b>"+jbarsHTML("connBars")); jbarsSet($("connBars"), null);
+    }catch(e){
+      // Cancelling the chooser is silent. Anything else (Bluetooth off, no
+      // adapter, Bluetooth blocked for this site) used to be silent too, and
+      // Connect just did nothing (app review 2026-10-29).
+      if(/cancel/i.test((e&&(e.message||e.name))||String(e))) return;   // any shell's cancel, whatever it names it
+      diagPush("ev","chooser failed: "+(e&&e.message||e));
+      hello("<b>Bluetooth isn't available.</b><div class='mini'>Turn the phone's Bluetooth on"+
+        " and allow Bluetooth for this app, then tap Connect again.<br>("+esc(e&&e.message||e)+")</div>");
+      return;
+    }
+    hello("<b>Connecting…</b>"+jbarsHTML("connBars"),true); jbarsSet($("connBars"), null);
     try{ await gattSetup(); diagPush("ev","link up"); }
     catch(e){
       diagPush("ev","connect failed: "+(e&&e.message||e));
@@ -1930,14 +1978,17 @@ async function connect(){
     // The connect screen STAYS under the PIN overlay so the intro (mark flies
     // from the row under the splash) can run once the PIN is accepted — hiding
     // it here skipped the intro on every real connection (user, 2026-09-13).
-    hello("<b>Connected.</b><div class='mini'>Unlocking…</div>");
+    hello("<b>Connected.</b><div class='mini'>Unlocking…</div>",true);
     // A real link supersedes the demo entirely: stop its seeder and drop its
     // ports so the controller's own count builds the cards from scratch.
     if(typeof demoOn!=="undefined" && demoOn){
       demoOn=false; clearInterval(demoTimer); demoTimer=null; clearInterval(demoFlkTimer);
       setDemoUi(false);
-      ports.length=0; prunePortCards(); $("ports").innerHTML=""; $("portInfo").innerHTML="";
     }
+    // A new pick may be a different controller: nothing of the last one's
+    // state, cards or held values may carry over (app review 2026-10-29).
+    resetUnitState(true);
+    zLoad();                                   // this controller's held dimmers, if any
     authed=false;
     askPin();
     autoPin();        // factory PIN, or this controller's remembered PIN
@@ -1946,6 +1997,10 @@ async function connect(){
     $("btnConnect").disabled=false;
   }
 }
+// Set by Disconnect: a drop the user asked for is not reconnected. The web path
+// clears dev for the same effect; the native shell keeps its device id, so its
+// Disconnect reconnected straight back to the PIN screen.
+let userDisc=false;
 async function onDisconnected(){
   diagPush("ev","link dropped"+(busy?" (while connecting)":"")+(kv.UP?` · controller up ${kv.UP} s`:""));
   if(typeof pcClose==="function") pcClose();  // a port sheet (and the WB preview in it) must not outlive its controller
@@ -1953,19 +2008,23 @@ async function onDisconnected(){
   dismissConfirm();                         // never leave a dead prompt on screen
   if(busy){ cmdChar=null; return; }         // a connect/reconnect owns the link
   busy=true;
-  authed=false; cmdChar=null;
+  authed=false; cmdChar=null; pinGen++; clearTimeout(authTimer);   // no PIN wait outlives its link
   otacChar=otadChar=otasChar=null; otaProbationSeen=false; if(!otaBusy) renderOta();
   markDrain();                              // the intro in reverse: bars drain, mark settles away
   hideOverlay(); hideApp();
   univStop();
+  // Follow must not carry on recalling scenes into whatever connects next,
+  // and an in-flight recall or fade must not land after the drop (C2).
+  scnStop(); recallGen++; clearInterval(fadeTimer); fadeTimer=null;
   try{
-    if(dev || NBLE()){          // native path keeps deviceId, not dev — allow reconnect
-      hello("<b>Link dropped — reconnecting…</b>"+jbarsHTML("connBars")); jbarsSet($("connBars"), null);
+    if((dev || NBLE()) && !userDisc){   // native path keeps deviceId, not dev — allow reconnect
+      hello("<b>Link dropped — reconnecting…</b>"+jbarsHTML("connBars"),true); jbarsSet($("connBars"), null);
       try{
         await sleep(800);
         await gattSetup();
         diagPush("ev","reconnected");
-        hello("<b>Reconnected.</b><div class='mini'>Unlocking…</div>");   // stays for the intro
+        resetUnitState(false);                // same unit: keep the cards, rebuild the state
+        hello("<b>Reconnected.</b><div class='mini'>Unlocking…</div>",true);   // stays for the intro
         askPin();
         autoPin();
         return;
@@ -1981,7 +2040,172 @@ async function onDisconnected(){
 // a drag/fade/prep could silently vanish. Everything now funnels through one
 // promise chain with a retry; ordering is guaranteed.
 let wq=Promise.resolve();
+// While a firmware update runs, its writes go straight to the update
+// characteristics; a fader touched on another tab would collide with them and
+// abort the transfer (A6). Controls wait until it finishes.
+let otaHoldToast=0;
+// The unlock and the status read stay open: an update that drops the link
+// reconnects mid-run, and a held PIN read as "wrong PIN" for up to 60 s.
+const OTA_PASS=/^(PIN=|GET$|IDENT$)/;
 function send(s){
+  s=String(s);
+  if(otaBusy && !OTA_PASS.test(s)){
+    if(Date.now()-otaHoldToast>3000){ otaHoldToast=Date.now(); toast("Updating: controls wait until it finishes"); }
+    return wq;
+  }
+  const lines=zeroGuard(s);
+  for(const l of lines) sendRaw(l);
+  zStamp();
+  return wq;
+}
+// A look sent as a whole (a scene, Undo, an import, Clear all) goes exactly as
+// it is: it sets its own dimmer, so any hold on its ports ends. The guard is
+// for hand moves only. A scene captured from a port held dark carries dimmer 0
+// and recalls dark; one the panel lit white from 0,0,0 recalls white, as it
+// was. Through the guard, an effect scene on a 0,0,0 colour recalled black.
+function sendLook(s){
+  s=String(s);
+  if(otaBusy) return send(s);              // the same hold and toast
+  zNote(s);
+  sendRaw(s);
+  zStamp();
+  return wq;
+}
+// ---- Black is not "no colour" (app review 2026-10-29, C1) ----
+// The controller reads a manual colour of all zeros as "no colour picked" and
+// lights every output as a WHITE master at the dimmer level (the panel has a
+// dimmer, not a colour wheel). So a colour pulled to black here lit the strip
+// white, and a Dim port's Level at 0 went to full. When a command would leave
+// a port's manual colour all zero, its dimmer goes to 0 first and the app
+// keeps the dimmer you asked for (zHeld) until a colour or an effect comes
+// back; dimmer moves in between are held, not sent. The firmware fade steers
+// to the live target, so a scene fading to black still fades, never flashes.
+// Under a running effect the manual colour shows nothing, so there is no hold;
+// switching the effect off onto a black colour takes the hold then.
+const zHeld={}, zCol={}, zSentT={}, zFx={}, zFxT={}, zDim={}, zDimT={};
+const Z_KEYS=["R","G","B","WH","AM"];
+const Z_LINE=/^(P(\d+)|ALL)\.(RGB|R|G|B|WH|AM|DIM|FX)=(.*)$/;
+// Read a value the way the firmware does (sscanf %d): "0.4" is 0, and a line
+// it can't read is not applied, so the guard leaves that line alone too.
+const zInt=v=>{ const m=String(v).match(/^\s*([+-]?\d+)/); return m?+m[1]:null; };
+const zRgb=v=>{ const m=String(v).match(/^\s*([+-]?\d+),\s*([+-]?\d+),\s*([+-]?\d+)/); return m?[+m[1],+m[2],+m[3]]:null; };
+function zPortCol(p){
+  if(!zCol[p]){ const m=ports[p-1]||{}; zCol[p]={}; for(const k of Z_KEYS) zCol[p][k]=+(m[k]??0); }
+  return zCol[p];
+}
+const zBlack=c=>Z_KEYS.every(k=>!(+c[k]>0));
+// Our own FX send is the truth until the state has caught up with it.
+const zFxOn=p=>(zFxT[p] && Date.now()-zFxT[p]<4000) ? zFx[p]>0 : +((ports[p-1]||{}).X||0)>0;
+// The same for the dimmer: a DIM=30 sent just before the colour went black
+// was held as the state's older 80, and the colour came back at 80.
+const zDimNow=p=>(zDimT[p] && Date.now()-zDimT[p]<4000) ? zDim[p] : +((ports[p-1]||{}).D??100);
+function zDimSent(ps,v){ const n=Date.now(); ps.forEach(p=>{ zDim[p]=v; zDimT[p]=n; }); }
+// The held dimmers outlive a reconnect and an app restart, per controller: the
+// unit still sits at 0,0,0 and dimmer 0, and a dimmer move with nothing held
+// lit it white. The state check below drops a hold the unit no longer matches.
+const zKey=()=>{ const n=devName(); return n?"jmb_zheld:"+n:""; };
+// Not from the demo: devName() still names the last unit after a disconnect,
+// and the demo's states saved an empty set over that unit's holds.
+function zSave(){ if(demoOn && !bleConnected()) return;
+  try{ const k=zKey(); if(k) localStorage.setItem(k,JSON.stringify(zHeld)); }catch(_){} }
+function zLoad(){ try{ const k=zKey(), o=k?JSON.parse(localStorage.getItem(k)||"{}"):{};
+  for(const p in o) if(Number.isFinite(+o[p])) zHeld[p]=+o[p]; }catch(_){} }
+// One ALL.DIM when every port takes the same value, as the Colour tab's All
+// sends one ALL.RGB: Android dropped per-port bursts (pushColour).
+function zDims(pairs){
+  if(!pairs.length) return [];
+  pairs.forEach(([p,v])=>zDimSent([p],v));
+  const v0=pairs[0][1];
+  if(ports.length>1 && pairs.length===ports.length && pairs.every(x=>x[1]===v0)) return [`ALL.DIM=${v0}`];
+  return pairs.map(([p,v])=>`P${p}.DIM=${v}`);
+}
+let zTouch=[];                             // ports the last line set, for zStamp
+// The state check waits HOT_MS after the WRITE, not after the queueing: a long
+// burst wrote late, and a record from before it ended the hold.
+function zStamp(){
+  const ps=zTouch; zTouch=[]; if(!ps.length) return;
+  const t=()=>{ const n=Date.now(); ps.forEach(p=>{ zSentT[p]=n; }); };
+  t(); wq=wq.then(t);
+}
+function zeroGuard(s){
+  zTouch=[];
+  if(demoOn && !bleConnected()) return [s];          // the demo has no white master
+  const m=s.match(Z_LINE);
+  if(!m || (m[2] && !ports[+m[2]-1])) return [s];
+  const list=m[2] ? [+m[2]] : ports.map((_,i)=>i+1), key=m[3];
+  if(key==="DIM"){
+    const v=zInt(m[4]); if(v==null) return [s];
+    const held=list.filter(p=>zHeld[p]!=null), free=list.filter(p=>zHeld[p]==null);
+    zDimSent(free,Math.max(0,Math.min(100,v)));
+    if(!held.length) return [s];
+    held.forEach(p=>{ zHeld[p]=Math.max(0,Math.min(100,v)); }); zSave();
+    // held ports stay dark (black × any dimmer); the rest take the value
+    return free.map(p=>`P${p}.DIM=${m[4]}`);
+  }
+  const pre=[], post=[];
+  if(key==="FX"){
+    const v=zInt(m[4]); if(v==null) return [s];
+    list.forEach(p=>{
+      const was=zFxOn(p); zFx[p]=v; zFxT[p]=Date.now();
+      if(v>0){ if(zHeld[p]!=null){ post.push([p,zHeld[p]]); delete zHeld[p]; } }  // an effect outranks manual: light comes back
+      else if(was && zHeld[p]==null && zBlack(zPortCol(p))){ zHeld[p]=zDimNow(p); pre.push([p,0]); }
+    });
+  }else{
+    const rgb=key==="RGB" ? zRgb(m[4]) : null, one=key==="RGB" ? null : zInt(m[4]);
+    if(key==="RGB" ? !rgb : one==null) return [s];
+    list.forEach(p=>{
+      const c=Object.assign({},zPortCol(p));
+      if(rgb){ c.R=rgb[0]; c.G=rgb[1]; c.B=rgb[2]; } else c[key]=one;
+      zCol[p]=c;
+      if(zFxOn(p)) return;                             // the effect owns the output
+      if(zBlack(c)){ if(zHeld[p]==null){ zHeld[p]=zDimNow(p); pre.push([p,0]); } }
+      else if(zHeld[p]!=null){ post.push([p,zHeld[p]]); delete zHeld[p]; }
+    });
+  }
+  zSave(); zTouch=list;
+  return zDims(pre).concat([s],zDims(post));
+}
+// sendLook's bookkeeping: the colour, effect and dimmer it sets. A look that
+// leaves a port black at dimmer 0 with no effect (a scene saved with a port
+// off, Undo of a held port) leaves it held, at its old held level or full:
+// with no hold, the next dimmer move went out bare and lit it white (second
+// review 2026-10-31). Any other look ends the hold. A look's lines arrive one
+// at a time, so each is judged on what the look has set so far; the last one
+// for a port decides.
+function zNote(s){
+  zTouch=[];
+  const m=s.match(Z_LINE);
+  if(!m || (m[2] && !ports[+m[2]-1])) return;
+  const list=m[2] ? [+m[2]] : ports.map((_,i)=>i+1), key=m[3];
+  const rgb=key==="RGB" ? zRgb(m[4]) : null, one=key==="RGB" ? null : zInt(m[4]);
+  if(key==="RGB" ? !rgb : one==null) return;          // the firmware won't apply it either
+  list.forEach(p=>{
+    if(key==="FX"){ zFx[p]=one; zFxT[p]=Date.now(); }
+    else if(key==="DIM") zDimSent([p],Math.max(0,Math.min(100,one)));
+    else{ const c=Object.assign({},zPortCol(p));
+      if(rgb){ c.R=rgb[0]; c.G=rgb[1]; c.B=rgb[2]; } else c[key]=one;
+      zCol[p]=c; }
+    if(!zFxOn(p) && zBlack(zPortCol(p)) && zDimNow(p)===0){ if(zHeld[p]==null) zHeld[p]=100; }
+    else delete zHeld[p];
+  });
+  zSave(); zTouch=list;
+}
+// The dimmer a port shows: the held one while the app keeps it dark.
+const portDim=p=>zHeld[p]!=null ? zHeld[p] : zDimNow(p);
+// Everything that belongs to ONE controller. full = a new pick, which may be a
+// different unit (cards rebuilt); otherwise a reconnect to the same one, which
+// keeps its holds (zLoad brings them back after a new pick of the same name).
+function resetUnitState(full){
+  for(const k in kv) delete kv[k];
+  for(const o of [zCol,zSentT,zFx,zFxT,zDim,zDimT,portSeen,colLast]) for(const k in o) delete o[k];
+  cycKeys.clear(); lastHdr=0; firstHdr=0;
+  scnStop(); recallGen++; clearInterval(fadeTimer); fadeTimer=null;
+  if(full){ for(const k in zHeld) delete zHeld[k];
+    lastUp=null;                           // a different unit's uptime is no restart
+    ports.length=0; prunePortCards(); $("ports").innerHTML=""; $("portInfo").innerHTML="";
+    colTgt="all"; }                        // a port 6 target must not reach a 1-port unit
+}
+function sendRaw(s){
   diagCmd(s);
   if(demoOn && !cmdChar && !NBLE()){ demoCmd(s); return wq; }
   if(NBLE()){
@@ -2104,32 +2328,66 @@ function tellUser(msg,opt){
                     n.classList.remove("hidden"); y.onclick=null; res(); };
   });
 }
-let pinPending="";
+let pinPending="", pinMiss=0, pinGen=0;
+// The firmware re-judges auth on EVERY PIN= line, so a second PIN sent while
+// the first one's answer is on its way logs the session back out. The wait
+// starts once the line is written (send resolves then), and pinGen drops a
+// wait whose connection has gone.
+function pinWait(ms,then){
+  const g=++pinGen; clearTimeout(authTimer);
+  return ()=>{ if(g!==pinGen || authed) return;
+    authTimer=setTimeout(()=>{ if(g===pinGen && !authed) then(); },ms); };
+}
+// The PIN this phone held before a Change PIN, kept until the new one has
+// unlocked a connection: if the controller never took the change (a dropped
+// write), the next connect still gets in (app review 2026-10-29, A9).
+const pinPrevKey=()=>{ const k=pinKey(); return k?k+":prev":""; };
+const loadPrevPin=()=>{ try{ const k=pinPrevKey(); return k?(localStorage.getItem(k)||""):""; }catch(_){ return ""; } };
+const dropPrevPin=()=>{ try{ const k=pinPrevKey(); if(k) localStorage.removeItem(k); }catch(_){} };
+// After five wrong PINs the controller ignores every PIN, the right one too,
+// for 30 s doubling to 5 minutes; to the app that looks like "wrong PIN" (A8).
+function pinNoAnswer(){
+  pinMiss++;
+  $("pinErr").textContent = pinMiss>=2
+    ? "No answer. After five wrong PINs the controller ignores every PIN, even the right one, for 30 s and up to 5 minutes. Wait, then try again."
+    : "No answer — wrong PIN?";
+}
 // Automatic unlock on connect. The FACTORY PIN (0123) is tried on every
 // controller and is never stored — it is public. A USER-DEFINED PIN is only
 // auto-entered on a controller it was typed for (loadPin, per-device); the
 // per-device memory rules apply to user PINs alone.
 function autoPin(){
-  const saved=loadPin(), pin=saved||"0123";
+  const saved=loadPin(), pin=saved||"0123", prev=loadPrevPin();
+  pinMiss=0;
   $("pinInput").value=saved;
   pinPending=saved;               // factory PIN never saved
-  send("PIN="+pin);
-  clearTimeout(authTimer);
-  authTimer=setTimeout(()=>{
-    if(!authed) $("pinErr").textContent=saved?"No answer — wrong PIN?"
-                                              :"This controller has its own PIN.";
-  },1500);
+  // 2 s with a fallback to follow, so a slow answer to the first PIN is not
+  // overtaken by the second; 1.5 s when nothing follows.
+  const fallback=!!(saved && prev && prev!==saved);
+  send("PIN="+pin).then(pinWait(fallback?2000:1500,()=>{
+    // The PIN from before a Change PIN, once, in case the change never landed.
+    // The controller judges every PIN line afresh, so the old PIN after a
+    // right-but-slow one logged the link out and was saved as this unit's PIN
+    // (second review 2026-10-31). GET is answered only once unlocked: ask
+    // first, and fall back only if that stays quiet too.
+    if(fallback){
+      send("GET").then(pinWait(1000,()=>{
+        pinPending=prev;
+        send("PIN="+prev).then(pinWait(1500,pinNoAnswer));
+      }));
+      return;
+    }
+    if(saved) pinNoAnswer(); else $("pinErr").textContent="This controller has its own PIN.";
+  }));
 }
 async function tryPin(){
   const pin=$("pinInput").value.trim();
   if(!pin) return;
   $("pinErr").textContent="";
   pinPending=pin;                 // persisted only once the controller ACCEPTS
+  const arm=pinWait(1500,pinNoAnswer);
   await send("PIN="+pin);
-  clearTimeout(authTimer);
-  authTimer=setTimeout(()=>{
-    if(!authed) $("pinErr").textContent="No answer — wrong PIN?";
-  },1500);
+  arm();
 }
 $("pinGo").onclick=tryPin;
 $("pinInput").addEventListener("keydown",e=>{ if(e.key==="Enter") tryPin(); });
@@ -2148,6 +2406,20 @@ $("pinFlash").onclick=()=>{
 // the MTU (8-port does): the first chunk starts "JMB;" (header + leading
 // ports), continuations start "JMB+;" and carry further port records. Every
 // chunk parses standalone; ports merge by number.
+// portSeen[i] = when port i+1's record last arrived; lastHdr = the last "JMB;".
+// On 2.0.0 (a024de9) a port record longer than one notify stops that port and
+// every later one arriving, while the header keeps coming: a busy port's
+// counters pass the limit within hours, label or not (fixed in firmware
+// 0d617be, not yet flashed). A port that has gone quiet while the header
+// still arrives shows "no data" instead of its frozen readings.
+const portSeen={}, cycKeys=new Set();
+let lastHdr=0, firstHdr=0;
+const PORT_QUIET_MS=5000;
+function portQuiet(idx){
+  if(demoOn || !lastHdr) return false;
+  const t=portSeen[idx]||firstHdr;          // never seen: count from the first header
+  return lastHdr-t>PORT_QUIET_MS && Date.now()-lastHdr<PORT_QUIET_MS;
+}
 function onState(str){
   if(str.startsWith("JMBU;")){ onUniv(str); return; }
   if(str.startsWith("JMBM;")||str.startsWith("JMBX;")){ onUnivMM(str); return; }
@@ -2172,15 +2444,26 @@ function onState(str){
     authed=true;
     diagPush("ev","unlocked");
     clearTimeout(authTimer);
-    if(pinPending){ savePin(pinPending); pinPending=""; }
+    // (The factory PIN is never remembered: it is tried on every unit anyway.)
+    if(pinPending){ savePin(pinPending==="0123"?"":pinPending); pinPending=""; }
+    dropPrevPin();                 // the PIN in force is known now
     hideOverlay(); showApp();
   }
   const pstr={};
+  // A new cycle starts at "JMB;". Keys the firmware sends only while a thing
+  // is true (WF<n> while a wiring fault is latched, WC<n> while a capture is
+  // held) are dropped when the cycle before carried none, so a cleared fault
+  // no longer leaves "PORT n INHIBITED" up until a reload (A3).
+  if(!cont){
+    const now=Date.now();
+    if(lastHdr) for(const k of Object.keys(kv)) if(/^W[FC]\d+$/.test(k) && !cycKeys.has(k)) delete kv[k];
+    cycKeys.clear(); lastHdr=now; if(!firstHdr) firstHdr=now;
+  }
   for(const part of str.split(";")){
     const i=part.indexOf("=");
     if(i<0) continue;
     const k=part.slice(0,i), v=part.slice(i+1);
-    if(/^P\d+$/.test(k)) pstr[k]=v; else kv[k]=v;
+    if(/^P\d+$/.test(k)) pstr[k]=v; else { kv[k]=v; cycKeys.add(k); }
   }
   const n=+(kv.PORTS||0);
   while(ports.length<n) ports.push({});
@@ -2217,6 +2500,18 @@ function onState(str){
       if(mm) m[mm[1]] = mm[1]==="F" ? parseInt(mm[2],16) : +mm[2];
     }
     ports[idx]=Object.assign(ports[idx]||{},m);   // partial records merge
+    portSeen[idx]=Date.now();
+    // Black-colour hold (zeroGuard): once our own sends have settled, the
+    // unit's state is the truth again. A colour or dimmer set from elsewhere
+    // (the panel, another phone) ends the hold without sending anything, and
+    // so does an effect started there: it owns the output.
+    const p=idx+1;
+    if(Date.now()-(zSentT[p]||0)>HOT_MS){
+      delete zCol[p];
+      if(zHeld[p]!=null){ const pm=ports[idx];
+        if(!zBlack({R:pm.R??0,G:pm.G??0,B:pm.B??0,WH:pm.WH??0,AM:pm.AM??0}) || +(pm.D??0)!==0 || +(pm.X||0)>0){
+          delete zHeld[p]; zSave(); } }
+    }
   }
   // DI= which input the receiver follows: 1 = the CRMX line (wired quiet).
   // DMX pill: lit green (tap for the detail box) while a signal drives the rig,
@@ -2231,9 +2526,13 @@ function onState(str){
   renderTx();
   // Test pill: amber while a test sequence overrides every source (live DMX
   // included). A tap goes to the Control tab, where its banner and Stop sit.
-  { const el=$("chipTest"), t=+(kv.TSEQ||0);
-    el.className="chip "+(t?"on-warn tap":"unlit");
-    el.title=t?`Test running: ${t===1?"Fade CMY":"Step RGBW"}. Tap for its Stop button`:"No test sequence running"; }
+  // The DMX test transmitter lights it too: it drives the line downstream
+  // and blocks a desk plugged in meanwhile, so its Stop is one tap away from
+  // every tab (app review 2026-10-29, D1).
+  { const el=$("chipTest"), t=+(kv.TSEQ||0), tx=kv.TXA==="1";
+    el.className="chip "+((t||tx)?"on-warn tap":"unlit");
+    el.title=t?`Test running: ${t===1?"Fade CMY":"Step RGBW"}. Tap for its Stop button`
+            :tx?"DMX test transmitter on. Tap for its Stop button":"No test sequence running"; }
   setChip("chipCid","ID",  kv.CID??"—");
   // Fault pill: red while any port reports a fault (the same bits as the port
   // card's badge). A tap goes to the first such port's card.
@@ -2313,9 +2612,15 @@ function pillInfoPaint(){
          :"No radio status from this controller.";
       break; }
     case "chipTest":
+      if(!t && kv.TXA==="1"){
+        title="DMX test transmitter on";
+        txt="This unit is sending its test channels down the DMX line, and a desk plugged in now is not read until it stops.";
+        act={label:"Stop transmitter", run:()=>{ send("DMXTX=OFF"); send("GET"); }};
+        break;
+      }
       title=t?"Test sequence running":"Test";
       txt=t?`${t===1?"Fade CMY":"Step RGBW"} is driving every port and overrides every source, live DMX included.`
-           :"Lights while a test sequence (Setup → Test sequences) is overriding the outputs. None is running.";
+           :"Lights while a test sequence (Setup → Test sequences) or the DMX test transmitter is running. Neither is.";
       if(t) act={label:"Stop test", run:()=>send("TESTSEQ=0")};
       break;
     case "chipCid":
@@ -2389,8 +2694,9 @@ function renderControl(){
   // Dashboard: Effects lights while any port runs an effect; Undo while a
   // Clear all is there to take back.
   { const bf=$("btnFx"); if(bf) bf.classList.toggle("glow", ports.some(m=>(m.X||0)>0)); }
-  { const bu=$("btnUndo"); if(bu){ let has=false; try{ has=!!localStorage.getItem("jmb_undo"); }catch(_){}
-      bu.disabled=!has; bu.style.opacity=has?"":".45"; bu.classList.toggle("glow",has); } }
+  // Undo is this controller's own, and locks with Clear all under live DMX or a test.
+  { const bu=$("btnUndo"); if(bu){ let has=false; try{ has=!demoOn && !!localStorage.getItem(undoKey()); }catch(_){}
+      bu.disabled=!has||lk; bu.style.opacity=(has&&!lk)?"":".45"; bu.classList.toggle("glow",has&&!lk); } }
   const root=$("ports");
   ports.forEach((m,idx)=>{
     const p=idx+1;
@@ -2400,10 +2706,11 @@ function renderControl(){
     // why); patch fields stay editable - addressing with the desk up is
     // normal. DEMO mode never locks: it exists to let people play.
     card.classList.toggle("dmxlock", (dmxLive||testOn) && !demoOn);
-    const on=m.O===1, flt=(m.F||0)!==0;
+    const on=m.O===1, flt=(m.F||0)!==0, quiet=portQuiet(idx);
     const bOn=$("on"+p);
-    bOn.textContent=on?"online":"offline";
-    bOn.className="badge "+(on?"on":"off");
+    bOn.textContent=quiet?"no data":on?"online":"offline";
+    bOn.className="badge "+(quiet?"fault":on?"on":"off");
+    bOn.title=quiet?"No reading from this port for a few seconds: what the card shows is the last one received, not live.":"";
     const bF=$("flt"+p);
     if(flt){ bF.classList.remove("hidden"); bF.textContent=faultWords(m.F)||"FAULT"; }
     else bF.classList.add("hidden");
@@ -2427,6 +2734,9 @@ function renderControl(){
       if(fbs) fbs.classList.toggle("hidden",!show);
       if(fb) fb.textContent = n===2 ? "Port 2" : `Ports 2–${n}`;
       if(fc){ const ok=kv.CHP==="1"; fc.disabled=!ok; fc.title=ok?"":"Needs a firmware update"; } }
+    // The preset builder needs a firmware that keeps presets (it echoes CPD<k>);
+    // 2.0.0 ignores them, so a preset "saved" there only lived in the app.
+    { const ce=$("cpe"+p); if(ce){ const ok=demoOn||("CPD1" in kv); ce.disabled=!ok; ce.title=ok?"":"Needs a firmware update"; } }
     // Slider rows follow the personality: one per output it uses, labelled and
     // coloured by the function on that output (paintRows rebuilds only when
     // the set changes, so a slider under a finger is never replaced).
@@ -2457,7 +2767,7 @@ function renderControl(){
       setIf(p,c,el=>{ el.value=m[c]??0; $("v"+c+p).textContent=m[c]??0; });
     }
     const fresh=k=>Date.now()-(hot[p+"."+k]||0)>=HOT_MS;
-    if(wheels[p+".D"] && fresh("D")) wheels[p+".D"].set(m.D??100);
+    if(wheels[p+".D"] && fresh("D")) wheels[p+".D"].set(portDim(p));   // the held dimmer while black (zeroGuard)
     if(wheels[p+".S"] && fresh("S")) wheels[p+".S"].set(m.S??128);
     if(fresh("L")) paintLabel(p,m.L||"");
     faultChoreo(p, card, flt);
@@ -2659,13 +2969,21 @@ function buildCard(p){
   d.querySelector("#chOut"+p).addEventListener("click",()=>pcOpen(p,"Out"));
   d.querySelector("#chProt"+p).addEventListener("click",()=>pcOpen(p,"Prot"));
   d.querySelector("#flt"+p).addEventListener("click",()=>pcOpen(p,"Prot"));   // the fault badge leads to the clear button
+  // An emptied field goes back to the port's value and sends nothing; a typed
+  // 0 clamps to the minimum. "||" fallbacks turned an empty Limit into the
+  // board maximum, wiping a low limit set for thin tape (C10, B7).
+  const typed=el=>{ const s=String(el.value).trim(); return s!=="" && Number.isFinite(+s) ? +s : null; };
   d.querySelector("#ocp"+p).addEventListener("change",e=>{
-    let a=Math.max(0.25,Math.min(ocpCapA(),+e.target.value||ocpCapA()));
+    const v=typed(e.target), m=ports[p-1]||{};
+    if(v==null){ e.target.value=((m.OC??ocpCapA()*1000)/1000).toFixed(2); return; }
+    let a=Math.max(0.25,Math.min(ocpCapA(),v));
     a=Math.round(a/0.25)*0.25; e.target.value=a;
     touch("OCP"); send(`P${p}.OCP=${Math.round(a*1000)}`);
   });
   d.querySelector("#ot"+p).addEventListener("change",e=>{
-    let t=Math.max(40,Math.min(110,+e.target.value||80));
+    const v=typed(e.target), m=ports[p-1]||{};
+    if(v==null){ e.target.value=m.OT??80; return; }
+    let t=Math.max(40,Math.min(110,v));
     t=Math.round(t/5)*5; e.target.value=t;
     touch("OT"); send(`P${p}.OT=${t}`);
   });
@@ -2682,14 +3000,17 @@ function buildCard(p){
     setTimeout(()=>send("GET"), 800);
   });
   d.querySelector("#addr"+p).addEventListener("change",e=>{
-    const mx=maxAddr(+$("pers"+p).value||0);
-    let v=Math.max(1,Math.min(mx,+e.target.value||1));
+    const mx=maxAddr(+$("pers"+p).value||0), t=typed(e.target);
+    if(t==null){ e.target.value=(ports[p-1]||{}).A??1; return; }
+    let v=Math.round(Math.max(1,Math.min(mx,t)));
     e.target.value=v; touch("ADDR"); send(`P${p}.ADDR=${v}`);
     // No popups: overlapping footprints are MARKED (amber outline, see
     // renderControl) rather than blocked — overlap can be deliberate.
   });
   d.querySelector("#head"+p).addEventListener("change",e=>{
-    let v=Math.max(0,Math.min(9999,+e.target.value||0));
+    const t=typed(e.target);
+    if(t==null){ e.target.value=(ports[p-1]||{}).H??0; return; }
+    let v=Math.round(Math.max(0,Math.min(9999,t)));
     e.target.value=v; touch("HEAD"); send(`P${p}.HEAD=${v}`);
   });
   // One Apply mode for the controller (state AM): the panel's All Ports edit
@@ -2997,7 +3318,9 @@ function scnGo(){
   activeSceneIdx=i;
   recallScene(sc); renderScenes();
   if(scnMode==="follow"){
-    const ms=Math.max(250,((+sc.fade||0)+(+sc.wait||0))*1000);
+    // At least 700 ms: each recall reads the rig for 300 ms before it sends, and
+    // a shorter timer superseded every recall before it sent anything (C7).
+    const ms=Math.max(700,((+sc.fade||0)+(+sc.wait||0))*1000);
     scnTimer=setTimeout(()=>{ scnTimer=null; scnGo(); },ms);
   }
   scnPaint();
@@ -3037,10 +3360,11 @@ async function recallScene(sc){
     // ONE burst, FADE first: static targets ride the 16-bit fade engine, and
     // a source change (effect in/out or swap) triggers the controller's
     // output crossfade — the old look BLENDS into the new one, no dip.
-    send(`P${p}.FADE=${T}`);
-    send(`P${p}.MAN=1`); send(`P${p}.FX=${t.x}`); send(`P${p}.FXS=${t.s??128}`);
-    send(`P${p}.RGB=${t.r},${t.g},${t.b}`);
-    send(`P${p}.DIM=${t.d}`);
+    // sendLook: the scene as captured, never the black guard (see sendLook).
+    sendLook(`P${p}.FADE=${T}`);
+    sendLook(`P${p}.MAN=1`); sendLook(`P${p}.FX=${t.x}`); sendLook(`P${p}.FXS=${t.s??128}`);
+    sendLook(`P${p}.RGB=${t.r},${t.g},${t.b}`);
+    sendLook(`P${p}.DIM=${t.d}`);
   });
   // MIRROR THE RIG: while the firmware runs a static→static crossfade, the
   // swatch tweens over the same time, so the phone and the light move together.
@@ -3192,6 +3516,12 @@ function ledWhiteRemap(rgb){
 function colTargetList(){
   return colTgt==="all" ? ports.map((_,i)=>i+1) : [+colTgt];
 }
+// What the picker last sent to each port, and the picker colour it came from.
+// The tape remap runs at send time, so a port's RGB is already remapped: seeding
+// the picker from it and remapping again warmed the colour on every visit to
+// this tab (100/81/66 → 100/71/45 → 100/65/33; app review 2026-10-29, C4).
+// While a port still holds what the picker sent, the picker resumes its own colour.
+const colLast={};
 function pushColour(){
   // remap the base white-point for the tape, THEN apply the ΔUV trim so a
   // deliberate green/magenta tint survives the remap.
@@ -3201,7 +3531,8 @@ function pushColour(){
   const mix=cctMixOf(col.base);
   const list=colTargetList();
   const isCct=p=>{const pe=ports[p-1]&&ports[p-1].PE; return pe===2||pe===3;};
-  list.forEach(p=>{ for(const k of ["R","G","B","D","X"]) hot[p+"."+k]=Date.now(); });
+  list.forEach(p=>{ for(const k of ["R","G","B","D","X"]) hot[p+"."+k]=Date.now();
+    colLast[p]={sent:isCct(p)?[mix.ww,mix.cw,0]:[pr,pg,pb], base:col.base.slice(), duv:col.duv}; });
   // ALL + uniform personalities → the firmware's ALL.* commands: two radio
   // packets total instead of two per port (per-port bursts overflowed the
   // Android BLE queue and later ports silently missed writes).
@@ -3236,7 +3567,10 @@ function pushColour(){
 function seedColour(){
   const t=colTargetList()[0];
   const m=t?ports[t-1]:null;
-  if(m){
+  const L=t?colLast[t]:null, near=(a,b)=>Math.abs((+a||0)-(+b||0))<=1;
+  if(m && L && near(m.R,L.sent[0]) && near(m.G,L.sent[1]) && near(m.B,L.sent[2])){
+    col.base=L.base.slice(); col.duv=L.duv; col.dim=Math.round(portDim(t));   // the picker's own colour, not a re-read
+  }else if(m){
     const pe=m.PE;
     if(pe===2||pe===3){                 // CW/WW port: derive CCT from the mix
       const ww=m.R??0, cw=m.G??0, tot=ww+cw;
@@ -3416,7 +3750,10 @@ function renderPortInfo(){
     const on=m.O===1, fw=faultWords(m.F||0);
     $("pih"+p).innerHTML=`Port ${p}${m.L?` <span class="pilabel">· ${esc(m.L)}</span>`:""}`;
     const bf=$("pif"+p); bf.classList.toggle("hidden",!fw); bf.textContent=fw;
-    const bo=$("pio"+p); bo.className="badge "+(on?"on":"off"); bo.textContent=on?"online":"offline";
+    const bo=$("pio"+p), quiet=portQuiet(idx);
+    bo.className="badge "+(quiet?"fault":on?"on":"off"); bo.textContent=quiet?"no data":on?"online":"offline";
+    bo.title=quiet?"No reading from this port for a few seconds: the figures below are the last ones received, not live.":"";
+    card.classList.toggle("quiet",quiet);
     faultChoreo("pi"+p, card, !!fw);
     $("pip"+p).textContent=`${PERS_NAMES[m.PE]??"?"} @ ${m.A??"—"} · head ${m.H??"—"}`;
     const ia=m.IA!=null?+m.IA:null, lim=+(m.OC||6500);
@@ -3737,7 +4074,11 @@ function fxTick(now){
     if(x===13 && S>128 && (+(mm.PF||0))>=0x204) sf=Math.pow(8,(S-128)/127*0.636)*((+(kv.BPM||128))/128);
     s.vt+=dt*sf;
     const [r,g,b]=(S===0 && (x===13||x===14)) ? [0,0,0] : fxCompute(x,i,s.vt,s);   // Strobe/Police: 0 = off
-    const d=(+(mm.D??100))/100, tr=(+(mm.R??100))/100, tg=(+(mm.G??100))/100, tb=(+(mm.B??100))/100;
+    // The state's R/G/B are the MANUAL colour, not the effect trims (those are
+    // not reported, and the sliders are locked at full while an effect runs),
+    // so the effect previews untrimmed. Multiplying by R/G/B turned Fire near
+    // black on a port left on blue (app review 2026-10-29, C5).
+    const d=(+(mm.D??100))/100, tr=1, tg=1, tb=1;
     const [cr,cg,cb]=swatchRGB(mm.PE??0, r*tr*d*100, g*tg*d*100, b*tb*d*100);
     swOwned[p]="fx";
     sw.style.background=`rgb(${cr|0},${cg|0},${cb|0})`;
@@ -4075,9 +4416,32 @@ function txParse(cmd){
   if(!chans.size) throw "no channels";
   return [...chans].sort((x,y)=>x-y).map(ch=>({ch,lvl}));
 }
+// Batched by LENGTH, not by count: 32 pairs ran to about 260 bytes, over one
+// Bluetooth write (182 on iPhone, 244 on Android), and a cut tail latched a
+// wrong level ("131,25" for 131 at 255; app review 2026-10-29, A4).
+const TX_LINE_MAX=170;
 function txSendPairs(pairs){
-  for(let i=0;i<pairs.length;i+=32)
-    send("DMXTX="+pairs.slice(i,i+32).map(p=>p.ch+","+p.lvl).join(";"));
+  let line="";
+  for(const p of pairs){
+    const pr=p.ch+","+p.lvl;
+    if(line && ("DMXTX=".length+line.length+1+pr.length)>TX_LINE_MAX){ send("DMXTX="+line); line=""; }
+    line+=(line?";":"")+pr;
+  }
+  if(line) send("DMXTX="+line);
+}
+// 2.0.0 lists up to 48 latched channels in one status record that cannot be
+// split, and past about 20 it cut off the rest of the status feed, every port
+// included. Firmware with the status splitter fix (it reports PWLIM) has no
+// such limit.
+const TX_MAX_OLD=20;
+const stateSplitFix=()=>"PWLIM" in kv;
+// Leaving Diagnostics, or the app going to the background, stops the
+// transmitter and frees an RDM session: both hold the DMX line, and nothing
+// else would end them short of the Stop button (app review 2026-10-29, D1/D4).
+function diagRelease(){
+  if(!bleConnected() || demoOn) return;
+  if(kv.TXA==="1"){ send("DMXTX=OFF"); send("GET"); }
+  if(rdmActive) rdmStop();
 }
 function renderTx(){
   const card=$("txCard"); if(!card) return;
@@ -4090,9 +4454,11 @@ function renderTx(){
   { const w=$("txWrap"); if(w) w.classList.toggle("hidden", !on); }   // the pad drops down while transmitting
   const n=+(kv.TXN||0), l=$("txList");
   if(!n){ l.textContent="No channels latched."; return; }
+  // Numbers only: this list comes off the radio, and markup in it would run
+  // in the app (app review 2026-10-29, E2).
   const items=(kv.TXL||"").split(",").filter(Boolean).map(e=>{
-    if(e.startsWith("+")) return `<span>${e.slice(1)} more…</span>`;
-    const [ch,lv]=e.split(":"); return `<span><b>${ch}</b> @ ${Math.round(+lv*100/255)}%</span>`;
+    if(e.startsWith("+")) return `<span>${+e.slice(1)||0} more…</span>`;
+    const [ch,lv]=e.split(":"); return `<span><b>${+ch||0}</b> @ ${Math.round((+lv||0)*100/255)}%</span>`;
   });
   l.innerHTML=`${n} latched: `+items.join(" · ");
 }
@@ -4110,6 +4476,10 @@ function renderTx(){
     err.textContent="";
     let pairs; try{ pairs=txParse(inp.value); }catch(e){ err.textContent=String(e); return; }
     if(kv.DMX==="1" && !demoOn){ err.textContent="DMX is being received — transmit unavailable."; return; }
+    const latched=new Set((kv.TXL||"").split(",").filter(e=>e&&!e.startsWith("+")).map(e=>+e.split(":")[0]));
+    pairs.forEach(p=>latched.add(p.ch));
+    if(!demoOn && !stateSplitFix() && latched.size>TX_MAX_OLD){
+      err.textContent=`This firmware takes up to ${TX_MAX_OLD} latched channels: Clear, or send fewer.`; return; }
     txSendPairs(pairs);
     if(kv.TXA!=="1") send("DMXTX=ON");
     inp.value=""; send("GET");
@@ -4128,18 +4498,25 @@ $("btnRdmScan").onclick=async()=>{
   if(!demoOn && kv.DMX==="1" &&
      !await askConfirm("Fixtures lose data while the scan takes over the "+
               "output line.",{title:"Scan with DMX live?",ok:"Scan"})) return;
+  // Rescan: the controller refuses a scan while its session is open (BUSY),
+  // so close it first rather than wiping the list for a refused scan (D6).
+  if(rdmActive){ rdmStop(); await sleep(400); }
   rdmDevs={}; rdmOrder=[]; rdmSens={}; rdmOpenUid=null;
   send(kv.DMX==="1"?"RDMSCAN!":"RDMSCAN");
   rdmPhaseTxt="scanning…"; rdmActive=true; renderRdm();
 };
-$("btnRdmStop").onclick=()=>{
+// Stop also turns off any Identify this app switched on: a fixture left
+// flashing after the session closed had no way back (D4).
+function rdmStop(){
+  for(const u of rdmOrder){ const d=rdmDevs[u]; if(d && d.ident && !d.self){ send(`RDM.${u}.IDENT=0`); d.ident=false; } }
   send("RDMSTOP");
   // Reflect it immediately: the controller confirms with JMBR;PH=OFF, but the
   // button must never look stuck if that notify is slow or dropped.
   rdmActive=false; rdmPend=null;
   rdmPhaseTxt="stopped — thru released";
   renderRdm();
-};
+}
+$("btnRdmStop").onclick=rdmStop;
 function onRdm(str){
   const parts=str.split(";");
   const tag=parts[1];
@@ -4187,6 +4564,7 @@ function onRdm(str){
     const why=parts[2];
     if(why==="BUSY"){
       rdmPhaseTxt="already scanning — press Stop first";   // session still live
+      rdmActive=true;              // e.g. after an app reload: Stop must be there to press (D6)
     }else{
       rdmPhaseTxt = why==="LIVE"  ? "refused — upstream DMX live (rescan to force)"
                   : why==="FULL"  ? "device table full (16 max)"
@@ -4213,6 +4591,10 @@ function renderRdm(){
   }
   const host=$("rdmDevs");
   if(!rdmOrder.length){ host.innerHTML=""; return; }
+  // Each state notify repaints this tab; rebuilding the cards under a field
+  // being typed in wiped it, and Set then sent the old value (D5).
+  { const a=document.activeElement;
+    if(a && host.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && a.type!=="checkbox") return; }
   host.innerHTML=rdmOrder.map(u=>{
     const d=rdmDevs[u], open=rdmOpenUid===u;
     const sens=rdmSens[u]||{};
@@ -4292,9 +4674,11 @@ function renderSetup(){
   if(document.activeElement!==$("setCid"))   $("setCid").value=kv.CID??"";
   if(document.activeElement!==$("setHold"))  $("setHold").value=kv.HOLD??"5";
   // The closed drop-down's one line: what is set, read from the state.
-  { const s=$("ctlSum"); if(s){ const clm=+(kv.CLM||68), cl=+(kv.CL||clm), hold=+(kv.HOLD??5);
+  { const s=$("ctlSum"); if(s){ const clm=+(kv.CLM||68), cl=+(kv.CL||clm), hold=+(kv.HOLD??5), pb=+(kv.PB||0);
       s.textContent=[hexDec(kv.CN)||"No name", "ID "+(kv.CID??"—"),
-        "hold "+(hold?hold+" s":"forever"), (cl/10)+" A"+(kv.CLK==="1"?" locked":"")].join(" · "); } }
+        "hold "+(hold?hold+" s":"forever"),
+        hasCtlLimit() ? (cl/10)+" A"+(kv.CLK==="1"?" locked":"")
+                      : "budget "+(pb?(pb/10)+" A":"off")].join(" · "); } }
   // Universe → Settings waits for a firmware that carries the settings baton.
   { const b=$("chSet"); if(b){ const ok=kv.CHS==="1"; b.disabled=!ok; b.title=ok?"":"Needs a firmware update"; } }
   // Factory reset waits for a firmware that takes it over Bluetooth (FR=1).
@@ -4304,10 +4688,24 @@ function renderSetup(){
   if(document.activeElement!==$("netUni")) $("netUni").value=kv.NUN??"1";
   if(document.activeElement!==$("setFold")) $("setFold").value=kv.TF??"1";
   if(document.activeElement!==$("setCfold")) $("setCfold").value=kv.CF??"1";
+  // Firmware before the controller limit (2.0.0, a024de9) has a PSU budget
+  // instead: PB in 0.1 A, 0 = off, outputs scaled back together to stay
+  // within it; no lock, no current fold. The row shows that, and never sends
+  // the 0 the padlock path used to, which switched the budget off (D2).
+  $("cfoldRow").classList.toggle("hidden",!hasCtlLimit());
+  $("btnLimLock").classList.toggle("hidden",!hasCtlLimit());
+  $("setLimLbl").textContent=hasCtlLimit()?"Current limit":"PSU budget";
+  if(!hasCtlLimit()){
+    const f=$("setLim"), pb=+(kv.PB||0);
+    f.min="0"; f.max="60"; f.disabled=false;
+    if(document.activeElement!==f) f.value=(pb/10).toString();
+    $("setLimNote").textContent="outputs scale back together to stay within it · 0 = off · Enter applies";
+    $("foldStatus").textContent="";
+  }else
   // Current limit: CL = effective limit, CLM = product max (both 0.1 A). Typed
   // in amps, 0.5 A steps; the switch beside it locks the field (user, 2026-09-24).
   { const clm=+(kv.CLM||68), cl=+(kv.CL||clm), lock=kv.CLK==="1";
-    const f=$("setLim");
+    const f=$("setLim"); f.min="0.5";
     f.max=(clm/10).toString();
     if(document.activeElement!==f) f.value=(cl/10).toString();
     f.disabled=lock;
@@ -4388,14 +4786,18 @@ function renderSetup(){
   // guessing. A uptime that goes BACKWARDS is proof the controller rebooted.
   if(kv.UP!=null){
     const up=+kv.UP;
+    // Per controller: one stored uptime for every unit warned "RESTARTED" on
+    // picking a unit that had been up less time than the last (second review
+    // 2026-10-31). The demo keeps out of it.
+    const upKey=(demoOn && !bleConnected()) ? "" : "jmbLastUp:"+(devName()||"");
     let prev=lastUp;
-    if(prev==null){ try{ const v=localStorage.getItem("jmbLastUp"); if(v!=null) prev=+v; }catch(_){} }
+    if(prev==null && upKey){ try{ const v=localStorage.getItem(upKey); if(v!=null) prev=+v; }catch(_){} }
     if(prev!=null && up < prev){
       setOtaMsg("⚠ The controller RESTARTED — its uptime went from "+prev+"s to "
         +up+"s. The link did not simply drop; the controller itself rebooted.");
     }
     lastUp=up;
-    try{ localStorage.setItem("jmbLastUp", String(up)); }catch(_){}
+    if(upKey) try{ localStorage.setItem(upKey, String(up)); localStorage.removeItem("jmbLastUp"); }catch(_){}
   }
   // RR = esp_reset_reason of this boot. Anything other than power-on or a
   // software restart means the controller crashed or was reset by a watchdog —
@@ -4424,7 +4826,7 @@ function renderSetup(){
     (kv.UP!=null ? " · up "+(+kv.UP)+"s" : "")+
     (kv.RR!=null ? " · last boot: "+(RR[+kv.RR]||("reason "+kv.RR)) : "")+crs)+'</span>';
   // Developer: shunt + current calibration
-  if(document.activeElement!==$("setShunt"))
+  if(document.activeElement!==$("setShunt") && !shuntAsking)
     $("setShunt").value = kv.SHM==="1" ? String(kv.SH??0) : "0";
   {
     const oldPort=ports.some(m=>m.PF!==undefined && m.PH!==0 && (+m.PF)<0x205);
@@ -4459,11 +4861,24 @@ $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.val
 $("setCfold").onchange=e=>{ setupTouched=Date.now(); send("CFOLD="+ +e.target.value); };
 // The limit goes out in 0.1 A; at or above the product max it sends 0
 // (= "the max"), which is also what the firmware stores for anything over.
+// An empty field puts the limit in force back and sends nothing: it used to
+// become 0.5 A, which the padlock then locked (B7).
 function limApply(){
   const f=$("setLim"), clm=+(kv.CLM||68);
-  let da=Math.round((+f.value||0)*10); if(da<5) da=5; if(da>=clm) da=0;
-  f.value=((da||clm)/10).toString(); send("PSUDA="+da);
+  if(f.value.trim()==="" || !Number.isFinite(+f.value)){ f.value=(+(kv.CL||clm)/10).toString(); return false; }
+  let da=Math.round((+f.value)*10); if(da<5) da=5; if(da>=clm) da=0;
+  f.value=((da||clm)/10).toString(); send("PSUDA="+da); return true;
 }
+// Does this firmware have the controller current limit (CL/CLM, lock, fold)?
+// 2.0.0 does not: there PSUDA is a PSU budget, 0 = off.
+function hasCtlLimit(){ return "CLM" in kv; }
+function budgetApply(){
+  const f=$("setLim");
+  if(f.value.trim()==="" || !Number.isFinite(+f.value)){ f.value=(+(kv.PB||0)/10).toString(); return; }
+  const da=Math.max(0,Math.min(600,Math.round(+f.value*10)));
+  f.value=(da/10).toString(); setupTouched=Date.now(); send("PSUDA="+da);
+}
+$("setLim").addEventListener("change",()=>{ if(!hasCtlLimit()) budgetApply(); });
 // The padlock is the only control (no Apply button, user 2026-10-01):
 // unlocked → apply what is in the field, then lock it; locked → unlock.
 // Enter in the field does the same as tapping it.
@@ -4475,10 +4890,12 @@ function ctlDD(open){
   $("ctlSum").classList.toggle("hidden",open);
 }
 $("ctlDD").onclick=()=>ctlDD($("ctlDD").getAttribute("aria-expanded")!=="true");
-$("setLim").onkeydown=e=>{ if(e.key==="Enter") $("btnLimLock").click(); };
+$("setLim").onkeydown=e=>{ if(e.key!=="Enter") return;
+  if(hasCtlLimit()) $("btnLimLock").click(); else e.target.blur(); };   // blur → change → budgetApply
 $("btnLimLock").onclick=()=>{ setupTouched=Date.now();
+  if(!hasCtlLimit()) return;                 // hidden on 2.0.0; never its PSUDA=0
   const locked = kv.CLK==="1";
-  if(!locked) limApply();
+  if(!locked && !limApply()) return;         // nothing typed: nothing to lock
   send("CLOCK="+(locked?0:1));
   $("setLim").disabled=!locked;
   $("btnLimLock").classList.toggle("on",!locked);
@@ -4505,7 +4922,18 @@ function setHelper(on){
 }
 setHelper((()=>{ try{ return localStorage.getItem("jmbHelper")!=="0"; }catch(_){ return true; } })());
 $("helpMode").onchange=e=>setHelper(e.target.checked);
-$("setShunt").onchange=e=>{ setupTouched=Date.now(); send("SHUNT="+ +e.target.value); };
+// The shunt scales every current reading, and so the real trip point and the
+// fold: one wrong pick doubles them. It asks first (app review 2026-10-29, D10).
+// shuntAsking (declared with ports/kv): the repaint leaves the pick alone while asked.
+$("setShunt").onchange=async e=>{
+  const v=+e.target.value, was=kv.SHM==="1"?(kv.SH??"0"):"0";
+  setupTouched=Date.now(); shuntAsking=true;
+  const ok=await askConfirm("Every port's current reading, its trip point and the current fold follow the shunt. The wrong value halves or doubles them.",
+                       {title:`Set the shunt to ${v?v+" mΩ":"auto"}?`,ok:"Set shunt",danger:true});
+  shuntAsking=false; setupTouched=Date.now();
+  if(!ok){ e.target.value=String(was); return; }
+  send("SHUNT="+v);
+};
 $("calPort").onchange=()=>renderSetup();
 $("btnCal").onclick=()=>{
   const p=+$("calPort").value||1, ma=Math.round(+$("calMa").value);
@@ -4532,9 +4960,16 @@ $("btnVariant").onclick=async()=>{
 };
 // ---------- Chain broadcast (factory look index: 0=DMX In, 1=Off, 9=White) ----------
 let chArmPend=0;
-$("chArm").addEventListener("change",e=>{
-  chArmPend=Date.now();
+$("chArm").addEventListener("change",async e=>{
   const on=e.target.checked;
+  // While armed the unit holds its DMX thru for the baton, so every fixture
+  // after it loses the desk until a baton arrives (app review 2026-10-29, D3).
+  // The state repaint stays off the toggle while the question is open.
+  chArmPend=Date.now()+86400000;
+  if(on && kv.DMX==="1" && !demoOn &&
+     !await askConfirm("While this unit waits for a baton, every fixture after it on the DMX line loses the desk's signal.",
+                       {title:"Listen with DMX live?",ok:"Listen",danger:true})){ e.target.checked=false; chArmPend=0; return; }
+  chArmPend=Date.now();
   send("CHARM="+(on?1:0));
   const st=$("chArmStat");                 // optimistic — firmware confirms
   st.textContent = on ? "ARMED — waiting for baton" : "off";
@@ -4594,9 +5029,11 @@ function renderIdentMsg(){
 // Shown on the unlock screen, where someone is already waiting — better than
 // discovering it three tabs in. Honest because state (and FWB) is published on
 // connect, before the PIN is accepted.
+// (The firmware sends no state until the PIN is accepted, so on the unlock
+// screen this only shows once this connection has reported its build.)
 function renderPinNotice(){
   const el=$("pinUpd"); if(!el) return;
-  el.classList.toggle("hidden", !otaUpdateAvailable());
+  el.classList.toggle("hidden", !(kv.FWB && otaUpdateAvailable()));
 }
 
 function renderLink(){
@@ -4665,8 +5102,16 @@ $("btnWireClear").onclick=async()=>{
   send("WIRECLR");
 };
 $("btnTestStop").onclick=()=>send("TESTSEQ=0");   // banner's own way out
-$("tsFade").onclick=()=>send("TESTSEQ=1");
-$("tsStep").onclick=()=>send("TESTSEQ=2");
+// A test sequence outranks live DMX on every port and runs on after the app
+// closes: with a desk driving the rig it asks first (app review 2026-10-29, D9).
+async function testSeq(n){
+  if(kv.DMX==="1" && !demoOn &&
+     !await askConfirm(`${n===1?"Fade CMY":"Step RGBW"} takes over every port from the desk until you stop it, and keeps running if the app closes.`,
+                       {title:"Override live DMX?",ok:"Start test",danger:true})) return;
+  send("TESTSEQ="+n);
+}
+$("tsFade").onclick=()=>testSeq(1);
+$("tsStep").onclick=()=>testSeq(2);
 $("tsOff").onclick =()=>send("TESTSEQ=0");
 // Each look button says what it did (user, 2026-10-02: "DMX In seems to do
 // nothing" — it sent the baton with no sign of it).
@@ -4767,16 +5212,20 @@ $("setName").addEventListener("change",e=>{
 });
 $("btnCidApply").onclick=()=>{ setupTouched=Date.now();
   send("CID="+Math.max(0,Math.min(9999,+$("setCid").value||0))); };
+// 0 = hold forever: "||5" turned it into 5 s (B7). Empty puts the value back.
 $("btnHoldApply").onclick=()=>{ setupTouched=Date.now();
-  send("HOLD="+Math.max(0,Math.min(60,+$("setHold").value||5))); };
+  const s=$("setHold").value.trim();
+  if(s===""||!Number.isFinite(+s)){ $("setHold").value=kv.HOLD??"5"; return; }
+  send("HOLD="+Math.round(Math.max(0,Math.min(60,+s)))); };
 // ---------- prep / reset-all / undo ----------
 $("btnPrep").onclick=async()=>{
   // Confirm only when the button is armed (blue = something to clear); with the
   // rig already clear there is nothing to warn about (user, 2026-09-13).
   if($("btnPrep").classList.contains("glow") &&
      !await askConfirm("Every port goes to full white, effects off, dimmer down.",{title:"Clear all ports?",ok:"Clear all",danger:true})) return;
-  // Keep what is about to go, for Undo on the dashboard (user, 2026-10-02).
-  try{ localStorage.setItem("jmb_undo",JSON.stringify(snapshotPorts())); }catch(_){}
+  // Keep what is about to go, for Undo on the dashboard (user, 2026-10-02),
+  // under this controller's name; the demo keeps none (app review 2026-10-29).
+  if(!demoOn) try{ localStorage.setItem(undoKey(),JSON.stringify(snapshotPorts())); }catch(_){}
   // Clear to a clean programming base: effect OFF, colour full, speed at
   // designed tempo, dimmer down — nothing lights until you raise a wheel.
   ports.forEach((m,i)=>{ const p=i+1;
@@ -4795,11 +5244,11 @@ $("btnPrep").onclick=async()=>{
     if(wheels[p+".S"]) wheels[p+".S"].set(128);
     m.R=m.G=m.B=100; m.D=0; m.S=128; m.M=1; m.X=0;
   });
-  send("ALL.DIM=0");                       // dimmer down FIRST — never a
-  send("ALL.MAN=1");                       // full-white blast on the way
-  send("ALL.FX=0");                        // kill any running effect
-  send("ALL.RGB=100,100,100");
-  send("ALL.FXS=128");
+  sendLook("ALL.DIM=0");                   // dimmer down FIRST — never a
+  sendLook("ALL.MAN=1");                   // full-white blast on the way
+  sendLook("ALL.FX=0");                    // kill any running effect
+  sendLook("ALL.RGB=100,100,100");
+  sendLook("ALL.FXS=128");
 };
 // statusEl: where the progress and "done" line goes. Only Import passes one
 // (its own line under Export / Import); Undo and the white balance report by
@@ -4808,26 +5257,50 @@ $("btnPrep").onclick=async()=>{
 async function applyQueue(q,label,statusEl){
   clearInterval(fadeTimer);               // a running scene fade would fight
   for(let i=0;i<q.length;i++){
-    await send(q[i]); await sleep(60);
+    await sendLook(q[i]); await sleep(60);   // a whole look: as it is (see sendLook)
     if(statusEl) statusEl.textContent=`${label}… ${i+1}/${q.length}`;
   }
   await send("GET");
   if(statusEl) statusEl.textContent=label+" done ✓";
 }
+// Undo is per controller: one shared key let a Clear all in the demo or on
+// another unit re-patch whatever connected next (app review 2026-10-29).
+function undoKey(){ return "jmb_undo:"+(devName()||""); }
+try{ localStorage.removeItem("jmb_undo"); }catch(_){}     // the old shared key
+// Undo puts back only what Clear all takes: the looks. The patch (mode,
+// address, head) was never touched by Clear all, so it is not restored.
 function snapshotPorts(){
-  return ports.map(m=>({a:m.A??1,h:m.H??0,pe:m.PE??0,m:m.M??0,
-                        r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
+  return ports.map(m=>({m:m.M??0,r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
                         x:m.X??0,s:m.S??128}));
 }
-function portQueue(list){
+function lookQueue(list){
   const q=[];
   list.slice(0,ports.length).forEach((t,i)=>{
+    if(!t || typeof t!=="object") return;   // skipped in place: filtering first moved port 3's look onto port 2
+    const p=i+1, n=x=>Math.max(0,Math.round(+x||0));
+    // The effect first, as a scene recall sends it: colour and dimmer first left
+    // an effect port on 0,0,0 in manual black at the dimmer (white) until FX landed.
+    q.push(`P${p}.FX=${n(t.x)}`,`P${p}.FXS=${n(t.s??128)}`,
+           `P${p}.RGB=${n(t.r)},${n(t.g)},${n(t.b)}`,`P${p}.DIM=${n(t.d??100)}`,`P${p}.MAN=${t.m?1:0}`);
+    for(const k of ["R","G","B","D","X","S"]) hot[p+"."+k]=Date.now()+4000;
+  });
+  return q;
+}
+function portQueue(list,skipped){
+  const q=[];
+  list.slice(0,ports.length).forEach((t0,i)=>{
     const p=i+1;
+    if(!t0 || typeof t0!=="object") return;               // a hand-edited file's null entry
+    const t=t0;
+    // A Mode this controller cannot run is not sent: the firmware would clamp
+    // it to the last code it knows, Dim 2ch 16-bit (B1). The port keeps its own.
+    const pe=Math.round(+t.pe||0), peOk=persAvail(pe);
+    if(!peOk && skipped) skipped.push(p);
     // PERS before ADDR: the firmware clamps a start address against the CURRENT
     // personality's footprint, so setting personality first stops an imported
     // address (valid for its own personality) getting clamped low.
-    q.push(`P${p}.PERS=${t.pe??0}`,
-           `P${p}.ADDR=${t.a??1}`,`P${p}.HEAD=${t.h??0}`,
+    if(peOk) q.push(`P${p}.PERS=${pe}`);
+    q.push(`P${p}.ADDR=${t.a??1}`,`P${p}.HEAD=${t.h??0}`,
            `P${p}.RGB=${t.r??0},${t.g??0},${t.b??0}`,
            `P${p}.DIM=${t.d??100}`,`P${p}.FX=${t.x??0}`,
            `P${p}.FXS=${t.s??128}`,`P${p}.MAN=${t.m?1:0}`);
@@ -4852,13 +5325,13 @@ function portQueue(list){
 // Undo on the Control dashboard (user, 2026-10-02): puts back the looks
 // Clear all took away. The patch reset that lived in Setup is gone with it.
 $("btnUndo").onclick=async()=>{
-  let snap; try{ snap=JSON.parse(localStorage.getItem("jmb_undo")||""); }
+  let snap; try{ snap=JSON.parse(localStorage.getItem(undoKey())||""); }
   catch(_){ toast("Nothing to undo"); return; }
   if(!Array.isArray(snap)){ toast("Nothing to undo"); return; }
-  if(!await askConfirm("Every port goes back to how it was before the last Clear all.",{title:"Undo Clear all?",ok:"Restore"}))
+  if(!await askConfirm("Every port's colour, dimmer and effect go back to how they were before the last Clear all.",{title:"Undo Clear all?",ok:"Restore"}))
     return;
-  await applyQueue(portQueue(snap),"Undo");
-  localStorage.removeItem("jmb_undo");
+  await applyQueue(lookQueue(snap),"Undo");
+  try{ localStorage.removeItem(undoKey()); }catch(_){}
   renderControl();
   toast("Looks restored");
 };
@@ -4924,10 +5397,12 @@ $("impFile").addEventListener("change",async ev=>{
   if(Array.isArray(data.cpd) && "CPD1" in kv) data.cpd.slice(0,4).forEach((c,k)=>{
     const s=(typeof c==="string" && /^[0-9A-F]+,[01],\d+,(8|16),[01],\d+(,\d+,\d+,(8|16)){5}$/.test(c)) ? c : "0";
     lib.push(`CPD${k+1}=${s}`); });
+  const skipped=[];
   const q=["CID="+(data.cid||0),"CNAME="+(nm?hexEnc(nm):"0"),
-           "AMODE="+(data.amode||0)].concat(lib,portQueue(data.ports));
+           "AMODE="+(data.amode||0)].concat(lib,portQueue(data.ports,skipped));
   await applyQueue(q,"Applying",$("impStatus"));
-  if(nsc){ saveScenes(data.scenes.slice(0,100)); renderScenes(); }
+  if(skipped.length) $("impStatus").textContent+=` · Mode kept on port${skipped.length>1?"s":""} ${skipped.join(", ")}: this firmware can't run the file's Mode`;
+  if(nsc){ saveScenes(data.scenes.slice(0,100).filter(s=>s&&typeof s==="object")); renderScenes(); }
 });
 
 // ---------- BLE OTA (firmware update over Bluetooth) ----------
@@ -4965,7 +5440,7 @@ function crc32(buf){
   return (c^0xFFFFFFFF)>>>0;
 }
 const otaEnc=s=>new TextEncoder().encode(s);
-let otaBusy=false, otaAbort=false, otaWaiter=null, otaProbationSeen=false;
+let otaBusy=false, otaAbort=false, otaWaiter=null, otaProbationSeen=false, fullUpdRunning=false;
 // HOSTED FIRMWARE — the image is published next to this app, so updating is one
 // button instead of hunting for a .bin. Served from our own origin, so no CORS
 // and the service worker keeps a copy for a retry with no signal.
@@ -5041,7 +5516,7 @@ function renderOta(){
       // The button says what the run will actually do: controller, port
       // module, or both — each only when its published image differs.
       const avail = otaUpdateAvailable();
-      hb.disabled = !ok || otaBusy || !avail;
+      hb.disabled = !ok || otaBusy || fullUpdRunning || !avail;
       hb.textContent = !avail ? "Firmware up to date"
         : (!ctrlUpdateAvailable() && portUpdateAvailable()) ? "Update port module" : "Update Firmware";
       // Controller-only is only meaningful when the full run would include
@@ -5272,7 +5747,17 @@ async function runStmRollback(){
 // ctrlOnly is no longer offered in the UI — the update is one button. It stays
 // as a parameter because the port-failure path continues to the controller
 // alone, which is the same journey.
+// One run at a time: the Update button came back to life during each image
+// download (otaBusy is set later), so a second tap started a second run that
+// interleaved with the first and failed both (app review 2026-10-29, A6).
+// (fullUpdRunning is declared beside otaBusy.)
 async function runFullUpdate(ctrlOnly){
+  if(fullUpdRunning) return;
+  fullUpdRunning=true; renderOta();
+  try{ return await runFullUpdateOnce(ctrlOnly); }
+  finally{ fullUpdRunning=false; renderOta(); }
+}
+async function runFullUpdateOnce(ctrlOnly){
   if(!otaManifest||!otacChar||!otadChar) return;
   // Not cleared to "" — the link has been dropping AT the confirm prompt, and an
   // empty phase means the disconnect handler stashes nothing.
@@ -5401,16 +5886,33 @@ async function runOta(file, opts){
   }
 }
 
-$("btnDisc").onclick=()=>{ if(NBLE()){ NBLE().disconnect(); onDisconnected(); return; }
+$("btnDisc").onclick=()=>{ userDisc=true;
+  if(NBLE()){ NBLE().disconnect(); onDisconnected(); return; }
   const d0=dev; dev=null; if(d0&&d0.gatt.connected) d0.gatt.disconnect(); };
+// From the PIN screen: the same, and if the link is already dead there is no
+// disconnect event to come, so put the connect screen back directly.
+$("pinCancel").onclick=()=>{
+  clearTimeout(authTimer); pinGen++; pinPending="";
+  const live=NBLE()?NBLE().connected:!!(dev&&dev.gatt&&dev.gatt.connected);
+  $("btnDisc").onclick();
+  if(!live){ hideOverlay(); cmdChar=null; $("btnConnect").classList.remove("hidden");
+    hello("<b>Disconnected.</b><div class='mini'>Tap Connect to rejoin.</div>"); }
+};
 $("btnPin").onclick=async()=>{
   // "Default: 0123" (user, 2026-10-04): the factory PIN, so it can be put back.
   const v=await askText("4\u201316 characters, no spaces. Default: 0123",{title:"New PIN",ok:"Set PIN",maxlength:16});
-  if(v&&v.trim().length>=4){
-    send("NEWPIN="+v.trim());
-    savePin(v.trim());
-    tellUser("Reconnections must use the new PIN.",{title:"PIN changed"});
-  }
+  if(v==null) return;
+  const n=v.trim();
+  // The controller stops reading at a space and ignores a PIN under 4
+  // characters, so "12 34" left the old PIN in force while the phone saved the
+  // new one and locked itself out (app review 2026-10-29, B5).
+  if(!/^[\x21-\x7E]{4,16}$/.test(n)){
+    tellUser("A PIN is 4 to 16 letters, numbers or symbols, with no spaces.",{title:"PIN not changed"}); return; }
+  const old=loadPin();
+  send("NEWPIN="+n);
+  try{ const k=pinPrevKey(); if(k) localStorage.setItem(k, old||"0123"); }catch(_){}
+  savePin(n);
+  tellUser("Reconnections must use the new PIN.",{title:"PIN changed"});
 };
 $("btnConnect").onclick=()=>{
   // In demo the button reads "Exit demo" and leaves cleanly (reload to the
@@ -6375,8 +6877,9 @@ $("btnDemo").onclick=()=>{
 
 if(!bleAvailable()){
   hello("<b>This browser has no Web Bluetooth.</b>"+
-    "<div class='mini'>Use Chrome or Edge (Android / desktop). On iPhone, "+
-    "open this page in the Bluefy browser — or install the App Store build.</div>");
+    "<div class='mini'>On Android, use the JMB Lighting app from Google Play, or Chrome. "+
+    "On iPhone, open this page in the Bluefy browser. On a computer, Chrome or Edge. "+
+    "Demo mode works here.</div>");
   $("btnConnect").disabled=true;
 }
 
