@@ -392,6 +392,15 @@
       background:rgba(22,27,35,.92); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
     body[data-tab="control"] #ports .card { scroll-margin-top:calc(var(--hdrH,64px) + var(--chipsH,42px) + 72px); }
   }
+  /* Fitted tabs (fitTo): Colour, and Control on a one-port controller
+     (body.one). The card ends just above the nav rather than 24 px short,
+     and on a short screen the one port's rows close up a little so the page
+     still fits without scrolling (user, 2026-11-07). */
+  body[data-tab="colour"] main, body.one[data-tab="control"] main { padding-bottom:8px; }
+  @media (max-height:800px){
+    body.one[data-tab="control"] #ports .rows { gap:6px; }
+    body.one[data-tab="control"] #ports .chrows { gap:5px; }
+  }
   .dash button { flex:1; min-width:0; padding:11px 6px; font-size:13.5px; line-height:1.2;
                  white-space:nowrap; border-radius:10px; }
   .dash button.glow { border-color:var(--acc); color:var(--acc);
@@ -1628,11 +1637,15 @@ function persOptionText(c){
     return `${n}. Custom ${k}${cp?` "${cp.name}"`:""} · ${cpdFoot(cp)} ch`+(cp?"":" (preset not set)"); }
   return `${n}. ${PERS_NAMES[c]} · ${PERS_CH[c]} ch`+(persAvail(c)?"":" (five-channel firmware)");
 }
+// Write an <option> property only when it differs. An open picker redraws on
+// every mutation, even a same-value one, so a state echo re-writing the PWM
+// list several times a second made it pulse on the phone (3.x bench 2026-11-07).
+function optSet(o,k,v){ if(o[k]!==v) o[k]=v; }
 function persPaintOptions(p){
   cpdSync();                              // custom footprints follow their presets
   const sel=$("pers"+p); if(!sel) return;
-  for(const o of sel.options){ const c=+o.value, ok=persAvail(c);
-    o.disabled=!ok; const t=persOptionText(c); if(o.textContent!==t) o.textContent=t; }
+  for(const o of sel.options){ const c=+o.value;
+    optSet(o,"disabled",!persAvail(c)); optSet(o,"textContent",persOptionText(c)); }
 }
 const FX_NAMES = ["Off","Candle","Fire","Fireworks","Water","Siren","Laser","Club",
                   "Lightning","Rainbow","Aurora","Sunset","TV Sim","Strobe","Police",
@@ -1647,7 +1660,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-10-31a.tests";
+const APP_VER="2026-11-07a.fit";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1804,6 +1817,7 @@ function selectTab(name){
   { const bar=$("scnBar"); if(bar){ bar.classList.toggle("hidden", name!=="scenes"); scnBarPlace(); } }
   if(name==="control" && typeof fxPreviewKick==="function") fxPreviewKick();
   if(name==="colour" && typeof fitCols==="function") fitCols();
+  if(name==="control" && typeof fitControl==="function") fitControl();
 }
 // The Scenes transport bar sits exactly on top of the nav, whatever height the
 // nav really is on this phone (labels, helper state, safe-area inset): measure
@@ -1827,21 +1841,40 @@ function pinPlace(){
 if(window.ResizeObserver){ try{ const ro=new ResizeObserver(()=>pinPlace());
   ro.observe(document.querySelector("header")); ro.observe($("chips")); }catch(_){} }
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(scnBarPlace).catch(()=>{});
-// Colour tab: the picker columns stretch to the screen (user, 2026-10-01:
-// "always stretch the colour tab to fit"). Measure the room left above the
-// nav bar after a nominal 300 px and give it to the columns.
+// FIT TO THE WINDOW. Two tabs size themselves to the screen:
+// - Colour: the picker columns stretch (user, 2026-10-01: "always stretch the
+//   colour tab to fit").
+// - Control on a one-port controller: the two jog wheels stretch (user,
+//   2026-11-07: "the port section on the zone in the control tab doesnt need
+//   to scroll, neither does the colour tab … fixed in position as long as all
+//   features are visible").
+// The stretchy parts sit side by side, so the page height moves 1:1 with
+// theirs. One measurement therefore sizes them so the page ends 1 px inside
+// the window, leaving nothing to scroll. (The old Colour sum missed the
+// page's bottom padding and left 13 px to scroll.) They stop at `min`; below
+// that the page scrolls as before, so nothing is ever cut off.
+// Synchronous: reading the height forces the layout, so this works on a
+// background tab too. A size already right is not re-written, because Control
+// runs this on every state line.
+function fitTo(els,min,max){
+  if(!els.length) return;
+  const cur=els[0].getBoundingClientRect().height;
+  const over=document.body.offsetHeight-innerHeight+1;
+  const h=Math.max(min,Math.min(max,Math.round(cur-over)));
+  if(Math.abs(h-cur)>=1) els.forEach(e=>e.style.height=h+"px");
+}
 function fitCols(){
   if(activeTabName()!=="colour") return;
-  const cols=[...document.querySelectorAll("#colCols .colcol")]; if(!cols.length) return;
-  const card=$("colCols").closest(".card"), nav=$("nav"); if(!card||!nav) return;
-  cols.forEach(c=>c.style.height="300px");
-  // Synchronous: reading the rects after the style change forces the layout,
-  // so this works even when the page is not painting (background tab).
-  const room=nav.getBoundingClientRect().top - card.getBoundingClientRect().bottom - 14;
-  const h=Math.max(220, Math.round(300+room));
-  cols.forEach(c=>c.style.height=h+"px");
+  fitTo([...document.querySelectorAll("#colCols .colcol")],220,2000);
 }
-addEventListener("resize",fitCols);
+function fitControl(){
+  const ws=[...document.querySelectorAll("#ports .wheelbox")], one=ports.length===1;
+  document.body.classList.toggle("one",one);
+  if(!one){ ws.forEach(w=>{ if(w.style.height) w.style.height=""; }); return; }   // 4our / 8ight scroll their cards
+  if(activeTabName()!=="control") return;
+  fitTo(ws,72,320);
+}
+addEventListener("resize",()=>{ fitCols(); fitControl(); });
 document.querySelectorAll("#nav button").forEach(btn=>{
   btn.onclick=()=>{
     selectTab(btn.dataset.tab);
@@ -2745,7 +2778,7 @@ function renderControl(){
       const cct=(m.PE===2||m.PE===3), dim1=(m.PE===5||m.PE===6);
       // Monochrome ports (CCT + Dim) only offer effects that read on them.
       const xs=$("x"+p);
-      if(xs) for(const o of xs.options) o.hidden = (cct||dim1) && !CCT_FX.has(+o.value);
+      if(xs) for(const o of xs.options) optSet(o,"hidden",(cct||dim1) && !CCT_FX.has(+o.value));
     }
     setIf(p,"X",   el=>el.value=m.X??0);
     // Effect running → the colour sliders are LOCKED (dulled and disabled)
@@ -2807,6 +2840,7 @@ function renderControl(){
     if(pv){ pv.classList.toggle("warn",clash); if(clash && !/⚠/.test(pv.textContent)) pv.textContent+=" ⚠"; }
     const pb=$("pbA"+(i+1)); if(pb) pb.classList.toggle("warn",clash);
   }
+  fitControl();                            // a one-port card fills the window (banners, rows and all)
 }
 // Every DMX channel a port listens on, sorted: a standard personality from its
 // start address, a custom preset from its own address list.
@@ -6383,10 +6417,10 @@ function pwPaintCard(p,m){
   if(sel) for(const o of sel.options){
     const v=+o.value; if(v<3) continue;
     const c=pwCustom(v-3);
-    o.hidden=!lib;
-    o.disabled=!c || pf<PORT_FW_CUSTOM;
-    o.textContent = !c ? `Custom ${v-2} (not set)`
-      : `Custom ${v-2} · ${fmtKhz(c.act)}`+(pf<PORT_FW_CUSTOM?" — port firmware 2.7":"");
+    optSet(o,"hidden",!lib);
+    optSet(o,"disabled",!c || pf<PORT_FW_CUSTOM);
+    optSet(o,"textContent", !c ? `Custom ${v-2} (not set)`
+      : `Custom ${v-2} · ${fmtKhz(c.act)}`+(pf<PORT_FW_CUSTOM?" — port firmware 2.7":""));
   }
   const pe=$("pwe"+p); if(pe) pe.classList.toggle("hidden",!lib);
   const slot=(m.PW??0)-3, c=slot>=0?pwCustom(slot):null;
@@ -7004,7 +7038,7 @@ function helpBind(btn,notes){
     // threw "Invalid left-hand side in assignment" on every tap; the toggle
     // above had already happened so it looked like it worked. 2026-09-13.)
     const t=open?"Hide notes":"Show notes"; btn.title=t; btn.setAttribute("aria-label",t);
-    if(typeof fitCols==="function") fitCols();   // the Colour tab re-measures when its note shows or hides
+    if(typeof fitCols==="function"){ fitCols(); fitControl(); }   // the fitted tabs re-measure when a note shows or hides
   };
 }
 document.querySelectorAll(".tab .card").forEach(card=>{
