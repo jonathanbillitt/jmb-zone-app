@@ -1660,7 +1660,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-08a.club";
+const APP_VER="2026-11-08b.fx";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -3977,16 +3977,27 @@ function faultChoreo(key, card, flt){
   setTimeout(()=>card.classList.remove(cls), flt?600:900);
 }
 
-// ---- LIVE EFFECT PREVIEW. The same effect maths as the controller's
-// effects.h, run in the browser on each port's own virtual clock and painted
-// into the port's swatch every frame — the phone shows what the strip is doing.
-// Speed follows the port's Speed and the rig BPM exactly as the firmware does;
-// the sliders act as RGB trims while an effect runs, and the dimmer scales it.
+// ---- LIVE EFFECT PREVIEW. A line-for-line port of the controller's
+// include/effects.h (as of 66c5fc7, FW-66, + the moody Club of 2026-11-08),
+// run in the browser and painted into the port's swatch: the phone shows what
+// the strip is doing (user, 2026-11-08: "These effects need to match the
+// firmwares. Preview window is noticeably different").
+// Mirrors the controller, not just the shapes:
+// - it steps the engine every 10 ms of real time (JMB_PUSH_MS), as the
+//   pushes do, so glides, event timings and decays land on the same grid
+//   whatever the phone's frame rate;
+// - the virtual clock keeps its fraction of a ms;
+// - the rig spread (SPR % × 8 ms per port) offsets each port's time;
+// - on an RGBW / RGBWA port the white output carries min(r, g, b) on top of
+//   the colour (amber stays dark), as main.cpp does under an effect.
+// When effects.h changes, change the matching case here.
 // Runs only while the Control tab is showing and the page is visible.
 const swOwned={};                       // swatches currently driven by a preview/tween
 const fxSt={};
 function fxRand(s){ let x=s.rng; x^=x<<13; x>>>=0; x^=x>>>17; x^=x<<5; x>>>=0; s.rng=x||1; return s.rng; }
-function fxFrand(s){ return (fxRand(s)%10000)/10000; }
+function fxFrand(s){ return (fxRand(s)&0xFFFFFF)/16777215; }           // 0..1, as fx_frand
+const fxGlide=(k10,vdt)=>vdt<=0?0:1-Math.pow(1-k10,vdt/10);          // fx_glide: per 10 virtual ms
+const fxTailQ=(t,t0,len)=>{ const e=t-t0; if(e>=len) return 0; const q=1-e/len; return q*q; };   // fx_tail_q
 function hsv(h,s,v){
   h=((h%360)+360)%360; v=Math.max(0,Math.min(1,v)); s=Math.max(0,Math.min(1,s));
   const c=v*s, x=c*(1-Math.abs((h/60)%2-1)), m=v-c; let r,g,b;
@@ -3996,20 +4007,25 @@ function hsv(h,s,v){
 }
 const POLICE_START=[0,50,100,250,300,350];
 const TRAFFIC_CT=[[255,141,11],[255,206,166],[227,233,255]];
-function fxCompute(fx, idx, t, s){          // idx = port index 0-based, t = virtual ms
+// t = the port's virtual ms (integer, spread included); vdt = virtual ms this
+// 10 ms step (the glides' rate); idx = port index 0-based.
+function fxCompute(fx, idx, t, s, vdt){
   const pf=idx, due=x=>(t-x)>=0, m=(a,b)=>((a%b)+b)%b;
   switch(fx){
   case 1:{ // Candle
     if(due(s.t_next)){ const f=fxFrand(s); s.tgt=0.55+0.45*f*f; if(fxFrand(s)<0.04) s.tgt=0.22; s.t_next=t+90+(fxRand(s)%130); }
-    s.lvl+=(s.tgt-s.lvl)*0.30; return hsv(21+4*s.lvl,0.96,0.10+0.85*s.lvl); }
+    s.lvl+=(s.tgt-s.lvl)*fxGlide(0.30,vdt); return hsv(21+4*s.lvl,0.96,0.10+0.85*s.lvl); }
   case 2:{ // Fire
     if(due(s.t_next)){ s.tgt=0.30+0.70*fxFrand(s); if(fxFrand(s)<0.06) s.tgt=1; s.t_next=t+40+(fxRand(s)%60); }
-    s.lvl+=(s.tgt-s.lvl)*0.45; return hsv(8+20*s.lvl,1,0.12+0.88*s.lvl); }
-  case 3:{ // Fireworks
+    s.lvl+=(s.tgt-s.lvl)*fxGlide(0.45,vdt); return hsv(8+20*s.lvl,1,0.12+0.88*s.lvl); }
+  case 3:{ // Fireworks: 0 night sky, 1 white pop, 2 coloured bloom, 3 fade-out tail
     if(s.stage===0){ if(due(s.t_next)){ s.stage=1; s.t_evt=t; s.hue=fxFrand(s)*360; } return [0,0,0]; }
-    if(s.stage===1){ if(t-s.t_evt>70){ s.stage=2; s.t_evt=t; } return [1,1,1]; }
+    if(s.stage===1){ if(t-s.t_evt>70){ s.stage=2; s.t_evt=t; } return hsv(0,0,1); }
+    if(s.stage===3){ const q=fxTailQ(t,s.t_evt,380);
+      if(q<=0 || due(s.t_next)){ s.stage=0; return [0,0,0]; }
+      return hsv(s.hue,1,s.lvl*q); }
     const v=Math.exp(-(t-s.t_evt)/380);
-    if(v<0.02){ s.stage=0; s.t_next=t+((fxFrand(s)<0.25)?120:400+(fxRand(s)%2200)); }
+    if(v<0.02){ s.stage=3; s.t_evt=t; s.lvl=v; s.t_next=t+((fxFrand(s)<0.25)?120:400+(fxRand(s)%2200)); }
     return hsv(s.hue,1,v); }
   case 4:{ // Water
     const v=0.58+0.17*Math.sin(m(t,11024)*0.00057+pf*1.7)+0.10*Math.sin(m(t,4333)*0.00145+pf*0.9)+0.04*Math.sin(m(t,997)*0.0063);
@@ -4017,17 +4033,25 @@ function fxCompute(fx, idx, t, s){          // idx = port index 0-based, t = vir
   case 5:{ // Siren
     const phase=Math.floor(t/400)+idx, pos=m(t,400)/400, v=0.55+0.45*Math.exp(-pos*3.5);
     return hsv((phase&1)?225:0,1,v); }
-  case 6:{ // Laser
+  case 6:{ // Laser: 0 dark, 1 hit + sharp decay, 2 fade-out tail
     if(s.stage===0){ if(due(s.t_next)){ s.stage=1; s.t_evt=t; s.hue=0; } return [0,0,0]; }
-    const v=Math.exp(-(t-s.t_evt)/90); if(v<0.03){ s.stage=0; s.t_next=t+120+(fxRand(s)%480); }
+    if(s.stage===2){ const q=fxTailQ(t,s.t_evt,90);
+      if(q<=0 || due(s.t_next)){ s.stage=0; return [0,0,0]; }
+      return hsv(s.hue,1,s.lvl*q); }
+    const v=Math.exp(-(t-s.t_evt)/90);
+    if(v<0.03){ s.stage=2; s.t_evt=t; s.lvl=v; s.t_next=t+120+(fxRand(s)%480); }
     return hsv(s.hue,1,v); }
-  case 7:{ // Club: no strobe fill (user, 2026-11-07: "this needs to come out")
-    const BEAT=469, beat=Math.floor(t/BEAT), bt=m(t,BEAT)/BEAT;
-    const bar=Math.floor(beat/4), hue=((bar*137)%360)+pf*30, v=0.35+0.65*Math.exp(-bt*4);
+  case 7:{ // Club: the beat thump in a moody palette, no strobe, never green
+    // (user, 2026-11-07/08). Hops of 53° inside the 140° arc from deep blue
+    // (220°) to crimson (360°); ports 30° apart inside the arc.
+    const BEAT=469, beat=Math.floor(t/BEAT), bt=m(t,BEAT)/BEAT, bar=Math.floor(beat/4);
+    const hue=220+((bar*53+idx*30)%140), v=0.20+0.65*Math.exp(-bt*4);
     return hsv(hue,1,v); }
   case 8:{ // Lightning
     if(s.stage===0){ if(due(s.t_next)){ s.stage=1; s.t_evt=t; s.n=2+(fxRand(s)%4); s.p1=30+(fxRand(s)%50); s.p2=550+(fxRand(s)%650); } return [0,0,0]; }
-    const dt=t-s.t_evt, flash=s.p1, v=(dt<flash)?1:Math.exp(-(dt-flash)/130);
+    const dt=t-s.t_evt, flash=s.p1;
+    let v=(dt<flash)?1:Math.exp(-(dt-flash)/130);
+    { const end=flash+s.p2; if(dt+130>end && dt<end){ const q=(end-dt)/130; v*=q*q; } }   // the afterglow fades out, no cut
     if(dt>flash+s.p2){ if(s.n) s.n--; if(s.n===0){ s.stage=0; s.t_next=t+2500+(fxRand(s)%7000); } else { s.t_evt=t; s.p1=30+(fxRand(s)%50); s.p2=550+(fxRand(s)%650); } }
     return hsv(220,0.06,v); }
   case 9:  return hsv(m(t,11000)*(360/11000)+pf*90,1,0.85);                                  // Rainbow
@@ -4040,7 +4064,7 @@ function fxCompute(fx, idx, t, s){          // idx = port index 0-based, t = vir
     const e=ph*ph*(3-2*ph); return hsv(42-34*e+pf*0.5,0.80+0.20*e,0.95*(1-e)); }
   case 12:{ // TV Sim
     if(due(s.t_next)){ s.tgt=0.15+0.75*fxFrand(s); s.hue=(fxFrand(s)<0.15)?40:210+25*fxFrand(s); s.t_next=t+250+(fxRand(s)%1350); }
-    s.lvl+=(s.tgt-s.lvl)*0.55; return hsv(s.hue,0.30,s.lvl); }
+    s.lvl+=(s.tgt-s.lvl)*fxGlide(0.55,vdt); return hsv(s.hue,0.30,s.lvl); }
   case 13:  return (m(t,125)<35)?[1,1,1]:[0,0,0];                                            // Strobe 8 Hz
   case 14:{ // Police: six 28 ms flashes per 1000 ms, odd ports on the other half-cycle
     const u=m(t-((idx&1)?500:0),1000), on=POLICE_START.some(st=>u>=st&&u<st+28);
@@ -4065,20 +4089,62 @@ function fxCompute(fx, idx, t, s){          // idx = port index 0-based, t = vir
     const dt=t-s.t_evt, on=(Math.floor(dt/(s.p1||1))&1)===0;
     if(dt>s.p1*2){ s.t_evt=t; s.p1=22+(fxRand(s)%75); if(s.n) s.n--; if(s.n===0){ s.stage=0; s.t_next=t+1500+(fxRand(s)%6500); } }
     return hsv(150,0.12,on?(0.82+0.18*fxFrand(s)):(0.03+0.06*fxFrand(s))); }
-  case 19:{ // Paparazzi
+  case 19:{ // Paparazzi: 0 dark, 1 pop + fast decay, 2 fade-out tail
     if(s.stage===0){ if(due(s.t_next)){ s.stage=1; s.t_evt=t; } return [0,0,0]; }
-    const v=Math.exp(-(t-s.t_evt)/45); if(v<0.03){ s.stage=0; s.t_next=t+50+(fxRand(s)%750); }
+    if(s.stage===2){ const q=fxTailQ(t,s.t_evt,45);
+      if(q<=0 || due(s.t_next)){ s.stage=0; return [0,0,0]; }
+      return hsv(210,0.04,s.lvl*q); }
+    const v=Math.exp(-(t-s.t_evt)/45);
+    if(v<0.03){ s.stage=2; s.t_evt=t; s.lvl=v; s.t_next=t+50+(fxRand(s)%750); }
     return hsv(210,0.04,v); }
-  case 20:{ // Explosion
-    if(s.stage===0){ if(due(s.t_next)){ s.stage=1; s.t_evt=t; } return [0,0,0]; }
-    const dt=t-s.t_evt; if(dt<55) return hsv(35,0.14,1);
-    const v=Math.exp(-(dt-55)/300); if(v<0.03){ s.stage=0; s.t_next=t+1200+(fxRand(s)%5200); }
-    return hsv(18+14*v,1,v*(0.80+0.20*fxFrand(s))); }
+  case 20:{ // Explosion: white-hot core, orange bloom with ember jitter, faded tail
+    if(s.stage===0){ if(due(s.t_next)){ s.stage=1; s.t_evt=t; s.lvl=1; s.tgt=1; s.p1=0; } return [0,0,0]; }
+    const dt=t-s.t_evt;
+    if(s.stage===1 && dt<55) return hsv(35,0.14,1);
+    if(dt>=s.p1){ s.tgt=fxFrand(s); s.p1=dt+25+(fxRand(s)%40); }      // jitter retargets on the effect clock
+    s.lvl+=(s.tgt-s.lvl)*fxGlide(0.5,vdt);
+    const flick=0.80+0.20*s.lvl;
+    let v=Math.exp(-(dt-55)/300);
+    if(v<0.03){
+      const CUT=55+1051, e=dt>CUT?dt-CUT:0, q=e>=300?0:(1-e/300)*(1-e/300);
+      if(q<=0){ s.stage=0; s.t_next=t+1200+(fxRand(s)%5200); return [0,0,0]; }
+      v=0.03*q; }
+    return hsv(18+14*v,1,v*flick); }
   case 21:{ // Clouds
     let sun=0.5+0.30*Math.sin(m(t,47000)*0.0001337+pf*0.6)+0.12*Math.sin(m(t,19000)*0.0003307+pf*1.1)+0.05*Math.sin(m(t,7000)*0.0008976);
     sun=Math.max(0,Math.min(1,sun)); return hsv(214-16*sun,0.05+0.11*(1-sun),0.30+0.70*sun); }
   default: return [0,0,0];
   }
+}
+// A port's engine state, seeded as fx_compute seeds it (p = port number, 1-based).
+const fxNew=(x,p,now)=>({fx:x,rng:((0x9E3779B9*p)^0xB5297A4D)>>>0||1,vt:0,vtf:0,acc:0,last:now,rgb:[0,0,0],
+                         stage:0,n:0,p1:0,p2:0,t_next:0,t_evt:0,hue:0,lvl:0,tgt:0,
+                         tr:0,duty:null,sent:null,chg:0});
+// The port module's output stage (stm32/port/port_bus.c), on the duty after
+// the dimmer and the curve (exponent ge). A changed level that arrives after
+// ≥70 ms of rest, or with any output jumping more than 37.5 % of full from
+// the last one, is taken at once on every output (a cue); a stream of
+// changes glides with a 33 ms time constant, which is what softens Candle and
+// Fire on the strip. One call per 10 ms push.
+const FX_GLIDE10=1-Math.exp(-10/33);
+function fxPort(s,d,ge){
+  const tgt=s.rgb.map(v=>Math.pow(Math.max(0,Math.min(1,v))*d,ge));
+  if(!s.duty){ s.duty=tgt; s.sent=tgt; s.chg=s.tr; return; }
+  if(tgt.some((v,c)=>v!==s.sent[c])){
+    const cue=(s.tr-s.chg>=70) || tgt.some((v,c)=>Math.abs(v-s.sent[c])>0.375);
+    s.chg=s.tr; s.sent=tgt;
+    if(cue){ s.duty=tgt.slice(); return; }
+  }
+  s.duty=s.duty.map((v,c)=>v+(s.sent[c]-v)*FX_GLIDE10);
+}
+// One push of the engine: dtr real ms, 10 between pushes and 0 on the first,
+// when the controller's clock has not moved yet.
+// The clock's fraction is kept in 32-bit floats, as the controller keeps it,
+// so the two clocks tick over on the same push even after minutes at speed.
+function fxStep(s,x,i,S,sf,spread,dtr){
+  const f=Math.fround, vdt=f(dtr*f(sf)); s.vtf=f(s.vtf+vdt);
+  const whole=Math.floor(s.vtf); s.vt+=whole; s.vtf=f(s.vtf-whole);
+  s.rgb=(S===0 && (x===13||x===14)) ? [0,0,0] : fxCompute(x,i,s.vt+spread,s,vdt);   // Strobe/Police: 0 = off
 }
 let fxRaf=0;
 function fxTick(now){
@@ -4094,10 +4160,6 @@ function fxTick(now){
     }
     if(swOwned[p] && swOwned[p]!=="fx") return;        // a scene tween has it for now
     any=true;
-    let s=fxSt[p];
-    if(!s||s.fx!==x){ s=fxSt[p]={fx:x,rng:((0x9E3779B9*p)^0xB5297A4D)>>>0||1,vt:0,last:now,
-                                stage:0,n:0,p1:0,p2:0,t_next:0,t_evt:0,hue:0,lvl:0,tgt:0}; }
-    let dt=now-s.last; s.last=now; if(dt>200) dt=200;
     const S=+(mm.S??128);
     let sf=S===0?0:Math.pow(8,(S-128)/127)*((+(kv.BPM||128))/128);   // speed 0 = stop
     // Strobe rate cap mirrors effects.h — only for ports WITHOUT the port-side
@@ -4105,14 +4167,28 @@ function fxTick(now){
     if(x===13 && sf>2.34 && (+(mm.PF||0))<0x204) sf=2.34;
     // Pulse-capable ports: Strobe's upper half is compressed so 255 = ~30 flashes/s
     if(x===13 && S>128 && (+(mm.PF||0))>=0x204) sf=Math.pow(8,(S-128)/127*0.636)*((+(kv.BPM||128))/128);
-    s.vt+=dt*sf;
-    const [r,g,b]=(S===0 && (x===13||x===14)) ? [0,0,0] : fxCompute(x,i,s.vt,s);   // Strobe/Police: 0 = off
+    // Step the engine on the controller's 10 ms push grid, carrying the virtual
+    // clock's fraction of a ms, with the rig spread on the port's time.
+    // (Strobe and Police run on the port's own clock, period and flash ÷ speed,
+    // odd Police ports half a cycle out; that pulse ignores the spread.)
+    const spread=(x===13||x===14) ? 0 : Math.round(i*Math.max(0,Math.min(100,+(kv.SPR||0)))*8);   // g_fx_spread_ms × port
     // The state's R/G/B are the MANUAL colour, not the effect trims (those are
     // not reported, and the sliders are locked at full while an effect runs),
     // so the effect previews untrimmed. Multiplying by R/G/B turned Fire near
     // black on a port left on blue (app review 2026-10-29, C5).
-    const d=(+(mm.D??100))/100, tr=1, tg=1, tb=1;
-    const [cr,cg,cb]=swatchRGB(mm.PE??0, r*tr*d*100, g*tg*d*100, b*tb*d*100);
+    const d=(+(mm.D??100))/100, ge=[1,1.6,2.2][+(mm.CV||0)]||1;   // dimmer (linear, DIM_LAW 0); curve exponent
+    let s=fxSt[p];
+    if(!s||s.fx!==x){ s=fxSt[p]=fxNew(x,p,now); fxStep(s,x,i,S,sf,spread,0); fxPort(s,d,ge); }
+    let dt=now-s.last; s.last=now; if(dt>200) dt=200;
+    s.acc+=dt;
+    while(s.acc>=10){ s.acc-=10; s.tr+=10; fxStep(s,x,i,S,sf,spread,10); fxPort(s,d,ge); }
+    // Back from duty to the effect's own scale for the screen (the swatch shows
+    // the look, not the curve), dimmer included.
+    const [r,g,b]=s.duty.map(v=>Math.pow(v,1/ge));
+    // RGBW / RGBWA ports: the white output adds the white already in the mix,
+    // min(r, g, b); amber stays dark (main.cpp, decision 2026-10-02 (b)).
+    const pe=mm.PE??0, wh=(pe>=7&&pe<=12)?Math.min(r,g,b):0;
+    const [cr,cg,cb]=swatchRGB(pe,(r+wh)*100,(g+wh)*100,(b+wh)*100).map(v=>Math.min(255,v));
     swOwned[p]="fx";
     sw.style.background=`rgb(${cr|0},${cg|0},${cb|0})`;
     const lum=cr+cg+cb;
