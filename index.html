@@ -1660,7 +1660,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-07a.fit";
+const APP_VER="2026-11-08a.club";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -4021,9 +4021,8 @@ function fxCompute(fx, idx, t, s){          // idx = port index 0-based, t = vir
     if(s.stage===0){ if(due(s.t_next)){ s.stage=1; s.t_evt=t; s.hue=0; } return [0,0,0]; }
     const v=Math.exp(-(t-s.t_evt)/90); if(v<0.03){ s.stage=0; s.t_next=t+120+(fxRand(s)%480); }
     return hsv(s.hue,1,v); }
-  case 7:{ // Club
+  case 7:{ // Club: no strobe fill (user, 2026-11-07: "this needs to come out")
     const BEAT=469, beat=Math.floor(t/BEAT), bt=m(t,BEAT)/BEAT;
-    if((beat%16)<2){ return (m(t,125)<40)?[1,1,1]:[0,0,0]; }
     const bar=Math.floor(beat/4), hue=((bar*137)%360)+pf*30, v=0.35+0.65*Math.exp(-bt*4);
     return hsv(hue,1,v); }
   case 8:{ // Lightning
