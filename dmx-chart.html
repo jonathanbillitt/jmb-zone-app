@@ -199,7 +199,7 @@ across an 8-port).</p>
 <tr>
 <td>next</td>
 <td>Effect speed</td>
-<td>128 = designed tempo; exponential — 0 ≈ ⅛×, 255 = 8×</td>
+<td>128 = designed tempo; exponential — 0 ≈ ⅛×, 255 = 8×. Beat effects (Club, Party, Pulse, Strobe, Police): 0 stop (Strobe/Police off) · 1–51 ¼× · 52–102 ½× · 103–153 1× · 154–204 2× · 205–255 4× the tempo</td>
 </tr>
 <tr>
 <td>last</td>
@@ -295,8 +295,10 @@ scales last.</p>
 </tbody>
 </table>
 <p>Notes: Siren and Police alternate phase across ports (lightbar feel);
-Club and Party run a 128 BPM clock by default (Party hops hue every 4th
-beat and renders greens as mint — never black, never strobes); Traffic
+Club, Party, Pulse, Strobe and Police run on the rig's beat clock (128 BPM
+by default; the app's tap tempo puts the downbeat on the music). Party hops
+hue every 4th beat and renders greens as teal — never black, never strobes;
+Club keeps to deep blue through crimson; Traffic
 plays passing-headlight sweeps with independent random timing per port;
 Water, Pulse and Clouds never go fully dark; effect speed (CH9) does not
 affect the CH10 strobe rate. The film gags: <strong>Fluoro</strong> is a failing
@@ -307,8 +309,8 @@ flash blooming to an orange fireball with an ember-flicker decay;
 <strong>Clouds</strong> drifts daylight slowly dimmer and cooler as cloud passes the
 sun, then back.</p>
 <p>Rig-wide FX controls (config, not DMX): <strong>FX Tempo</strong> (60–240 BPM,
-tap-settable from the app or set in panel Setup) scales every beat
-effect, and <strong>FX Spread</strong> (0–100%) staggers the effect clock across
+tap-settable from the app or set in panel Setup) sets the beat for the
+beat effects and the speed of the rest, and <strong>FX Spread</strong> (0–100%) staggers the effect clock across
 ports. Defaults (128 BPM, 0%) reproduce the behaviour above.</p>
 <h2>Sources</h2>
 <p>The rig accepts <strong>wired DMX (5-pin)</strong> and <strong>CRMX wireless</strong> (LumenRadio).

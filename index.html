@@ -1449,9 +1449,9 @@
     <input type="number" id="fxBpm" min="60" max="240" step="1" style="width:76px">
     <span class="unit">BPM</span>
   </div>
-  <div class="mini" id="fxTapHint" data-help>Tap 4+ times in time with the music, or
-    type a BPM. 128 = the designed tempo. Beat effects (Party, Club, Pulse)
-    follow it rig-wide, and the ports' Speed wheels move with it.</div>
+  <div class="mini" id="fxTapHint" data-help>Tap in time with the music: each tap
+    puts the downbeat on it, and a few taps set the tempo. Or type a BPM; 128 is
+    the designed tempo. Club, Party, Pulse, Strobe and Police lock to the beat.</div>
   <div class="row" style="margin-top:10px"><label>Spread</label>
     <input type="range" id="fxSpread" min="0" max="100" step="5" style="flex:1">
     <span id="fxSpreadV" style="width:38px;text-align:right"></span>
@@ -1660,7 +1660,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-08b.fx";
+const APP_VER="2026-11-08c.tap";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -3127,11 +3127,22 @@ function buildCard(p){
       if(!((m.X||0)>0)) ensureMan(p);
       touch("D"); sendThrottled(p+".DIM",`P${p}.DIM=${v}`); }});
   wheels[p+".S"]=makeWheel(d.querySelector("#ws"+p),{
-    label:"FX SPEED", min:0, max:255, value:128, fmt:v=>String(v),
+    label:"FX SPEED", min:0, max:255, value:128, fmt:v=>fxSpeedText(p,v),
     onInput:v=>{ touch("S"); sendThrottled(p+".FXS",`P${p}.FXS=${v}`); }});
   return d;
 }
 
+// The Speed wheel's read-out. On a unit with the beat clock (TAPV) the beat
+// effects take Speed in five musical bands, so the wheel says what the band
+// does: ¼× … 4× of the tempo, or flashes per beat on Strobe; 0 stops a look
+// (Strobe and Police go dark). Everything else reads the raw 0–255.
+function fxSpeedText(p,v){
+  const x=+((ports[p-1]||{}).X||0);
+  if(kv.TAPV!=="1" || !FX_BEAT_FX.has(x)) return String(v);
+  if(v===0) return (x===13||x===14) ? "Off" : "Stop";
+  if(x===13) return fxStrobePerBeat(v)+"/beat";
+  return {0.25:"¼×",0.5:"½×",1:"1×",2:"2×",4:"4×"}[fxBeatMult(v)];
+}
 // ---------- side jog-wheel control ----------
 // MQ-console intensity-wheel feel: drag up/down anywhere on the wheel; the
 // tick texture scrolls under your thumb (relative jog = fine control), the
@@ -3998,6 +4009,54 @@ function fxRand(s){ let x=s.rng; x^=x<<13; x>>>=0; x^=x>>>17; x^=x<<5; x>>>=0; s
 function fxFrand(s){ return (fxRand(s)&0xFFFFFF)/16777215; }           // 0..1, as fx_frand
 const fxGlide=(k10,vdt)=>vdt<=0?0:1-Math.pow(1-k10,vdt/10);          // fx_glide: per 10 virtual ms
 const fxTailQ=(t,t0,len)=>{ const e=t-t0; if(e>=len) return 0; const q=1-e/len; return q*q; };   // fx_tail_q
+// BEAT CLOCK (effects.h, 2026-11-08: tap sets the beat as well as the tempo;
+// Speed is musical on beat effects; Strobe, Police and Pulse lock to the
+// tempo). Club, Party, Pulse, Strobe and Police read their position from it;
+// every other effect stays on the virtual clock with the tempo as a rate,
+// FX_DESIGN_BEAT_MS / ms. The preview keeps its own copy: the phone's taps
+// put its downbeat where the unit's goes (give or take the Bluetooth delay),
+// and a BPM from anywhere else retimes it without a jump, as fx_set_beat_ms
+// does. Times are performance.now() ms.
+const FX_DESIGN_BEAT_MS=468.75;                          // 128 BPM
+const fxBeat={ms:FX_DESIGN_BEAT_MS, anchor:0, bpm:128, taps:[]};
+const fxBeatClamp=ms=>Math.max(250,Math.min(1000,ms));   // 240 … 60 BPM
+const FX_BEAT_FX=new Set([7,13,14,15,16]);               // Club, Strobe, Police, Pulse, Party
+const fxBeatMult=sp=>sp===0?0:sp<=51?0.25:sp<=102?0.5:sp<=153?1:sp<=204?2:4;   // fx_beat_mult
+function fxBeatsRaw(now,pf,mult,sprMs){                   // fx_beats_raw
+  return (Math.max(0,now-fxBeat.anchor)+pf*sprMs)/fxBeat.ms*mult;
+}
+function fxBeatPos(s,now,sp,pf,sprMs){                    // fx_beat_pos: speed 0 holds the position
+  const m=fxBeatMult(sp); if(m<=0) return s.bpos||0;
+  return s.bpos=fxBeatsRaw(now,pf,m,sprMs);
+}
+function fxStrobePerBeat(sp){                             // 1 … 16 per beat, at most 30 a second
+  let d=4*fxBeatMult(sp); while(d>1 && d*1000/fxBeat.ms>30) d*=0.5; return d;
+}
+const fxPoliceCycleMs=sp=>{ const m=fxBeatMult(sp); return m>0?2*fxBeat.ms/m:0; };
+function fxBeatSetMs(ms,now){                             // fx_set_beat_ms: retime, keep the beat position
+  ms=fxBeatClamp(ms);
+  const pos=Math.max(0,now-fxBeat.anchor)/fxBeat.ms, frac=pos-Math.floor(pos);
+  fxBeat.anchor=now-Math.floor(frac*ms+0.5); fxBeat.ms=ms;
+}
+function fxBeatTap(now){                                  // fx_tap: returns the tapped BPM, 0 on the first tap
+  const T=fxBeat.taps;
+  if(T.length && now-T[T.length-1]>2000) T.length=0;     // a new run of taps
+  if(T.length===8) T.shift();
+  T.push(now); fxBeat.anchor=now;                         // every tap is a downbeat
+  if(T.length<2) return 0;
+  fxBeat.ms=fxBeatClamp((T[T.length-1]-T[0])/(T.length-1));
+  return fxBeat.bpm=Math.round(60000/fxBeat.ms);
+}
+// The unit reports the rounded BPM; it keeps the exact tapped interval, and so
+// does the preview while the report is the echo of its own taps.
+function fxBeatSync(now){
+  const b=Math.max(60,Math.min(240,+(kv.BPM||128)));
+  if(b===fxBeat.bpm) return;
+  fxBeat.bpm=b;
+  const last=fxBeat.taps[fxBeat.taps.length-1];
+  if(last!==undefined && now-last<3000) return;          // the echo of a tap run
+  fxBeatSetMs(60000/b,now);
+}
 function hsv(h,s,v){
   h=((h%360)+360)%360; v=Math.max(0,Math.min(1,v)); s=Math.max(0,Math.min(1,s));
   const c=v*s, x=c*(1-Math.abs((h/60)%2-1)), m=v-c; let r,g,b;
@@ -4005,11 +4064,13 @@ function hsv(h,s,v){
   else if(h<240){r=0;g=x;b=c;}else if(h<300){r=x;g=0;b=c;}else{r=c;g=0;b=x;}
   return [r+m,g+m,b+m];
 }
-const POLICE_START=[0,50,100,250,300,350];
+const POLICE_START=[0,0.05,0.10,0.25,0.30,0.35].map(Math.fround);   // FX_POLICE_START: fractions of the cycle
 const TRAFFIC_CT=[[255,141,11],[255,206,166],[227,233,255]];
 // t = the port's virtual ms (integer, spread included); vdt = virtual ms this
-// 10 ms step (the glides' rate); idx = port index 0-based.
-function fxCompute(fx, idx, t, s, vdt){
+// 10 ms step (the glides' rate); idx = port index 0-based; now = the push's
+// real time and sp = the port's Speed, for the beat clock; sprMs = the rig
+// spread per port in ms.
+function fxCompute(fx, idx, t, s, vdt, now, sp, sprMs){
   const pf=idx, due=x=>(t-x)>=0, m=(a,b)=>((a%b)+b)%b;
   switch(fx){
   case 1:{ // Candle
@@ -4043,8 +4104,8 @@ function fxCompute(fx, idx, t, s, vdt){
     return hsv(s.hue,1,v); }
   case 7:{ // Club: the beat thump in a moody palette, no strobe, never green
     // (user, 2026-11-07/08). Hops of 53° inside the 140° arc from deep blue
-    // (220°) to crimson (360°); ports 30° apart inside the arc.
-    const BEAT=469, beat=Math.floor(t/BEAT), bt=m(t,BEAT)/BEAT, bar=Math.floor(beat/4);
+    // (220°) to crimson (360°); ports 30° apart inside the arc. Beat clock.
+    const pos=fxBeatPos(s,now,sp,pf,sprMs), beat=Math.floor(pos), bt=pos-beat, bar=Math.floor(beat/4);
     const hue=220+((bar*53+idx*30)%140), v=0.20+0.65*Math.exp(-bt*4);
     return hsv(hue,1,v); }
   case 8:{ // Lightning
@@ -4065,13 +4126,37 @@ function fxCompute(fx, idx, t, s, vdt){
   case 12:{ // TV Sim
     if(due(s.t_next)){ s.tgt=0.15+0.75*fxFrand(s); s.hue=(fxFrand(s)<0.15)?40:210+25*fxFrand(s); s.t_next=t+250+(fxRand(s)%1350); }
     s.lvl+=(s.tgt-s.lvl)*fxGlide(0.55,vdt); return hsv(s.hue,0.30,s.lvl); }
-  case 13:  return (m(t,125)<35)?[1,1,1]:[0,0,0];                                            // Strobe 8 Hz
-  case 14:{ // Police: six 28 ms flashes per 1000 ms, odd ports on the other half-cycle
-    const u=m(t-((idx&1)?500:0),1000), on=POLICE_START.some(st=>u>=st&&u<st+28);
+  case 13:{ // Strobe on the beat: 1 … 16 flashes per beat by the Speed band, at most
+    // 30 a second; a flash starts at each division, a fixed push count long
+    // (35 ms, at most half the period). Speed 0 = off.
+    if(sp===0){ s.n=0; return [0,0,0]; }
+    const div=fxStrobePerBeat(sp), per=fxBeat.ms/div;
+    const onP=Math.max(1,Math.floor(Math.min(35,0.5*per)/10+0.5));
+    const k=Math.floor(fxBeatsRaw(now,pf,1,sprMs)*div)&0xFFFF;
+    if(s.n===0){ s.n=1; s.p1=0; s.p2=k; }
+    if(k!==s.p2){ s.p2=k; s.p1=onP; }                     // the next division: a flash
+    const on=s.p1>0; if(s.p1) s.p1--;
+    return on?[1,1,1]:[0,0,0]; }
+  case 14:{ // Police on the beat: a six-flash cycle per two beats at 1×, ¼× … 4× by
+    // the Speed band; odd ports half a cycle out. Speed 0 = off.
+    if(sp===0){ s.n=0; return [0,0,0]; }
+    const cyc=Math.fround(fxPoliceCycleMs(sp)), sc=Math.fround(cyc/1000);
+    let onP=Math.floor(28*sc/10+0.5); const slotP=Math.floor(50*sc/10);
+    if(onP<1) onP=1;
+    if(slotP>1 && onP>slotP-1) onP=slotP-1;               // at least one dark push
+    if(onP<1) onP=1;
+    const cy=fxBeatsRaw(now,pf,1,sprMs)*fxBeat.ms/cyc+((idx&1)?0.5:0), cf=Math.floor(cy), c=Math.fround(cy-cf);
+    let k=0; while(k<6 && c>=POLICE_START[k]) k++;        // flashes begun this cycle
+    const id=(cf*8+k)&0xFFFF;
+    if(s.n===0){ s.n=1; s.p1=0; s.p2=id; }
+    if(id!==s.p2){ s.p2=id; s.p1=onP; }                   // the next start point: a flash
+    const on=s.p1>0; if(s.p1) s.p1--;
     return hsv(228,1,on?1:0); }
-  case 15:{ const ph=m(t,2500)/2500; return hsv(30,0.35,0.18+0.82*0.5*(1-Math.cos(ph*6.2832))); }   // Pulse
-  case 16:{ // Party
-    const BEAT=469, beat=Math.floor(t/BEAT), bt=m(t,BEAT)/BEAT, bar=Math.floor(beat/4);
+  case 15:{ // Pulse: one breath per bar on the beat clock, bottoming out on the downbeat
+    const bars=fxBeatPos(s,now,sp,pf,sprMs)*0.25, ph=bars-Math.floor(bars);
+    return hsv(30,0.35,0.18+0.82*0.5*(1-Math.cos(ph*6.2832))); }
+  case 16:{ // Party (beat clock)
+    const pos=fxBeatPos(s,now,sp,pf,sprMs), beat=Math.floor(pos), bt=pos-beat, bar=Math.floor(beat/4);
     let hue=((bar*137)%360)+pf*25, sat=1; const hm=m(hue,360);
     if(hm>85&&hm<165){ hue=165; sat=0.92; }
     const v=0.45+0.25*Math.sin(bt*3.1416)+(((beat&3)===0)?0.18*Math.exp(-bt*5):0);
@@ -4141,14 +4226,16 @@ function fxPort(s,d,ge){
 // when the controller's clock has not moved yet.
 // The clock's fraction is kept in 32-bit floats, as the controller keeps it,
 // so the two clocks tick over on the same push even after minutes at speed.
-function fxStep(s,x,i,S,sf,spread,dtr){
+// now = the push's real time (the beat clock's); sprMs = the spread per port.
+function fxStep(s,x,i,S,sf,spread,dtr,now,sprMs){
   const f=Math.fround, vdt=f(dtr*f(sf)); s.vtf=f(s.vtf+vdt);
   const whole=Math.floor(s.vtf); s.vt+=whole; s.vtf=f(s.vtf-whole);
-  s.rgb=(S===0 && (x===13||x===14)) ? [0,0,0] : fxCompute(x,i,s.vt+spread,s,vdt);   // Strobe/Police: 0 = off
+  s.rgb=fxCompute(x,i,s.vt+spread,s,vdt,now,S,sprMs);
 }
 let fxRaf=0;
 function fxTick(now){
   fxRaf=0;
+  fxBeatSync(now);
   let any=false;
   ports.forEach((mm,i)=>{
     const p=i+1, x=+(mm.X||0), sw=$("sw"+p); if(!sw) return;
@@ -4161,27 +4248,22 @@ function fxTick(now){
     if(swOwned[p] && swOwned[p]!=="fx") return;        // a scene tween has it for now
     any=true;
     const S=+(mm.S??128);
-    let sf=S===0?0:Math.pow(8,(S-128)/127)*((+(kv.BPM||128))/128);   // speed 0 = stop
-    // Strobe rate cap mirrors effects.h — only for ports WITHOUT the port-side
-    // pulse (port fw < 2.4); a pulse-capable port strobes exactly at any rate.
-    if(x===13 && sf>2.34 && (+(mm.PF||0))<0x204) sf=2.34;
-    // Pulse-capable ports: Strobe's upper half is compressed so 255 = ~30 flashes/s
-    if(x===13 && S>128 && (+(mm.PF||0))>=0x204) sf=Math.pow(8,(S-128)/127*0.636)*((+(kv.BPM||128))/128);
+    // The virtual clock's rate: Speed × the tempo as a rate (beat effects read
+    // the beat clock instead; Strobe and Police are timed by it on the port too).
+    const sf=S===0?0:Math.pow(8,(S-128)/127)*(FX_DESIGN_BEAT_MS/fxBeat.ms);   // speed 0 = stop
     // Step the engine on the controller's 10 ms push grid, carrying the virtual
     // clock's fraction of a ms, with the rig spread on the port's time.
-    // (Strobe and Police run on the port's own clock, period and flash ÷ speed,
-    // odd Police ports half a cycle out; that pulse ignores the spread.)
-    const spread=(x===13||x===14) ? 0 : Math.round(i*Math.max(0,Math.min(100,+(kv.SPR||0)))*8);   // g_fx_spread_ms × port
+    const sprMs=Math.max(0,Math.min(100,+(kv.SPR||0)))*8, spread=Math.round(i*sprMs);   // g_fx_spread_ms; × port
     // The state's R/G/B are the MANUAL colour, not the effect trims (those are
     // not reported, and the sliders are locked at full while an effect runs),
     // so the effect previews untrimmed. Multiplying by R/G/B turned Fire near
     // black on a port left on blue (app review 2026-10-29, C5).
     const d=(+(mm.D??100))/100, ge=[1,1.6,2.2][+(mm.CV||0)]||1;   // dimmer (linear, DIM_LAW 0); curve exponent
     let s=fxSt[p];
-    if(!s||s.fx!==x){ s=fxSt[p]=fxNew(x,p,now); fxStep(s,x,i,S,sf,spread,0); fxPort(s,d,ge); }
+    if(!s||s.fx!==x){ s=fxSt[p]=fxNew(x,p,now); fxStep(s,x,i,S,sf,spread,0,now,sprMs); fxPort(s,d,ge); }
     let dt=now-s.last; s.last=now; if(dt>200) dt=200;
     s.acc+=dt;
-    while(s.acc>=10){ s.acc-=10; s.tr+=10; fxStep(s,x,i,S,sf,spread,10); fxPort(s,d,ge); }
+    while(s.acc>=10){ s.acc-=10; s.tr+=10; fxStep(s,x,i,S,sf,spread,10,now-s.acc,sprMs); fxPort(s,d,ge); }
     // Back from duty to the effect's own scale for the screen (the swatch shows
     // the look, not the curve), dimmer included.
     const [r,g,b]=s.duty.map(v=>Math.pow(v,1/ge));
@@ -5257,8 +5339,15 @@ function applyTempo(bpm){
   bpm = Math.max(60, Math.min(240, Math.round(bpm)));
   $("fxBpm").value = bpm;
   send("BPM=" + bpm);
-  // Move every port's Speed encoder (and the controller) to match, so the
-  // wheel reads the tapped tempo instead of drifting out of step with it.
+  // A unit with the beat clock retimes without a jump and leaves Speed alone:
+  // there Speed picks ¼× … 4× of the tempo, so moving it would change the look.
+  if (kv.TAPV === "1") {
+    fxBeatSetMs(60000 / bpm, performance.now()); fxBeat.bpm = bpm;
+    $("fxTapHint").textContent = `${bpm} BPM` + (bpm === FX_BASE_BPM ? " (the designed tempo)" : "");
+    return;
+  }
+  // Older units: move every port's Speed encoder (and the controller) to
+  // match, so the wheel reads the tapped tempo instead of drifting from it.
   const sp = bpmToSpeed(bpm);
   ports.forEach((m, i) => {
     const p = i + 1;
@@ -5272,6 +5361,17 @@ function applyTempo(bpm){
 }
 let tapTimes = [];
 $("fxTap").onclick = () => {
+  // A unit with the beat clock (TAPV=1) times the taps itself: one TAP per
+  // press, and every tap is a downbeat. The preview's clock follows the same
+  // taps so the swatches land on the beat with the strip.
+  if (kv.TAPV === "1") {
+    send("TAP");
+    const bpm = fxBeatTap(performance.now());
+    $("fxTapHint").textContent = bpm ? `${bpm} BPM, downbeat on your last tap`
+                                     : "Downbeat set. Keep tapping for the tempo";
+    reveal("fxTapHint");
+    return;
+  }
   const now = Date.now();
   if (tapTimes.length && now - tapTimes[tapTimes.length - 1] > 2000) tapTimes = [];
   tapTimes.push(now);
@@ -6653,7 +6753,7 @@ const SUP_TO="support@jmblighting.co.uk";
 const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD",
   "RDM","ANS","RB","RBOK","STM","SPC","CHL","TSEQ","TXA","TXN","LPX","LPS","LPN","LPA","LPG","BSY","BRT","BSM","BRM",
   "NET","NW","NRS","TF","PB","CL","CLM","CLK","CF","FC","FT","OL","SH","SHM","TCR","CX","CA","CXR","CXL","CXS","CXF",
-  "SQ","SQN","BPM","SPR","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
+  "SQ","SQN","BPM","SPR","TAPV","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
 function supReport(){
   const names=$("supNames").checked;
   const red=t=>{ t=String(t||""); return names ? t : (t ? `<${t.length} chars>` : ""); };
@@ -6788,7 +6888,7 @@ function demoState(){
     "NCH=5;CHP=1;CHS=1;FR=1;"+                  // the demo is a five-channel unit with the universe batons and a factory reset: no firmware greying
     "PWLIM=2000,25000;"+PWC+demoF.cpd.map((c,k)=>`CPD${k+1}=${c||"0"};`).join("")+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)).join("")+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
-    `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=${demoF.spr};`+demoTxState()+
+    `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=${demoF.spr};TAPV=1;`+demoTxState()+
     "LPX=9;LPS=5;LPN=0;LPA=31;LPG=22;RR=1;BSY=0;BRT=3;"+
     "CN="+(demoF.cn!=null?demoF.cn:Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join(""))+";"+
     demoP.slice(0,demoF.var).map((d,i)=>P(i+1,d)).join(""));
@@ -6909,6 +7009,13 @@ function demoCmd(s){
   if(s.startsWith("BTNAME=")){ demoF.btn=s.slice(7); demoState(); return; }
   if(m=s.match(/^CNAME=(.*)$/)){ demoF.cn=(m[1]==="0"||!m[1])?"":m[1]; demoState(); return; }   // the demo keeps a typed name
   if(m=s.match(/^BPM=(\d+)/)){ demoF.bpm=+m[1]; demoState(); return; }
+  if(s==="TAP"){                    // the unit's tap rule (fx_tap): a run of taps under 2 s apart, last eight
+    const t=performance.now(), T=demoF.taps||(demoF.taps=[]);
+    if(T.length && t-T[T.length-1]>2000) T.length=0;
+    if(T.length===8) T.shift();
+    T.push(t);
+    if(T.length>=2){ const ms=Math.max(250,Math.min(1000,(T[T.length-1]-T[0])/(T.length-1))); demoF.bpm=Math.round(60000/ms); }
+    demoState(); return; }
   if(m=s.match(/^SPREAD=(\d+)/)){ demoF.spr=+m[1]; demoState(); return; }   // was never echoed: the next state line put the slider back (2026-10-03)
   // CRMX Link / Unlink (user, 2026-10-04: "make sure the pills and prompts say
   // unlinked if I select CRMX unlink"): Unlink reads not linked everywhere;

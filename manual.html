@@ -115,7 +115,8 @@ sub-menu (below).</p>
   The app, the panel, a desk's RDM base address and the chain baton all use
   the same rule.
 - <strong>Tempo</strong> (60–240 bpm) and <strong>Spread</strong> (0–100 %) — the effects clock and the
-  port-to-port offset, live, the same as the app's Effects card.
+  port-to-port offset, live, the same as the app's Tempo pop-up. (Tapping the
+  beat is in the app.)
 - <strong>Clear All</strong> — every port to dimmer 0, manual on, effect off, colour
   100/100/100, speed 128 (the app's Clear all).</p>
 <h3>Presets (Port Settings → Presets)</h3>
@@ -227,18 +228,27 @@ from the app or DMX channel 9. While an effect runs, the app's <strong>RGB
 sliders are greyed out</strong> — the effect owns the colour; clear the effect to
 get them back (the dimmer and speed wheels stay live). <strong>Speed 0 stops an
 effect</strong>: a continuous look freezes on its current frame, Strobe and Police
-go dark. <strong>Strobe and Police are clocked on the port module itself</strong> — the
-controller sends the flash pattern once and the port keeps time on its own
-clock, so the rate is exact at every speed and identical across every unit
-running it. The top of the Strobe speed wheel is compressed: above the
-mid-point the rate rises more gently, and 255 is about 30 flashes a second,
-the fastest the eye still reads as a strobe. <strong>Effects never start on
+go dark.</p>
+<p><strong>Beat effects lock to the tempo.</strong> Club, Party, Pulse, Strobe and Police
+run on the rig's beat, so they land on the music once the tempo is tapped
+(below). On these five, Speed is <strong>musical</strong>: five equal bands give ¼×, ½×,
+1×, 2× or 4× the tempo (128 sits in the middle of 1×), and the app's Speed
+wheel shows the band. Strobe gives 1, 2, 4, 8 or 16 flashes a beat, 4 at
+1×, never more than 30 flashes a second, the fastest the eye still reads as
+a strobe. Police runs one burst-burst-pause cycle every two beats at 1×.
+Pulse takes one breath a bar, at its dimmest on the downbeat. Every other
+effect follows the tempo as a speed. <strong>Strobe and Police are clocked on the
+port module itself</strong>: the controller sends the flash pattern and keeps the
+port in step with the beat, so every flash is exact at every speed.
+<strong>Effects never start on
 their own.</strong> When
 DMX is absent, an effect runs only from the moment you deliberately pick
 it (panel or app) — a saved effect does not auto-run at power-up, and a
 desk dropout (cable or CRMX) always <strong>holds the last DMX look</strong> rather
 than starting one. Pick the effect again after a loss to run it. Siren/Police alternate across ports like a
-lightbar; Party pulses fully-saturated colour on a 128 BPM bar clock;
+lightbar; Party pulses fully-saturated colour, a new colour each bar;
+Club thumps on every beat in deep blues, violets, magentas and crimson,
+never green;
 Fireworks bursts out of true darkness; <strong>Sunset is a one-shot arc</strong> — from
 golden hour it eases through ember red down to black over ~2 minutes and
 stays there; re-select it (or dip the port dimmer to 0 and back up) to
@@ -249,9 +259,13 @@ faint mains buzz; Paparazzi fires irregular hard white pops, independent per
 port, like a press pit; Explosion is a white-hot flash blooming to an orange
 fireball with an ember-flicker decay; Clouds drifts daylight slowly dimmer
 and cooler as cloud crosses the sun, then back.</p>
-<p><strong>Rig-wide effect controls</strong> (the app's Tempo pop-up, from the Tempo button at the top of the Control tab): <strong>Tap tempo</strong> sets the
-whole rig's beat-effect speed to the music — tap the app's Tap button in time
-(or type a BPM, 60–240; 128 is the designed tempo). <strong>Spread</strong> offsets
+<p><strong>Rig-wide effect controls</strong> (the app's Tempo pop-up, from the Tempo button at the top of the Control tab): <strong>Tap tempo</strong>
+puts the whole rig on the music. Tap the app's Tap button in time: every tap
+puts the downbeat on that moment, and a run of taps (each under 2 seconds
+apart, the last eight averaged) sets the tempo. The controller times the
+taps itself, so the result does not depend on the phone. Or type a BPM,
+60–240; 128 is the designed tempo, and a typed tempo changes the speed
+without jumping the beat. <strong>Spread</strong> offsets
 each port in time (0–100 %) so effects sweep across the rig as a wave
 instead of every port in lockstep. Both persist across reboots.</p>
 <p><strong>Capture to scene:</strong> the app's Scenes tab saves the current look — <strong>Save
