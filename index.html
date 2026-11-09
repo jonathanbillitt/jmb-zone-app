@@ -269,8 +269,9 @@
   .toggle.sm span::after { width:13px; height:13px; }
   .toggle.sm input:checked + span::after { left:17px; }
   /* Developer mode: bench/test detail (bus counters, loop timing, module lines,
-     crash marker, shunt + current calibration, raw commands) sits behind
-     Setup → Developer (user, 2026-09-14). Latched per phone. */
+     crash marker, current calibration, raw commands) sits behind Setup → Developer
+     (user, 2026-09-14). The switch itself is hidden until five quick taps on the
+     app version (user, 2026-11-08). Both remembered per phone. */
   body:not(.dev) .devonly { display:none !important; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
   th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
@@ -1141,8 +1142,7 @@
         </div>
         <div class="mini">Controllers detect their port count on the bus, but
         detection only ever counts <em>up</em> — a unit that boots believing it is
-        bigger than it is (or a screenless <b>JMB Zone</b>, which has no panel to
-        set it from) needs pinning here once. The controller restarts.</div>
+        bigger than it is needs pinning here once. The controller restarts.</div>
       </div>
       <!-- The unit's housekeeping at the foot of its own card (user, 2026-10-02):
            find it, reset it, PIN, disconnect, what it is. -->
@@ -1178,21 +1178,13 @@
       <div class="mini">Everything back to as shipped: patch, looks, names, PIN, limits, presets and the CRMX link. The controller restarts.</div>
       <div class="devonly" style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">
         <div class="row"><label>Shunt</label>
-          <select id="setShunt" style="width:160px">
-            <option value="0">auto by model</option>
-            <option value="5">5 mΩ (Zone, .3 boards)</option>
-            <option value="10">10 mΩ (stock .2 module)</option>
-          </select>
           <span class="mini" id="shuntLine" style="margin:0"></span>
         </div>
-        <div class="mini">The current-sense shunt fitted to the port module. Auto = 5 mΩ
-          on a Zone, 10 mΩ on a 4our/8ight. The wrong value halves or doubles every
-          current reading and the trip point. Needs port firmware 2.5.</div>
         <!-- No label: 52 px + four fields overflowed a phone-width card (Reset
              dropped to its own line). The calLine text underneath names it. -->
         <div class="row" style="margin-top:6px">
           <select id="calPort" style="width:52px"></select>
-          <input type="number" id="calMa" min="250" max="13000" step="1" placeholder="meter mA" style="width:80px">
+          <input type="number" id="calMa" min="250" max="6750" step="1" placeholder="meter mA" style="width:80px">
           <button id="btnCal">Calibrate current</button>
           <button id="btnCalReset" style="padding-left:8px;padding-right:8px">Reset</button>
         </div>
@@ -1338,7 +1330,7 @@
     <div class="card" id="appCard">
       <div class="ctitle">
         <label>App</label>
-        <span class="mini" id="appVerTxt"></span>
+        <span class="mini" id="appVerTxt" style="touch-action:manipulation;user-select:none;-webkit-user-select:none"></span>
       </div>
       <div class="ctlrow" style="align-items:center">
         <button id="appRefresh">Look for app update</button>
@@ -1349,7 +1341,7 @@
       <div class="ctlrow" style="align-items:center;margin-top:10px;gap:18px">
         <span class="tg"><span class="mini" style="margin:0">Helper</span>
           <label class="toggle sm" title="Help notes behind the hand; off also hides the tab names"><input type="checkbox" id="helpMode" checked><span></span></label></span>
-        <span class="tg"><span class="mini" style="margin:0">Developer</span>
+        <span class="tg hidden" id="devTg"><span class="mini" style="margin:0">Developer</span>
           <label class="toggle sm" title="Developer mode"><input type="checkbox" id="devMode"><span></span></label></span>
       </div>
       <div class="mini" id="appUpdMsg" data-help>The app checks for its own update every
@@ -1660,7 +1652,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-08c.tap";
+const APP_VER="2026-11-09a.fuse";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1752,7 +1744,6 @@ if("serviceWorker" in navigator){
     navigator.storage.persist().catch(()=>{}); }catch(_){}
 }
 let ports=[], kv={};
-let shuntAsking=false;     // the shunt confirm is open (setShunt); read by renderSetup
 const hot={};              // "1.R" -> ts while user drags (skip inbound)
 const HOT_MS=1600;
 const enc=new TextEncoder(), dec=new TextDecoder();
@@ -4396,10 +4387,8 @@ function renderDiag(){
     // the number entry A is waiting for — the port's own account of how late
     // it answers; loop gap says what stalled it; overruns / ADC timeouts say why.
     if(m.OR!==undefined)
-      rows+=`<tr><td colspan="8" class="mini" style="margin:0;padding:2px 4px 8px">port ${i+1}${m.PF?` (fw ${(+m.PF)>>8}.${(+m.PF)&255}${(+m.PF)>=0x204?", port-clocked pulse":""})`:""} reports: `
-        +(m.PH===0
-          ? `port firmware 2.0 — no health counters (update the port module)`
-          : `overruns ${m.OR} · ADC timeouts ${(+m.AT)&0xFFF}${((+m.AT)>>12)?` (${["A/B 1st","A/B 2nd","NTC","EOS/CCRDY"].filter((_,b)=>((+m.AT)>>12)&(1<<b)).join("+")})`:""} · loop gap ${m.GP} ms · reply latency ${m.RL} ms (5 s max)`)
+      rows+=`<tr><td colspan="8" class="mini" style="margin:0;padding:2px 4px 8px">port ${i+1}${m.PF?` (fw ${(+m.PF)>>8}.${(+m.PF)&255}})`:""} reports: `
+        +(`overruns ${m.OR} · ADC timeouts ${(+m.AT)&0xFFF}${((+m.AT)>>12)?` (${["A/B 1st","A/B 2nd","NTC","EOS/CCRDY"].filter((_,b)=>((+m.AT)>>12)&(1<<b)).join("+")})`:""} · loop gap ${m.GP} ms · reply latency ${m.RL} ms (5 s max)`)
         +`</td></tr>`;
     window.__busPrev[i]={tx:+m.TX,rx:+m.RX,ce:+m.CE,to:+m.TO,ec:+m.EC,ts:+m.TS};
   });
@@ -4926,18 +4915,17 @@ function renderSetup(){
     st.textContent=["not linked","linking…",
       (rfOk ? "linked — no data" : "linked — no RF"),
       "linked · "+(kv.FPS??"?")+"Hz"][cx]||"—";
-    // Raw TiMo status lines — shows whether the module is talking to the
-    // controller AT ALL, not just the firmware's interpretation. The status
-    // inputs have no pull-ups, so an absent or badly-soldered module reads
-    // all-zero instead of masquerading as "linked".
+    // Raw TiMo status lines: what the radio pins read, not the firmware's
+    // interpretation. With no module fitted these pins float, so they mean
+    // nothing; CXP says whether one is there (0 = none, missing = older firmware).
     const dbg=$("crmxRaw");
     if(dbg){
       if(kv.CXR==null) dbg.textContent="";
       else{
         const l=kv.CXL==="1", s2=kv.CXS==="1", rf=kv.CXF==="1";
-        dbg.textContent=`module lines — linked ${l?1:0} · status ${s2?1:0} · rf ${rf?1:0}`
-          + (!l&&!s2&&!rf ? "   (no module detected)" : "");
-        dbg.style.color=(!l&&!s2&&!rf)?"var(--warn)":"var(--dim)";
+        const none=kv.CXP==="0";
+        dbg.textContent=none ? "no CRMX module fitted" : `module lines — linked ${l?1:0} · status ${s2?1:0} · rf ${rf?1:0}`;
+        dbg.style.color=none?"var(--warn)":"var(--dim)";
       }
     }
     // Linked (2 = paired, 3 = paired + data) reads green; linking amber; off dim.
@@ -5016,15 +5004,11 @@ function renderSetup(){
     '<span class="devonly">'+esc(
     (kv.UP!=null ? " · up "+(+kv.UP)+"s" : "")+
     (kv.RR!=null ? " · last boot: "+(RR[+kv.RR]||("reason "+kv.RR)) : "")+crs)+'</span>';
-  // Developer: shunt + current calibration
-  if(document.activeElement!==$("setShunt") && !shuntAsking)
-    $("setShunt").value = kv.SHM==="1" ? String(kv.SH??0) : "0";
+  // Developer: the shunt in force (every 3.x board carries 5 mΩ, from the copper) + current calibration
   {
-    const oldPort=ports.some(m=>m.PF!==undefined && m.PH!==0 && (+m.PF)<0x205);
-    $("shuntLine").textContent = kv.SH!=null
-      ? `${kv.SH} mΩ${kv.SHM==="1"?"":" (auto)"}`+(oldPort?" · port fw < 2.5 ignores this — update the port module":"")
-      : "";
-    $("shuntLine").style.color = oldPort ? "var(--warn)" : "";
+    const offShunt = kv.SH!=null && +kv.SH!==5;
+    $("shuntLine").textContent = kv.SH==null ? "" : offShunt ? `${kv.SH} mΩ · these boards carry 5 mΩ: send SHUNT=0` : `${kv.SH} mΩ`;
+    $("shuntLine").style.color = offShunt ? "var(--warn)" : "";
     const cp=$("calPort");
     if(cp.options.length!==ports.length)
       cp.innerHTML=ports.map((_,i)=>`<option value="${i+1}">P${i+1}</option>`).join("");
@@ -5102,6 +5086,18 @@ function setDev(on){
 }
 setDev((()=>{ try{ return localStorage.getItem("jmbDev")==="1"; }catch(_){ return false; } })());
 $("devMode").onchange=e=>setDev(e.target.checked);
+// The Developer switch stays out of sight (user, 2026-11-08): five quick taps on
+// the app version show it; five more hide it and turn Developer off. A phone that
+// already has Developer on keeps the switch, so it can be turned off.
+function showDevSwitch(on){
+  $("devTg").classList.toggle("hidden",!on);
+  try{ localStorage.setItem("jmbDevShow",on?"1":"0"); }catch(_){}
+  if(!on && document.body.classList.contains("dev")) setDev(false);
+}
+showDevSwitch((()=>{ try{ return localStorage.getItem("jmbDevShow")==="1"||localStorage.getItem("jmbDev")==="1"; }catch(_){ return false; } })());
+{ let n=0, last=0;
+  $("appVerTxt").addEventListener("click",()=>{ const now=Date.now(); n=(now-last<500)?n+1:1; last=now;
+    if(n>=5){ n=0; showDevSwitch($("devTg").classList.contains("hidden")); } }); }
 // Helper (Setup → App, beside Developer): the raised-hand icons that keep the
 // notes out of the way. Off = no hands at all, notes stay hidden. On by default.
 function setHelper(on){
@@ -5113,22 +5109,10 @@ function setHelper(on){
 }
 setHelper((()=>{ try{ return localStorage.getItem("jmbHelper")!=="0"; }catch(_){ return true; } })());
 $("helpMode").onchange=e=>setHelper(e.target.checked);
-// The shunt scales every current reading, and so the real trip point and the
-// fold: one wrong pick doubles them. It asks first (app review 2026-10-29, D10).
-// shuntAsking (declared with ports/kv): the repaint leaves the pick alone while asked.
-$("setShunt").onchange=async e=>{
-  const v=+e.target.value, was=kv.SHM==="1"?(kv.SH??"0"):"0";
-  setupTouched=Date.now(); shuntAsking=true;
-  const ok=await askConfirm("Every port's current reading, its trip point and the current fold follow the shunt. The wrong value halves or doubles them.",
-                       {title:`Set the shunt to ${v?v+" mΩ":"auto"}?`,ok:"Set shunt",danger:true});
-  shuntAsking=false; setupTouched=Date.now();
-  if(!ok){ e.target.value=String(was); return; }
-  send("SHUNT="+v);
-};
 $("calPort").onchange=()=>renderSetup();
 $("btnCal").onclick=()=>{
   const p=+$("calPort").value||1, ma=Math.round(+$("calMa").value);
-  if(!(ma>=250&&ma<=13000)){ tellUser("Enter the meter reading in mA (250 to 13000).",{title:"Calibrate current"}); return; }
+  if(!(ma>=250&&ma<=6750)){ tellUser("Enter the meter reading in mA (250 to 6750).",{title:"Calibrate current"}); return; }
   send(`P${p}.CALCUR=${ma}`);
 };
 $("btnCalReset").onclick=()=>{ const p=+$("calPort").value||1; send(`P${p}.CALCUR=0`); };
@@ -5184,9 +5168,6 @@ const WC_VERDICT=[
 // advertisements — so BRS comes from the controller's own radio.
 // Thresholds are the usual BLE rules of thumb: better than -60 is excellent,
 // -70 good, -80 workable, below that expect dropouts.
-// Flash-to-find behaves differently by variant, so describe the unit in front of
-// you rather than the general case: a panel unit strobes its screen and leaves
-// the rig alone, while the screenless ONE has nothing else to answer with.
 // Is there actually an update to install? The controller's build id against the
 // published one. A controller too old to report FWB is certainly behind, so it
 // counts as an update; without a manifest we cannot know, so we claim nothing.
@@ -5209,12 +5190,9 @@ function otaUpdateAvailable(){ return ctrlUpdateAvailable() || portUpdateAvailab
 
 function renderIdentMsg(){
   const el=$("identMsg"); if(!el) return;
-  const oneOff = (+(kv.PORTS||kv.VAR||0)) === 1;
   el.textContent = "Flash identifies this controller for 5 seconds — tap it "
     + "after connecting to check you're on the right unit. "
-    + (oneOff
-        ? "Its indicators pulse together; the strip is never touched."
-        : "Its screens strobe; the strip is never touched.");
+    + "Its screen strobes and its indicators pulse; the strip is never touched.";   // the same on every model now the Zone has a screen (firmware render_main + ind_pulse)
 }
 
 // Shown on the unlock screen, where someone is already waiting — better than

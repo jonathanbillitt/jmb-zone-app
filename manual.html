@@ -209,9 +209,6 @@ no USB, no cable.</p>
   been checked — and it can simply be retried over Bluetooth. If the app
   reports <em>a stale copy is still being served</em>, the download site has not yet
   caught up with a very recent publish: wait a few minutes and try again.</li>
-<li><strong>Controller only</strong> (Developer mode, §6 Setup) skips a pending port-module
-  step. It exists for one case — a port step that drops the link every time —
-  and is otherwise unnecessary.</li>
 </ul>
 <blockquote>
 <p>Keep the app open and the phone unlocked until an update finishes. Outputs
@@ -550,12 +547,7 @@ the wire. Each tool answers a specific question:</p>
   Scanning takes over the output line while it runs.</p>
 </li>
 <li>
-<p><strong>Port bus</strong> (Developer mode only, see Setup) — a health table for the
-  internal link to each output module (frames sent and received, CRC errors,
-  timeouts, the module's own loop and reply timing) plus the controller's loop
-  timing, for diagnosing a port that has stopped responding.</p>
-</li>
-<li><strong>Transmit DMX</strong> — sends a test universe from the OUT socket while no DMX is
+<p><strong>Transmit DMX</strong> — sends a test universe from the OUT socket while no DMX is
   being received (greyed while a desk is live). Desk syntax on the keypad:
   <code>1 THRU 5 @ 80</code>, <code>10 + 12 @ FULL</code>, <code>1 THRU 10 - 5 @ 50</code>; levels are 0–100 or
   FULL. Each channel set is listed with its level and stays latched — across
@@ -563,7 +555,8 @@ the wire. Each tool answers a specific question:</p>
   output; the amber banner and the <strong>Test</strong> pill show while transmitting. The
   output stops by itself when you leave Diagnostics or put the app away, so a
   forgotten test never holds the line; the latched channels stay for next
-  time.</li>
+  time.</p>
+</li>
 </ul>
 <h3>Setup — controller and housekeeping</h3>
 <p>The controller's own settings sit under <strong>Settings</strong> in the Controller card.
@@ -598,31 +591,10 @@ connect still gets in with the old PIN), <strong>Disconnect</strong>, and <stron
 (everything back to as shipped: the controller unlinks its CRMX receiver first,
 then erases and restarts). (The rig-wide <strong>Clear all</strong>
 and its <strong>Undo</strong> live on the Control tab's dashboard.)</p>
-<p><strong>Developer mode</strong> — the small slider in the App card at the foot of Setup,
-remembered per phone. <strong>Helper</strong>, beside it and on by default, is the
-raised-hand icon on each card and sheet that keeps the explanatory notes out of
-the way until tapped; switched off, the hands go, the notes stay hidden, and
-the tab bar drops its names and shows larger icons alone.
-Developer off (the default) hides the bench detail an operator never needs: the Diagnostics <em>Port bus</em> table, the CRMX module
-signal lines, uptime and last-boot reason, and the script-error strip. On, it
-also reveals the calibration rows in the Hardware card:</p>
-<ul>
-<li><strong>Shunt</strong> — which current-sense resistor the unit's port module carries. <em>Auto</em>
-  is right for every unit as shipped (5 mΩ on every port). Only change it if the hardware has been modified: the wrong
-  value halves or doubles every current reading <em>and</em> the trip point.</li>
-<li><strong>Cal current</strong> — calibrates a port's current reading against a meter. Drive
-  a steady load of at least 0.25 A, read the true current on a bench meter,
-  type it in mA and tap <em>Calibrate current</em>; the stored gains show on the line
-  beneath. <em>Reset</em> returns to unity.</li>
-<li><strong>Calibrate temperature</strong> — captures each port's sensor offset against a
-  known ambient. Leave the unit powered but dark at room temperature for ten
-  minutes, enter the true ambient from a trusted thermometer, and every port's
-  offset is stored. A port more than <strong>10 °C</strong> out is refused and flagged: that
-  size of error is a faulty sensor, not drift, and must never be calibrated
-  away.</li>
-<li><strong>Command</strong> — sends a raw controller command, for bench work.</li>
-<li><strong>Controller only</strong> in the Firmware card (§2a).</li>
-</ul>
+<p><strong>Helper</strong> — the switch in the App card at the foot of Setup, on by default. It
+is the raised-hand icon on each card and sheet that keeps the explanatory notes
+out of the way until tapped; switched off, the hands go, the notes stay hidden,
+and the tab bar drops its names and shows larger icons alone.</p>
 <p><strong>Test sequences</strong> (Setup, top of the tab) drive every port directly, overriding
 every source — <strong>live DMX included</strong> — until switched <strong>Off</strong>; with a desk live,
 the app asks before starting one. A banner appears
@@ -826,7 +798,6 @@ before a show:</p>
 <li>Flash to find never lights the strip; RDM discovery and Identify from a
   desk do — that is the RDM standard</li>
 <li>An RDM scan left open releases the thru line after 3 minutes idle</li>
-<li>Developer mode (Setup, bottom slider) holds the bench and calibration tools</li>
 </ul>
 <script>
 (function(){
