@@ -226,6 +226,8 @@
   .pbv.warn { color:var(--warn); }
   .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .row label { width:52px; color:var(--dim); font-size:12.5px; flex-shrink:0; }
+  /* A greyed row that needs newer firmware: taps reach the row, which says why. */
+  .row.needfw input, .row.needfw button { pointer-events:none; }
   .row input[type=range] { flex:1; min-width:120px; accent-color:var(--acc); height:26px; }
   .row.r input[type=range] { accent-color:var(--r); }
   .row.g input[type=range] { accent-color:var(--g); }
@@ -875,7 +877,7 @@
     use the Bluefy browser. Bluetooth on.</div>
     </div>
     <div id="unitPick">
-      <button data-ports="1"><img src="unit-zone.webp" alt=""><span>Zone</span></button>
+      <button data-ports="1"><img src="unit-zone.webp" alt=""><span>zOne</span></button>   <!-- the art name, like 4our / 8ight (user, 2026-11-11) -->
       <button data-ports="4"><img src="unit-four.webp" alt=""><span>4our</span></button>
       <button data-ports="8"><img src="unit-eight.webp" alt=""><span>8ight</span></button>
     </div>
@@ -1120,7 +1122,7 @@
              always held the last look forever. Default = never (hold); a time =
              that long after DMX loss, fade to black. Greyed until the firmware
              reports DLR. -->
-        <div class="row"><label style="line-height:1.15">DMX loss release</label>
+        <div class="row" id="dlrRow"><label style="line-height:1.15">DMX loss release</label>
           <input type="number" id="setHold" min="0" max="60" step="1" placeholder="never">
           <span class="unit">s</span>
           <button id="btnHoldApply">Apply</button>
@@ -1676,7 +1678,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-11c.dlr";
+const APP_VER="2026-11-11d.apply";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1799,7 +1801,7 @@ function hello(html,busy){ $("hello").classList.remove("hidden"); $("helloMsg").
 // The unit on the other end of a connection, as a picture (user, 2026-11-11): the
 // model chosen on the connect screen, else the model in its advertised name
 // ("JMB 4our #07-A1B2"), else the port count it reports.
-const UNIT_MODELS={1:{k:"zone",name:"JMB Zone"},4:{k:"four",name:"JMB 4our"},8:{k:"eight",name:"JMB 8ight"}};
+const UNIT_MODELS={1:{k:"zone",name:"JMB zOne"},4:{k:"four",name:"JMB 4our"},8:{k:"eight",name:"JMB 8ight"}};
 let pickedPorts=0;
 function unitFromName(n){ const m=/\b(Zone|one|4our|8ight)\b/i.exec(n||""); if(!m) return 0; const w=m[1].toLowerCase(); return w==="4our"?4:w==="8ight"?8:1; }
 function unitShot(){ const n=+(typeof kv!=="undefined"&&kv.PORTS)||0, u=UNIT_MODELS[pickedPorts||unitFromName(devName())||(n>=8?8:n>=4?4:n?1:0)];
@@ -4919,6 +4921,11 @@ function renderRdm(){
 
 // ---------- Setup tab ----------
 let setupTouched=0;
+// ID and DMX loss release: once typed in, the state echo leaves the field alone until its Apply
+// (or 30 s with no touch). Focus alone wasn't enough: closing the phone keyboard blurs the field,
+// and the echo put the old value back over a cleared one (bench 2026-11-11).
+const fieldEdit={};
+const fieldKeep=id=>document.activeElement===$(id) || (fieldEdit[id] && Date.now()-fieldEdit[id]<30000);
 function renderSetup(){
   if(Date.now()-setupTouched<HOT_MS) return;
   if(document.activeElement!==$("setName")) $("setName").value=hexDec(kv.CN);
@@ -4926,10 +4933,11 @@ function renderSetup(){
   // Guard EVERY field: on mobile `change` fires on blur, so an unguarded
   // state echo rewrites the focused field first and the edit silently
   // vanishes ("ID / DMX hold refuse to change", bench 2026-08-28; the row is DMX loss release now).
-  if(document.activeElement!==$("setCid"))   $("setCid").value=kv.CID??"";
-  if(document.activeElement!==$("setHold"))  $("setHold").value=dlrTxt();
-  { const ok="DLR" in kv; $("setHold").disabled=!ok; const b=$("btnHoldApply");
-    b.disabled=!ok; b.title=ok?"":"Needs a firmware update"; }
+  if(!fieldKeep("setCid"))   $("setCid").value=kv.CID??"";
+  if(!fieldKeep("setHold"))  $("setHold").value=dlrTxt();
+  { const ok="DLR" in kv; $("setHold").disabled=!ok;
+    $("btnHoldApply").title=ok?"":"Needs a firmware update"; $("dlrRow").classList.toggle("needfw",!ok); }
+  applyPaint();
   // The closed drop-down's one line: what is set, read from the state.
   { const s=$("ctlSum"); if(s){ const clm=+(kv.CLM||68), cl=+(kv.CL||clm), rel=+(kv.DLR||0), pb=+(kv.PB||0);
       s.textContent=[hexDec(kv.CN)||"No name", "ID "+(kv.CID??"—"),
@@ -5465,7 +5473,9 @@ $("btnWifiApply").onclick=()=>{ setupTouched=Date.now();
 // word not doubled; no name = "JMB <model> #<id>-<mac>". FW-80 shipped in the same build as
 // DLR, so a unit without DLR keeps the old line.
 function btAdvName(name){
-  const n=+(kv.PORTS||0), model=n>=8?"8ight":n>=4?"4our":"Zone";
+  // The 1-port word follows the unit's own advertised spelling ("JMB Zone" on FW-80, "zOne" once the
+  // firmware takes the art name, user 2026-11-11), so the preview never disagrees with the unit.
+  const n=+(kv.PORTS||0), zw=(/\b(zone)\b/i.exec(devName()||"")||[])[1]||"zOne", model=n>=8?"8ight":n>=4?"4our":zw;
   const mac=(/-([0-9A-F]{4})$/i.exec(devName()||"")||[])[1]||"xxxx";
   const tail=" #"+String(+(kv.CID||0)).padStart(2,"0")+"-"+mac.toUpperCase();
   name=(name||"").trim(); if(!name) return "JMB "+model+tail;
@@ -5493,16 +5503,30 @@ $("setName").addEventListener("change",e=>{
   const el=$(id); if(!el) return;
   ["focus","input","keydown"].forEach(ev=>
     el.addEventListener(ev,()=>{ setupTouched=Date.now(); }));
+  if(id==="setCid"||id==="setHold") el.addEventListener("input",()=>{ fieldEdit[id]=Date.now(); });
 });
-$("btnCidApply").onclick=()=>{ setupTouched=Date.now();
-  send("CID="+Math.max(0,Math.min(9999,+$("setCid").value||0))); };
+// Apply lights only when pressing it would change something (user, 2026-11-11): the typed
+// value, read the way Apply reads it, differs from what the controller reports. A blank ID
+// changes nothing; a blank loss release means never (0).
+function cidWant(){ const s=$("setCid").value.trim(); return s===""?null:Math.max(0,Math.min(9999,Math.round(+s||0))); }
+function dlrWant(){ const s=$("setHold").value.trim(), v=s===""?0:+s; return Number.isFinite(v)?Math.round(Math.max(0,Math.min(60,v))):null; }
+function applyPaint(){
+  const c=cidWant(); $("btnCidApply").disabled = c===null || c===+(kv.CID||0);
+  const d=dlrWant(); $("btnHoldApply").disabled = !("DLR" in kv) || d===null || d===+(kv.DLR||0);
+}
+["setCid","setHold"].forEach(id=>$(id).addEventListener("input",applyPaint));
+$("btnCidApply").onclick=()=>{ setupTouched=Date.now(); delete fieldEdit.setCid;
+  const c=cidWant(); if(c===null) return; $("btnCidApply").disabled=true;
+  send("CID="+c); };
 // DMX loss release: blank or 0 = never (hold the last look, the default); 1-60 s = that
 // long after DMX loss, fade to black. Junk puts the value back.
+$("dlrRow").addEventListener("click",()=>{ if($("dlrRow").classList.contains("needfw"))
+  toast("Loss release needs the next controller firmware",3500); });   // one line: the toast clips (the summary already says it holds)
 function dlrTxt(){ const v=+(kv.DLR||0); return v>0 ? String(v) : ""; }
-$("btnHoldApply").onclick=()=>{ setupTouched=Date.now();
-  const s=$("setHold").value.trim(), v=s===""?0:+s;
-  if(!Number.isFinite(v)){ $("setHold").value=dlrTxt(); return; }
-  send("DLR="+Math.round(Math.max(0,Math.min(60,v)))); };
+$("btnHoldApply").onclick=()=>{ setupTouched=Date.now(); delete fieldEdit.setHold;
+  const d=dlrWant();
+  if(d===null){ $("setHold").value=dlrTxt(); applyPaint(); return; }
+  $("btnHoldApply").disabled=true; send("DLR="+d); };
 // ---------- prep / reset-all / undo ----------
 $("btnPrep").onclick=async()=>{
   // Confirm only when the button is armed (blue = something to clear); with the
@@ -6952,7 +6976,7 @@ function demoState(){
   const W=(n,d)=>{ const w=d.wb||[255,255,255]; return `W${n}=${w[0]},${w[1]},${w[2]},${d.wbp||0};`; };
   const PWC=demoF.pwc.map((c,k)=>`PWC${k+1}=${c?`${c.hz},${pwActual(c.hz)}`:"0,0"};`).join("");
   onState(
-    `JMB;FW=demo;PORTS=${demoF.var};CID=7;DMX=1;FPS=44;DI=0;CRV=1;AM=${demoF.am??1};DLR=${demoF.dlr||0};SL=512;SC=0;ASC=3;ERR=0;`+
+    `JMB;FW=demo;PORTS=${demoF.var};CID=${demoF.cid??7};DMX=1;FPS=44;DI=0;CRV=1;AM=${demoF.am??1};DLR=${demoF.dlr||0};SL=512;SC=0;ASC=3;ERR=0;`+
     "RDM=42;ANS=42;AGE=23;"+
     `CAPON=${demoF.capon};CAPMS=${demoF.capon?Date.now()-demoF.capt0:0};CFL=43;CFH=45;`+
     `VAR=${demoF.var};VARM=${demoF.varm};BTN=${demoF.btn};`+
@@ -7091,6 +7115,7 @@ function demoCmd(s){
     T.push(t);
     if(T.length>=2){ const ms=Math.max(250,Math.min(1000,(T[T.length-1]-T[0])/(T.length-1))); demoF.bpm=Math.round(60000/ms); }
     demoState(); return; }
+  if(m=s.match(/^CID=(\d+)/)){ demoF.cid=Math.min(9999,+m[1]); demoState(); return; }
   if(m=s.match(/^DLR=(\d+)/)){ demoF.dlr=Math.min(60,+m[1]); demoState(); return; }   // DMX loss release
   if(m=s.match(/^SPREAD=(\d+)/)){ demoF.spr=+m[1]; demoState(); return; }   // was never echoed: the next state line put the slider back (2026-10-03)
   // CRMX Link / Unlink (user, 2026-10-04: "make sure the pills and prompts say
