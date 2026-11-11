@@ -1027,7 +1027,7 @@
         <button id="btnRdmScan" class="primary">Scan</button>
       </div>
       <div class="mini" id="rdmPhase" data-help>Discover and edit every RDM fixture on the
-        thru line — address, personality, label, identify and sensors, like a
+        DMX output — address, personality, label, identify and sensors, like a
         RDM tester. Scanning takes over the output line while active; the
         controller hands it back after 3 minutes without a command.</div>
       <div id="rdmDevs"></div>
@@ -1106,20 +1106,25 @@
           <input type="text" id="setName" maxlength="16" placeholder="name this controller"
                  style="flex:1 1 100%" autocomplete="off">
         </div>
-        <div class="mini">The Bluetooth name changes at the controller's next restart.</div>
+        <div class="mini" id="btPrev">The Bluetooth name changes at the controller's next restart.</div>
         <div class="row"><label>ID</label>
           <input type="number" id="setCid" min="0" max="9999">
-          <span class="unit" style="visibility:hidden">s</span>   <!-- keeps Apply in line with DMX hold's (user, 2026-10-02) -->
+          <span class="unit" style="visibility:hidden">s</span>   <!-- keeps Apply in line with DMX loss release's (user, 2026-10-02) -->
           <button id="btnCidApply">Apply</button>
           <span class="mini" style="margin:0">on screens, BLE name (next boot), RDM label</span>
         </div>
         <!-- The Apply mode (Same / Seq / Offset) moved to each port's Patch
              sheet beside the address (user, 2026-10-02). -->
-        <div class="row"><label>DMX hold</label>
-          <input type="number" id="setHold" min="0" max="60" step="1">
+        <!-- DMX loss release (user, 2026-11-11). The old "DMX hold" (HOLD=) read as
+             "hold 5 s, then let go", yet the firmware never used it: the unit has
+             always held the last look forever. Default = never (hold); a time =
+             that long after DMX loss, fade to black. Greyed until the firmware
+             reports DLR. -->
+        <div class="row"><label style="line-height:1.15">DMX loss release</label>
+          <input type="number" id="setHold" min="0" max="60" step="1" placeholder="never">
           <span class="unit">s</span>
           <button id="btnHoldApply">Apply</button>
-          <span class="mini" style="margin:0">keep last look after DMX loss · 0 = forever</span>
+          <span class="mini" style="margin:0">fade to black this long after DMX loss · blank = never (holds the last look)</span>
         </div>
         <!-- Limits (user, 2026-09-24): the controller's total current cap, never
              above the product max (Zone 6.75 A · 4our 27 A · 8ight 54 A), in
@@ -1671,7 +1676,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-11b.calc";
+const APP_VER="2026-11-11c.dlr";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -4762,7 +4767,7 @@ function rdmStop(){
   // Reflect it immediately: the controller confirms with JMBR;PH=OFF, but the
   // button must never look stuck if that notify is slow or dropped.
   rdmActive=false; rdmPend=null;
-  rdmPhaseTxt="stopped — thru released";
+  rdmPhaseTxt="stopped — DMX output released";
   renderRdm();
 }
 $("btnRdmStop").onclick=rdmStop;
@@ -4780,8 +4785,8 @@ function onRdm(str){
       : f.PH==="READY" ? `${f.N||0} device${f.N==="1"?"":"s"} on the line`
       // W: why it ended — 1 = the controller's 3-minute idle watchdog released
       // the line (a scan left open no longer holds the rig).
-      : f.PH==="OFF" ? (f.W==="1" ? "stopped — idle for 3 minutes, thru released"
-                       : f.W==="2" ? "" : "stopped — thru released")
+      : f.PH==="OFF" ? (f.W==="1" ? "stopped — idle for 3 minutes, DMX output released"
+                       : f.W==="2" ? "" : "stopped — DMX output released")
       : "";
     if(f.PH==="OFF") rdmPend=null;
   }else if(tag==="DEV"){
@@ -4917,15 +4922,18 @@ let setupTouched=0;
 function renderSetup(){
   if(Date.now()-setupTouched<HOT_MS) return;
   if(document.activeElement!==$("setName")) $("setName").value=hexDec(kv.CN);
+  btPrevPaint();
   // Guard EVERY field: on mobile `change` fires on blur, so an unguarded
   // state echo rewrites the focused field first and the edit silently
-  // vanishes ("ID / DMX hold refuse to change", bench 2026-08-28).
+  // vanishes ("ID / DMX hold refuse to change", bench 2026-08-28; the row is DMX loss release now).
   if(document.activeElement!==$("setCid"))   $("setCid").value=kv.CID??"";
-  if(document.activeElement!==$("setHold"))  $("setHold").value=kv.HOLD??"5";
+  if(document.activeElement!==$("setHold"))  $("setHold").value=dlrTxt();
+  { const ok="DLR" in kv; $("setHold").disabled=!ok; const b=$("btnHoldApply");
+    b.disabled=!ok; b.title=ok?"":"Needs a firmware update"; }
   // The closed drop-down's one line: what is set, read from the state.
-  { const s=$("ctlSum"); if(s){ const clm=+(kv.CLM||68), cl=+(kv.CL||clm), hold=+(kv.HOLD??5), pb=+(kv.PB||0);
+  { const s=$("ctlSum"); if(s){ const clm=+(kv.CLM||68), cl=+(kv.CL||clm), rel=+(kv.DLR||0), pb=+(kv.PB||0);
       s.textContent=[hexDec(kv.CN)||"No name", "ID "+(kv.CID??"—"),
-        "hold "+(hold?hold+" s":"forever"),
+        rel?"holds "+rel+" s, then fades":"holds on DMX loss",   // the firmware chat: say what happens after
         hasCtlLimit() ? (cl/10)+" A"+(kv.CLK==="1"?" locked":"")
                       : "budget "+(pb?(pb/10)+" A":"off")].join(" · "); } }
   // Universe → Settings waits for a firmware that carries the settings baton.
@@ -5206,7 +5214,7 @@ $("btnVariant").onclick=async()=>{
 let chArmPend=0;
 $("chArm").addEventListener("change",async e=>{
   const on=e.target.checked;
-  // While armed the unit holds its DMX thru for the baton, so every fixture
+  // While armed the unit holds its DMX output for the baton, so every fixture
   // after it loses the desk until a baton arrives (app review 2026-10-29, D3).
   // The state repaint stays off the toggle while the question is open.
   chArmPend=Date.now()+86400000;
@@ -5363,7 +5371,7 @@ $("chDmx").onclick=()=>{ send("CHLOOK=0"); toast("Universe: back to DMX in"); };
 // what identifies or patches a unit. The firmware builds the baton from its
 // own config on CHSET=1; the list here is the contract in words.
 $("chSet").onclick=async()=>{
-  if(!await askConfirm("Every unit armed to Listen takes this unit's curve, PWM, white balance, limit and trip per port, and its current limit and lock, folds, DMX hold, Apply mode, tempo and spread, with the custom PWM entries. Addresses, modes, heads, numbers, names, labels, PIN and presets stay as they are.",
+  if(!await askConfirm("Every unit armed to Listen takes this unit's curve, PWM, white balance, limit and trip per port, and its current limit and lock, folds, DMX loss release, Apply mode, tempo and spread, with the custom PWM entries. Addresses, modes, heads, numbers, names, labels, PIN and presets stay as they are.",
                        {title:"Send settings to the universe?",ok:"Send"})) return;
   send("CHSET=1"); toast("Settings sent to the universe");
 };
@@ -5452,6 +5460,23 @@ $("btnWifiApply").onclick=()=>{ setupTouched=Date.now();
   $("netPass").value="";                          // never leave the secret on screen
   send("NET=1"); $("netEn").value="1";            // joining implies enable
 };
+// What the phone's Bluetooth list will show, the firmware's own rule (ble_control.cpp, FW-80):
+// "<model> <name> #<id>-<mac>", 22 characters at most, the custom name cut first, the model
+// word not doubled; no name = "JMB <model> #<id>-<mac>". FW-80 shipped in the same build as
+// DLR, so a unit without DLR keeps the old line.
+function btAdvName(name){
+  const n=+(kv.PORTS||0), model=n>=8?"8ight":n>=4?"4our":"Zone";
+  const mac=(/-([0-9A-F]{4})$/i.exec(devName()||"")||[])[1]||"xxxx";
+  const tail=" #"+String(+(kv.CID||0)).padStart(2,"0")+"-"+mac.toUpperCase();
+  name=(name||"").trim(); if(!name) return "JMB "+model+tail;
+  const has=name.toLowerCase().startsWith(model.toLowerCase()) && (name.length===model.length||name[model.length]===" ");
+  return (has?name:model+" "+name).slice(0,22-tail.length).replace(/ +$/,"")+tail;
+}
+function btPrevPaint(){ const el=$("btPrev"); if(!el) return;
+  el.textContent=("DLR" in kv)
+    ? "Bluetooth will list it as \u201C"+btAdvName($("setName").value)+"\u201D after the next restart."
+    : "The Bluetooth name changes at the controller's next restart."; }
+$("setName").addEventListener("input",btPrevPaint);
 $("setName").addEventListener("change",e=>{
   setupTouched=Date.now();
   const v=e.target.value.replace(/[^\x20-\x7E]/g,"").trim().slice(0,16);
@@ -5471,11 +5496,13 @@ $("setName").addEventListener("change",e=>{
 });
 $("btnCidApply").onclick=()=>{ setupTouched=Date.now();
   send("CID="+Math.max(0,Math.min(9999,+$("setCid").value||0))); };
-// 0 = hold forever: "||5" turned it into 5 s (B7). Empty puts the value back.
+// DMX loss release: blank or 0 = never (hold the last look, the default); 1-60 s = that
+// long after DMX loss, fade to black. Junk puts the value back.
+function dlrTxt(){ const v=+(kv.DLR||0); return v>0 ? String(v) : ""; }
 $("btnHoldApply").onclick=()=>{ setupTouched=Date.now();
-  const s=$("setHold").value.trim();
-  if(s===""||!Number.isFinite(+s)){ $("setHold").value=kv.HOLD??"5"; return; }
-  send("HOLD="+Math.round(Math.max(0,Math.min(60,+s)))); };
+  const s=$("setHold").value.trim(), v=s===""?0:+s;
+  if(!Number.isFinite(v)){ $("setHold").value=dlrTxt(); return; }
+  send("DLR="+Math.round(Math.max(0,Math.min(60,v)))); };
 // ---------- prep / reset-all / undo ----------
 $("btnPrep").onclick=async()=>{
   // Confirm only when the button is armed (blue = something to clear); with the
@@ -6798,7 +6825,7 @@ const SUP_TO="support@jmblighting.co.uk";
 // Controller status that goes in. A WHITELIST: a key the firmware gains later
 // stays out until it is added here on purpose. Never listed: NIP (network
 // address). Names (CN, BTN), the ID and port labels go in only with the tick.
-const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD",
+const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD","DLR",
   "RDM","ANS","RB","RBOK","STM","SPC","CHL","TSEQ","TXA","TXN","LPX","LPS","LPN","LPA","LPG","BSY","BRT","BSM","BRM",
   "NET","NW","NRS","TF","PB","CL","CLM","CLK","CF","FC","FT","OL","SH","SHM","TCR","CX","CA","CXR","CXL","CXS","CXF",
   "SQ","SQN","BPM","SPR","TAPV","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
@@ -6925,7 +6952,7 @@ function demoState(){
   const W=(n,d)=>{ const w=d.wb||[255,255,255]; return `W${n}=${w[0]},${w[1]},${w[2]},${d.wbp||0};`; };
   const PWC=demoF.pwc.map((c,k)=>`PWC${k+1}=${c?`${c.hz},${pwActual(c.hz)}`:"0,0"};`).join("");
   onState(
-    `JMB;FW=demo;PORTS=${demoF.var};CID=7;DMX=1;FPS=44;DI=0;CRV=1;AM=${demoF.am??1};HOLD=5;SL=512;SC=0;ASC=3;ERR=0;`+
+    `JMB;FW=demo;PORTS=${demoF.var};CID=7;DMX=1;FPS=44;DI=0;CRV=1;AM=${demoF.am??1};DLR=${demoF.dlr||0};SL=512;SC=0;ASC=3;ERR=0;`+
     "RDM=42;ANS=42;AGE=23;"+
     `CAPON=${demoF.capon};CAPMS=${demoF.capon?Date.now()-demoF.capt0:0};CFL=43;CFH=45;`+
     `VAR=${demoF.var};VARM=${demoF.varm};BTN=${demoF.btn};`+
@@ -7064,6 +7091,7 @@ function demoCmd(s){
     T.push(t);
     if(T.length>=2){ const ms=Math.max(250,Math.min(1000,(T[T.length-1]-T[0])/(T.length-1))); demoF.bpm=Math.round(60000/ms); }
     demoState(); return; }
+  if(m=s.match(/^DLR=(\d+)/)){ demoF.dlr=Math.min(60,+m[1]); demoState(); return; }   // DMX loss release
   if(m=s.match(/^SPREAD=(\d+)/)){ demoF.spr=+m[1]; demoState(); return; }   // was never echoed: the next state line put the slider back (2026-10-03)
   // CRMX Link / Unlink (user, 2026-10-04: "make sure the pills and prompts say
   // unlinked if I select CRMX unlink"): Unlink reads not linked everywhere;

@@ -87,7 +87,7 @@ never masquerade as a live source.</p>
 </tr>
 <tr>
 <td>Setup</td>
-<td>system only: ID, Bluetooth + PIN, DMX hold, curve (all ports), encoder, language, protection, cal, reset</td>
+<td>system only: ID, Bluetooth + PIN, DMX loss release, curve (all ports), encoder, language, protection, cal, reset</td>
 </tr>
 </tbody>
 </table>
@@ -158,8 +158,9 @@ ONE baton from up the line — always Off at power-up, disarms itself after use;
 the app's Setup → Universe → Listen is the same switch).</p>
 <h3>Setup</h3>
 <p>Controller ID (shows on screens, in the Bluetooth name after reboot, and in
-the RDM label) · Bluetooth on/off + PIN · <strong>DMX Hold</strong> (how many seconds the
-last look is kept after the signal is lost, 0–60; 0 = forever) · Curve (all)
+the RDM label) · Bluetooth on/off + PIN · <strong>DMX Loss Release</strong> (0 = never, the
+default: the last look holds; 1–60 s = that long after the signal is lost, the
+outputs fade to black) · Curve (all)
 (sets every port's curve at once; the per-port row is Ports → Curve) ·
 Reverse Encoder · Language · Current Limit + Limit Lock · Current Fold ·
 Thermal Fold · Calibrate temp · Factory Reset (confirmed; it unlinks the CRMX
@@ -169,7 +170,8 @@ here on any unit (it ships on); switch it back on the same way.</p>
 <h2>2. Output priority</h2>
 <p><strong>Test mode → Identify (RDM/app) → live DMX → Effect → Manual → hold-last.</strong>
 Live DMX always outranks manual and effects; when the desk vanishes, the
-last DMX look holds until you set something else. At power-up the outputs
+last DMX look holds until you set something else (or, if a DMX loss release
+time is set, until that time runs out and the outputs fade to black). At power-up the outputs
 stay dark for just over a second, so the supply's inrush bypass has closed
 before the strips draw current, and then fade up over half a second. All
 sources pass the dimmer curve.</p>
@@ -177,11 +179,12 @@ sources pass the dimmer curve.</p>
 universe, so everything downstream (patch, FX personality, the diagnostics
 viewer, RDM) treats the radio exactly like a cable. The header on every screen
 names the winner: <strong>DMX</strong> or <strong>CRMX</strong>.</p>
-<p><strong>DMX thru is active, not a loop-through.</strong> The OUT socket is re-driven by its
-own line transceiver, so the signal leaving the unit is a fresh copy of what
-arrived (bit-for-bit, no software in the path) and a long daisy-chain stays
-clean however many units are in it. Downstream fixtures' RDM answers are
-relayed back up to the desk through the same path.</p>
+<p><strong>The DMX output is buffered, not a loop-through.</strong> The output socket has its
+own line driver, and DMX is passed straight through to it inside the controller,
+bit for bit at the desk's own rate, with no software in the path, so a long
+daisy-chain stays clean however many units are in it. If the desk signal stops,
+the output stops too. With the unit switched off, a relay links DMX IN to the
+DMX output, so the signal still passes on down the line.</p>
 <h2>2a. Firmware update over Bluetooth (BLE OTA)</h2>
 <p>The controller updates its own firmware straight over Bluetooth from the app —
 no USB, no cable.</p>
@@ -314,8 +317,8 @@ every armed unit. Choosing <strong>Off</strong> blacks out the whole universe; <
 it to full. The app's <strong>Universe</strong> section (Setup, under CRMX) has one-tap <strong>Blackout / Full /
 DMX In</strong> buttons for the same thing, and <strong>Send settings</strong> sends this unit's
 settings to every armed unit: curve, PWM, white balance, limit and trip per
-port, the controller's current limit and lock, folds, DMX hold, Apply mode,
-tempo and spread, and the custom PWM entries; never addresses, modes, heads,
+port, the controller's current limit and lock, folds, DMX loss release, Apply
+mode, tempo and spread, and the custom PWM entries; never addresses, modes, heads,
 numbers, names, labels, the PIN or the custom presets.
 A unit with more ports than the sender gives its extra ports the sender's last
 port's settings, and each receiving unit shows <strong>Universe settings set</strong>. A port's white
@@ -338,21 +341,20 @@ chart. The
 controller also publishes <strong>per-port temperature and current as E1.20 sensors</strong>
 on the root device ("Port 1 Temp", "Port 1 Current", …), so any RDM console
 reads fixture health live. The main screen also flashes the moment discovery
-finds the unit. The powered DMX
-thru forwards everything downstream; downstream fixtures' RDM responses are
-relayed back to the desk automatically.</p>
+finds the unit. The buffered DMX
+output forwards everything downstream.</p>
 <p><strong>RDM controller (the app's Diagnostics tab).</strong> The controller is also an RDM
-<em>controller</em> for everything plugged into its thru line — a full RDM tester
+<em>controller</em> for everything plugged into its DMX output — a full RDM tester
 built into the rack. <strong>Scan</strong> discovers every downstream RDM fixture and lists it as a
 card: model, label, UID, start address, footprint, personality and sensor
 count. Tap a card to edit it in place — <strong>identify</strong> (flash the fixture to
 find it), <strong>start address</strong>, <strong>personality</strong>, <strong>label</strong>, and live <strong>sensor
 reads</strong>. Scanning takes over the output line while it runs, so with an
 upstream desk live the app asks before taking over; the session releases the
-thru automatically when you stop, when you leave the Diagnostics tab or put the
+DMX output automatically when you stop, when you leave the Diagnostics tab or put the
 app away (any fixture still identifying is switched off on the way out), or
 <strong>3 minutes after your last command</strong> — the app then reads <em>stopped — idle for
-3 minutes, thru released</em>, so a scan left open at a gig never holds the rig.</p>
+3 minutes, DMX output released</em>, so a scan left open at a gig never holds the rig.</p>
 <blockquote>
 <p><strong>Discovery flashes fixtures.</strong> When a desk (or this app) runs RDM
 discovery, every fixture it finds — this controller's ports included —
@@ -563,7 +565,7 @@ the wire. Each tool answers a specific question:</p>
   Scanning takes over the output line while it runs.</p>
 </li>
 <li>
-<p><strong>Transmit DMX</strong> — sends a test universe from the OUT socket while no DMX is
+<p><strong>Transmit DMX</strong> — sends a test universe from the DMX output while no DMX is
   being received (greyed while a desk is live). Desk syntax on the keypad:
   <code>1 THRU 5 @ 80</code>, <code>10 + 12 @ FULL</code>, <code>1 THRU 10 - 5 @ 50</code>; levels are 0–100 or
   FULL. Each channel set is listed with its level and stays latched — across
@@ -576,10 +578,11 @@ the wire. Each tool answers a specific question:</p>
 </ul>
 <h3>Setup — controller and housekeeping</h3>
 <p>The controller's own settings sit under <strong>Settings</strong> in the Controller card.
-Closed, one line shows what is set (name, ID, DMX hold and the current limit);
+Closed, one line shows what is set (name, ID, what happens on DMX loss and the current limit);
 tap it to open the fields. The buttons beneath stay in view either
-way. <strong>DMX hold</strong> is how many seconds the last DMX look is kept after the signal
-is lost, 0–60; <strong>0</strong> keeps it until you set something else.</p>
+way. <strong>DMX loss release</strong> is blank (never) by default: when DMX is lost the
+last look holds until you set something else. Enter 1–60 s and the outputs fade
+to black that long after the signal goes; DMX coming back lights them again.</p>
 <p><strong>Controller and Bluetooth name</strong> (one field; the Bluetooth name changes at the
 next restart) and <strong>ID</strong>, which together are what the pairing list shows, the current limit and
 folds, and the <strong>CRMX by LumenRadio</strong> card: <strong>Unlink</strong> and <strong>Link</strong> (the
@@ -813,7 +816,7 @@ before a show:</p>
 <li>Power link: up to 16 Zones / 4 4ours / 2 8ights on one 16 A supply</li>
 <li>Flash to find never lights the strip; RDM discovery and Identify from a
   desk do — that is the RDM standard</li>
-<li>An RDM scan left open releases the thru line after 3 minutes idle</li>
+<li>An RDM scan left open releases the DMX output after 3 minutes idle</li>
 </ul>
 <hr />
 <h2>10. Dimensions</h2>
