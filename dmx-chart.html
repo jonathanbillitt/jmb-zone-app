@@ -24,10 +24,21 @@ ul, ol { margin: 6px 0; padding-left: 22px; }
 a { color: #4636b8; }
 blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #b7ade6; background: #f7f5fd; color: #444; }
 .page-break { page-break-before: always; }
+/* Dimension drawings (2026-11-11, Hardware): A4-landscape sheets. On screen they fit the column; in the
+   PDF each gets its own page, turned a quarter-turn anticlockwise (top of the drawing to the left edge). */
+.dimsheet { margin: 10px 0 18px; }
+.dimsheet img { display: block; width: 100%; height: auto; border: 1px solid #e4e0f4; }
+@media print {
+  .dimsheet { page-break-before: always; page-break-inside: avoid; position: relative; height: 245mm; margin: 0; overflow: hidden; }
+  .dimsheet img { position: absolute; left: 50%; top: 50%; width: 245mm; border: 0;
+                  transform: translate(-50%, -50%) rotate(-90deg); }
+}
 .footer { margin-top: 26px; font-size: 8.5pt; color: #99a; text-align: center; }
 /* On-screen section search (hidden in the PDF). */
 #jmbsearch { position: sticky; top: 0; z-index: 50; background: #fff; padding: 10px 0 8px; margin: 0 0 8px; border-bottom: 1px solid #d8d4ee; }
-#jmbsearch input { width: 100%; box-sizing: border-box; font: 11pt 'Segoe UI', system-ui, sans-serif; padding: 9px 14px; border: 1.5px solid #b7ade6; border-radius: 9px; outline: none; }
+#jmbsearch .jsrow { display: flex; gap: 8px; align-items: center; }
+#jmbsearch .jpdf { flex: none; font: 600 10.5pt 'Segoe UI', system-ui, sans-serif; color: #6a2cf5; border: 1.5px solid #b7ade6; border-radius: 9px; padding: 8px 13px; text-decoration: none; }
+#jmbsearch input { flex: 1; min-width: 0; width: 100%; box-sizing: border-box; font: 11pt 'Segoe UI', system-ui, sans-serif; padding: 9px 14px; border: 1.5px solid #b7ade6; border-radius: 9px; outline: none; }
 #jmbsearch input:focus { border-color: #6a2cf5; }
 #jmbsearch .jr { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #d8d4ee; border-radius: 0 0 9px 9px; box-shadow: 0 10px 24px rgba(20,20,40,.14); max-height: 55vh; overflow: auto; }
 #jmbsearch .jrow { padding: 9px 14px; cursor: pointer; border-bottom: 1px solid #f0eef8; font-size: 10.5pt; color: #2a1d66; }
@@ -36,7 +47,7 @@ blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #b7ade6; 
 #jmbsearch .jrow small { color: #99a; font-size: 8.5pt; }
 @media print { #jmbsearch { display: none !important; } }
 </style></head><body>
-<div id="jmbsearch"><input type="search" placeholder="Search this manual — e.g. port bus" aria-label="Search this manual"><div class="jr"></div></div>
+<div id="jmbsearch"><div class="jsrow"><input type="search" placeholder="Search this manual — e.g. current limit" aria-label="Search this manual"><a class="jpdf" href="dmx-chart.pdf" download>PDF</a></div><div class="jr"></div></div>
 <h1>JMB Lighting — DMX Personality Chart</h1>
 <p>JMB Zone / 4our / 8ight · Firmware 2.x · 2026-10-02 (five-channel set added)</p>
 <h2>Personalities (per port)</h2>

@@ -1271,11 +1271,10 @@
       <div class="ctlrow">
         <a class="dbtn" href="./manual.html" target="_blank" rel="noopener">User manual</a>
         <a class="dbtn" href="./dmx-chart.html" target="_blank" rel="noopener">DMX chart</a>
-        <a class="dbtn" href="./manual.pdf" target="_blank" rel="noopener">Manual PDF</a>
         <a class="dbtn" href="./safety.html" target="_blank" rel="noopener">Safety guide</a>
       </div>
-      <div class="mini">The full user manual and DMX channel chart. Bundled with
-        the app — they open even with no internet, once the app has loaded once.
+      <div class="mini">Each opens with a PDF button for printing. Bundled with the
+        app — they open even with no internet, once the app has loaded once.
         <a href="./privacy.html" target="_blank" rel="noopener">Privacy policy</a></div>
     </div>
     <!-- Network DMX (sACN/Art-Net over Wi-Fi) PARKED 2026-08-20 — hidden; the
@@ -1672,10 +1671,29 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-11a.units";
+const APP_VER="2026-11-11b.calc";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
+// Load calculator in each port's Protection sheet (user, 2026-11-11: "fixture watts per meter and length which
+// adjusts the current limit ... editing any of these fields can update the others"). draw = W/m × m ÷ V; the Limit
+// becomes the draw rounded up to 0.25 A; a typed Limit gives the longest run it covers at that W/m. The app can't
+// tell a 12 V unit from a 24 V one, so the volts are chosen here. Kept per controller and port on this phone only.
+let ltBusy=false;
+const ltKey=p=>"jmb_lt:"+((typeof devName==="function"&&devName())||"demo")+":"+p;
+function ltLoad(p){ try{ return JSON.parse(localStorage.getItem(ltKey(p))||"null")||{}; }catch(_){ return {}; } }
+function ltRead(p){ const n=id=>{ const e=$(id+p); const v=e?+e.value:NaN; return Number.isFinite(v)&&v>0?v:0; }; return {w:n("ltw"), l:n("ltl"), v:+(($("ltv"+p)||{}).value||24)}; }
+function ltSave(p){ try{ localStorage.setItem(ltKey(p),JSON.stringify(ltRead(p))); }catch(_){} }
+function ltNote(p,over){ const el=$("ltn"+p); if(!el) return; const {w,l,v}=ltRead(p);
+  if(!(w&&l)){ el.textContent=""; return; }
+  const draw=w*l/v; el.textContent=over?`needs ${draw.toFixed(2)} A, over the ${ocpCapA()} A an output gives`:`draws ${draw.toFixed(2)} A`;
+  el.style.color=over?"var(--warn)":"var(--dim)"; }
+function ltToLimit(p){ const {w,l,v}=ltRead(p); ltSave(p); if(!(w&&l)){ ltNote(p); return; }
+  const draw=w*l/v, cap=ocpCapA(), over=draw>cap, a=Math.max(0.25,Math.min(cap,Math.ceil(draw/0.25-1e-9)*0.25)), oc=$("ocp"+p);
+  if(oc){ oc.value=a; ltBusy=true; oc.dispatchEvent(new Event("change")); ltBusy=false; }
+  ltNote(p,over); }
+function ltFromLimit(p,a){ const {w,v}=ltRead(p); if(!w) return;
+  const l=Math.floor(a*v/w*10)/10, el=$("ltl"+p); if(el) el.value=l; ltSave(p); ltNote(p); }
 // ---------- support diagnostics (2026-09-29) ----------
 // What Setup → Support puts in its report: script errors, link events and the
 // last commands sent. Held in memory (errors also in local storage, so one
@@ -2993,6 +3011,16 @@ function buildCard(p){
         <div id="wbHost${p}"></div>   <!-- the white balance block mounts here while the sheet is open -->
       </div>
       <div class="psheet rows" id="psProt${p}" data-title="Port ${p} · Protection">
+        <!-- Load calculator (user, 2026-11-11): tape W/m × length ÷ volts = the draw, which sets the Limit;
+             a typed Limit gives the longest run it covers. Kept on this phone, per controller and port. -->
+        <div class="row"><label>Tape</label>
+          <input type="number" id="ltw${p}" min="0.5" max="100" step="0.1" placeholder="14.4">
+          <span class="unit">W/m</span>
+          <select id="ltv${p}" style="width:78px;margin-left:8px"><option value="24">24 V</option><option value="12">12 V</option></select></div>
+        <div class="row"><label>Length</label>
+          <input type="number" id="ltl${p}" min="0.1" max="200" step="0.1" placeholder="5">
+          <span class="unit">m</span>
+          <span class="mini" id="ltn${p}" style="margin:0 0 0 8px;color:var(--dim)"></span></div>
         <div class="row"><label>Limit</label>
           <input type="number" id="ocp${p}" min="0.25" max="6.75" step="0.25">
           <span class="unit">A</span>
@@ -3005,7 +3033,7 @@ function buildCard(p){
           <button class="danger hidden" id="clrf${p}">Clear fault &amp; re-enable</button>
           <span class="mini" id="nof${p}" style="margin:0;color:var(--ok);font-weight:600">&#10003; No faults</span>
         </div>
-        <div class="mini">Limit is the current the output may draw; Trip is the temperature it shuts down at. A fault stays latched until it is cleared here.</div>
+        <div class="mini">Tape and Length set the Limit to what the run draws; type a Limit to see the longest run it covers. Trip is the temperature the output shuts down at. A fault stays latched until it is cleared here.</div>
       </div>
     </div>`;
   const touch=k=>{ hot[p+"."+k]=Date.now(); };
@@ -3040,7 +3068,12 @@ function buildCard(p){
     let a=Math.max(0.25,Math.min(ocpCapA(),v));
     a=Math.round(a/0.25)*0.25; e.target.value=a;
     touch("OCP"); send(`P${p}.OCP=${Math.round(a*1000)}`);
+    if(!ltBusy) ltFromLimit(p,a);
   });
+  // Load calculator: any of tape, volts or length sets the Limit; the values stay on this phone.
+  { const lt=ltLoad(p); if(lt.w) d.querySelector("#ltw"+p).value=lt.w; if(lt.l) d.querySelector("#ltl"+p).value=lt.l; if(lt.v) d.querySelector("#ltv"+p).value=lt.v;
+    for(const id of ["ltw","ltl","ltv"]) d.querySelector("#"+id+p).addEventListener("change",()=>ltToLimit(p));
+    setTimeout(()=>ltNote(p),0); }
   d.querySelector("#ot"+p).addEventListener("change",e=>{
     const v=typed(e.target), m=ports[p-1]||{};
     if(v==null){ e.target.value=m.OT??80; return; }
