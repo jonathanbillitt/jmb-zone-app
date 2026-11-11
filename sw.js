@@ -6,13 +6,14 @@
 // MUST be "jmb-" + the app's APP_VER with dots as dashes. deploy_pages.py
 // enforces it: a deploy that bumps APP_VER but not this key publishes new HTML
 // that no client ever sees, because the old shell stays cached and un-evicted.
-const CACHE="jmb-2026-11-09a-fuse";
+const CACHE="jmb-2026-11-11a-units";
 // The shell: what the connect screen and the app need. Precached at install.
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./firmware.json",
                 "./icon.svg", "./icon-maskable.svg", "./icon-192.png",
                 "./icon-192-maskable.png", "./icon-512.png",
                 "./icon-512-maskable.png", "./privacy.html", "./jmb-splash.png",
-                "./crmx-lumenradio-dark.png"];
+                "./crmx-lumenradio-dark.png", "./unit-zone.webp", "./unit-four.webp",
+                "./unit-eight.webp"];
 // Docs precached so the manual + DMX chart open with no signal — but AFTER the
 // worker is live, not at install: ~900 KB of PDFs fetched at install time ran
 // alongside the page's own first load after an update (caches wiped), and the

@@ -686,6 +686,19 @@
   #helloMsg > b{ display:block; font-size:19px; font-weight:600; letter-spacing:.2px; }
   #hello .mini{ margin-top:8px; }
   #hello .ctlrow{ justify-content:center; margin-top:14px; }
+  /* Pick by model (user, 2026-11-11): a render of each unit opens the Bluetooth
+     list filtered to that model; the header's Connect still lists every unit. */
+  #unitPick{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px; }
+  #unitPick button{ display:flex; flex-direction:column; align-items:center; gap:2px;
+    padding:6px 4px 7px; border-radius:12px; background:rgba(255,255,255,.03); }
+  #unitPick img, .unitshot img{ width:100%; object-fit:contain;
+    filter:drop-shadow(0 6px 10px rgba(120,90,255,.28)); }
+  #unitPick img{ height:52px; }
+  #unitPick span{ font-size:12px; color:var(--dim); }
+  .unitshot{ text-align:center; margin:-2px 0 10px; }
+  .unitshot img{ width:74%; max-height:112px; }
+  .unitshot b{ display:block; margin-top:2px; }
+  .unitshot .mini{ margin:0 !important; }
   #btnDemo{ color:var(--acc); border-color:rgba(77,163,255,.55);
     background:rgba(77,163,255,.10); padding:10px 22px;
     box-shadow:0 0 16px rgba(77,163,255,.32), inset 0 0 12px rgba(77,163,255,.14); }
@@ -857,8 +870,14 @@
          thing a phone without a controller can use (app review 2026-10-29). -->
     <div id="helloMsg">
     <b>Not connected</b>
-    <div class="mini">Tap Connect and pick your controller (“JMB Zone #ID-XXXX”).
-    Chrome/Edge only — on iPhone use the Bluefy browser. Bluetooth on.</div>
+    <div class="mini">Tap your model, then pick your controller from the list
+    by its ID. Connect at the top lists every unit. Chrome/Edge only — on iPhone
+    use the Bluefy browser. Bluetooth on.</div>
+    </div>
+    <div id="unitPick">
+      <button data-ports="1"><img src="unit-zone.webp" alt=""><span>Zone</span></button>
+      <button data-ports="4"><img src="unit-four.webp" alt=""><span>4our</span></button>
+      <button data-ports="8"><img src="unit-eight.webp" alt=""><span>8ight</span></button>
     </div>
     <div class="ctlrow" id="helloRow">
       <button id="btnDemo">Demo mode</button>
@@ -1517,6 +1536,7 @@
 
 <div id="overlay" class="hidden">
   <div class="box">
+    <div id="pinUnit"></div>
     <b>Enter PIN</b>
     <div class="mini">The factory PIN 0123 is tried for you. A controller with its
       own PIN asks once per phone, then remembers it for that controller only.</div>
@@ -1652,7 +1672,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-09a.fuse";
+const APP_VER="2026-11-11a.units";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1751,8 +1771,16 @@ const $=id=>document.getElementById(id);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 // busy = a connection is under way: the Demo row steps aside until it ends.
 function hello(html,busy){ $("hello").classList.remove("hidden"); $("helloMsg").innerHTML=html;
-  $("helloRow").classList.toggle("hidden",!!busy);
-  try{ window.scrollTo(0,0); }catch(_){} }     // the connect screen always starts at the top
+  $("helloRow").classList.toggle("hidden",!!busy); $("unitPick").classList.toggle("hidden",!!busy);
+  try{ window.scrollTo(0,0); }catch(_){} }
+// The unit on the other end of a connection, as a picture (user, 2026-11-11): the
+// model chosen on the connect screen, else the model in its advertised name
+// ("JMB 4our #07-A1B2"), else the port count it reports.
+const UNIT_MODELS={1:{k:"zone",name:"JMB Zone"},4:{k:"four",name:"JMB 4our"},8:{k:"eight",name:"JMB 8ight"}};
+let pickedPorts=0;
+function unitFromName(n){ const m=/\b(Zone|one|4our|8ight)\b/i.exec(n||""); if(!m) return 0; const w=m[1].toLowerCase(); return w==="4our"?4:w==="8ight"?8:1; }
+function unitShot(){ const n=+(typeof kv!=="undefined"&&kv.PORTS)||0, u=UNIT_MODELS[pickedPorts||unitFromName(devName())||(n>=8?8:n>=4?4:n?1:0)];
+  return u ? `<div class="unitshot"><img src="unit-${u.k}.webp" alt=""><b>${u.name}</b><div class="mini">${esc(devName())}</div></div>` : ""; }     // the connect screen always starts at the top
 // The connect screen is a fixed column that cannot be scrolled by hand, so a
 // stale scroll offset is a trap: Chrome restores the old position on a reload
 // (the app update button reloads from the foot of the Setup tab) and on a
@@ -1967,15 +1995,23 @@ async function gattSetup(){
   }
   throw lastErr||new Error("unknown");
 }
-async function connect(){
+async function connect(ports){
   if(busy) return;
-  busy=true; userDisc=false;
+  busy=true; userDisc=false; pickedPorts=ports||0;
   $("btnConnect").disabled=true;
   try{
     try{
-      if(NBLE()){ await NBLE().requestDevice(); }
-      else dev=await navigator.bluetooth.requestDevice({
-        filters:[{services:[SVC]}], optionalServices:[SVC]});
+      if(NBLE()){ await NBLE().requestDevice(ports?{ports}:undefined); }
+      else{
+        // Every unit's scan response carries 'J''Z' (read as company 0x5A4A), its ID and its port
+        // count (ble_control.cpp): a model picks only that byte. A browser without manufacturer
+        // filters throws TypeError and gets the whole list instead.
+        const all={filters:[{services:[SVC]}], optionalServices:[SVC]};
+        const one=ports?{filters:[{services:[SVC], manufacturerData:[{companyIdentifier:0x5A4A,
+          dataPrefix:new Uint8Array([0,0,ports]), mask:new Uint8Array([0,0,0xFF])}]}], optionalServices:[SVC]}:null;
+        try{ dev=await navigator.bluetooth.requestDevice(one||all); }
+        catch(e){ if(one && e && e.name==="TypeError"){ diagPush("ev","model filter unsupported: "+e.message); pickedPorts=0; dev=await navigator.bluetooth.requestDevice(all); } else throw e; }
+      }
     }catch(e){
       // Cancelling the chooser is silent. Anything else (Bluetooth off, no
       // adapter, Bluetooth blocked for this site) used to be silent too, and
@@ -1986,7 +2022,7 @@ async function connect(){
         " and allow Bluetooth for this app, then tap Connect again.<br>("+esc(e&&e.message||e)+")</div>");
       return;
     }
-    hello("<b>Connecting…</b>"+jbarsHTML("connBars"),true); jbarsSet($("connBars"), null);
+    hello(unitShot()+"<b>Connecting…</b>"+jbarsHTML("connBars"),true); jbarsSet($("connBars"), null);
     try{ await gattSetup(); diagPush("ev","link up"); }
     catch(e){
       diagPush("ev","connect failed: "+(e&&e.message||e));
@@ -2002,7 +2038,7 @@ async function connect(){
     // The connect screen STAYS under the PIN overlay so the intro (mark flies
     // from the row under the splash) can run once the PIN is accepted — hiding
     // it here skipped the intro on every real connection (user, 2026-09-13).
-    hello("<b>Connected.</b><div class='mini'>Unlocking…</div>",true);
+    hello(unitShot()+"<b>Connected.</b><div class='mini'>Unlocking…</div>",true);
     // A real link supersedes the demo entirely: stop its seeder and drop its
     // ports so the controller's own count builds the cards from scratch.
     if(typeof demoOn!=="undefined" && demoOn){
@@ -2268,7 +2304,7 @@ function ensureMan(p){
 
 // ---------- PIN ----------
 function askPin(){
-  renderPinNotice();
+  renderPinNotice(); $("pinUnit").innerHTML=unitShot();
   $("overlay").classList.remove("hidden");
   $("pinErr").textContent="";
   $("pinInput").value=loadPin();
@@ -6110,6 +6146,7 @@ $("btnConnect").onclick=()=>{
   if(demoOn){ exitDemo(); return; }
   connect();
 };
+document.querySelectorAll("#unitPick button").forEach(b=>b.onclick=()=>connect(+b.dataset.ports));
 // Demo is marked by the header alone (the DEMO pill went on the user's word,
 // 2026-10-04): Connect reads Exit and the name reads Demo Rig.
 function setDemoUi(on){
