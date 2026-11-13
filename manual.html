@@ -328,7 +328,11 @@ the panel's WB editor on All Ports with Universe: Send does the same (<strong>SE
 change the output.)</p>
 <hr />
 <h2>5. RDM</h2>
-<p>The controller is a full E1.20 responder: discovery, identify (flashes the
+<p><strong>RDM is off by default.</strong> Out of the box the controller is a plain one-way DMX
+buffer: it answers no RDM and the app's Diagnostics scan is greyed. Switch it on
+in the app under Setup → Settings → <strong>RDM</strong> when you want a desk or the app to
+find and set fixtures.</p>
+<p>With RDM on, the controller is a full E1.20 responder: discovery, identify (flashes the
 ports and strobes the main screen <strong>HERE</strong>), device info, start address,
 personality — the root device carries the rack view (a SET fans out per the
 Apply mode) and each port is addressable individually as a sub-device.
@@ -582,7 +586,8 @@ Closed, one line shows what is set (name, ID, what happens on DMX loss and the c
 tap it to open the fields. The buttons beneath stay in view either
 way. <strong>DMX loss release</strong> is blank (never) by default: when DMX is lost the
 last look holds until you set something else. Enter 1–60 s and the outputs fade
-to black that long after the signal goes; DMX coming back lights them again.</p>
+to black that long after the signal goes; DMX coming back lights them again.
+<strong>RDM</strong> is off by default; see section 5.</p>
 <p><strong>Controller and Bluetooth name</strong> (one field; the Bluetooth name changes at the
 next restart) and <strong>ID</strong>, which together are what the pairing list shows, the current limit and
 folds, and the <strong>CRMX by LumenRadio</strong> card: <strong>Unlink</strong> and <strong>Link</strong> (the
@@ -679,6 +684,11 @@ learning the app or showing it off before the hardware is in front of you.</p>
 µs trip, over-temperature, ground-leak imbalance, comms-loss failsafe.
 Latched ports show a flashing fault banner on their screen, the fault word
 appears in the menu and the app, and Clear Faults / Port Reset re-arms.</p>
+<p><strong>Power fault (inrush board).</strong> If the outputs collapse twice soon after
+lighting, the sign of an inrush board whose bypass is not closing, the controller
+holds every output dark. The panel reads <em>PWR FLT</em> and the app shows a red
+banner on every tab. Check the mains side and the inrush board, then tap <strong>Clear
+fault</strong> in the banner (or Clear Faults on the panel); the outputs come back on.</p>
 <p><strong>Wiring fault.</strong> Separate from the electrical faults above, and raised by the
 controller rather than the port. Running <strong>Step</strong> measures each output's
 current one colour at a time; if one output draws roughly double while another

@@ -45,6 +45,12 @@
   }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html { overscroll-behavior:none; }   /* no pull-to-refresh reload */
+  /* No text selection from a long press (user, 2026-11-13: "the phone is confusing a long screen
+     press for a selection request"). Typed fields stay selectable so a value can still be edited. */
+  body { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]),
+  textarea, [contenteditable] { -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+  img { -webkit-user-drag:none; }
   body { margin:0; background:var(--bg); color:var(--text);
          font:15px/1.45 system-ui,Segoe UI,Roboto,sans-serif;
          overscroll-behavior:none;         /* both, for iOS + Android */
@@ -226,8 +232,15 @@
   .pbv.warn { color:var(--warn); }
   .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .row label { width:52px; color:var(--dim); font-size:12.5px; flex-shrink:0; }
-  /* A greyed row that needs newer firmware: taps reach the row, which says why. */
-  .row.needfw input, .row.needfw button { pointer-events:none; }
+  /* A greyed row with a reason (newer firmware needed, RDM off): taps reach the row, which
+     toasts its data-why. */
+  .needfw input, .needfw button, .needfw select { pointer-events:none; }
+  /* Inrush-board power fault (S5): pinned under the pills on every tab while PWRF=1. */
+  #pwrfBan { flex:1 1 100%; display:flex; align-items:center; gap:10px; margin-top:6px;
+    background:#3a1418; color:#ff9a9a; border:1px solid #8a2a30; border-radius:8px;
+    padding:8px 10px; font-size:13px; line-height:1.3; }
+  #pwrfBan.hidden { display:none; }
+  #pwrfBan span { flex:1; }
   .row input[type=range] { flex:1; min-width:120px; accent-color:var(--acc); height:26px; }
   .row.r input[type=range] { accent-color:var(--r); }
   .row.g input[type=range] { accent-color:var(--g); }
@@ -859,6 +872,13 @@
     <span id="pillInfoTxt"></span>
     <button id="pillInfoAct" class="hidden"></button>
   </div>
+  <!-- PWRF=1 (firmware S5): the inrush board's bypass failed under load twice, so the
+       controller holds every output dark until a deliberate clear. Any port's CLRF clears
+       it; a locked unit may show no port fault, so the banner carries its own button. -->
+  <div id="pwrfBan" class="hidden" role="alert">
+    <span>Power fault (inrush board): outputs held. Check the mains side, then clear the fault.</span>
+    <button id="pwrfClr" class="danger">Clear fault</button>
+  </div>
   <!-- No DEMO pill (user, 2026-10-04: "let's lose the demo pill"): Demo is
        marked by the header alone — the button reads Exit, the name Demo Rig. -->
 </div>
@@ -1023,7 +1043,7 @@
     </div>
 
     <div class="card">
-      <div class="ctlrow">
+      <div class="ctlrow" id="rdmScanRow" data-why="RDM is off: switch it on in Setup, Settings">
         <b style="flex:1">RDM universe</b>
         <button id="btnRdmStop" class="hidden">Stop</button>
         <button id="btnRdmScan" class="primary">Scan</button>
@@ -1122,7 +1142,7 @@
              always held the last look forever. Default = never (hold); a time =
              that long after DMX loss, fade to black. Greyed until the firmware
              reports DLR. -->
-        <div class="row" id="dlrRow"><label style="line-height:1.15">DMX loss release</label>
+        <div class="row" id="dlrRow" data-why="Loss release needs the next controller firmware"><label style="line-height:1.15">DMX loss release</label>
           <input type="number" id="setHold" min="0" max="60" step="1" placeholder="never">
           <span class="unit">s</span>
           <button id="btnHoldApply">Apply</button>
@@ -1153,6 +1173,13 @@
           <select id="setFold" style="width:90px"><option value="1">On</option>
             <option value="0">Off</option></select>
           <span class="mini" style="margin:0">dim a hot port over its last 10°C instead of tripping</span>
+        </div>
+        <!-- RDM on/off (firmware FW-74, user 2026-11-13). Off is the default: the unit is a
+             plain one-way DMX buffer, answers no RDM and the Diagnostics scan is refused. -->
+        <div class="row" id="rdmRow" data-why="The RDM switch needs the next controller firmware"><label>RDM</label>
+          <select id="setRdm" style="width:90px"><option value="0">Off</option>
+            <option value="1">On</option></select>
+          <span class="mini" style="margin:0">on: desks and the Diagnostics scan can find and set RDM fixtures · off: one-way DMX only</span>
         </div>
         <div class="mini" id="foldStatus" style="margin-top:4px"></div>
         <!-- Model under the folds, so the foot of the card is all buttons
@@ -1678,7 +1705,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-11d.apply";
+const APP_VER="2026-11-13a.rdm";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -4953,6 +4980,12 @@ function renderSetup(){
   if(document.activeElement!==$("netUni")) $("netUni").value=kv.NUN??"1";
   if(document.activeElement!==$("setFold")) $("setFold").value=kv.TF??"1";
   if(document.activeElement!==$("setCfold")) $("setCfold").value=kv.CF??"1";
+  { const ok="RDMEN" in kv, r=$("setRdm"); if(document.activeElement!==r) r.value=kv.RDMEN==="1"?"1":"0";
+    r.disabled=!ok; $("rdmRow").classList.toggle("needfw",!ok); }
+  // Diagnostics: RDM off greys the scan (a running session is left to finish or stop).
+  { const off=kv.RDMEN==="0", b=$("btnRdmScan"); b.disabled=off && !rdmActive;
+    $("rdmScanRow").classList.toggle("needfw",off && !rdmActive); }
+  $("pwrfBan").classList.toggle("hidden",kv.PWRF!=="1");
   // Firmware before the controller limit (2.0.0, a024de9) has a PSU budget
   // instead: PB in 0.1 A, 0 = off, outputs scaled back together to stay
   // within it; no lock, no current fold. The row shows that, and never sends
@@ -5119,6 +5152,16 @@ function renderSetup(){
 }
 $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.value); };
 $("setCfold").onchange=e=>{ setupTouched=Date.now(); send("CFOLD="+ +e.target.value); };
+$("setRdm").onchange=e=>{ setupTouched=Date.now(); const on=e.target.value==="1";
+  if(!on && rdmActive) rdmStop();                 // the firmware stops answering; close our session first
+  send("RDMEN="+(on?1:0)); };
+// A clear re-lights the outputs after a power fault: say so first (the firmware treats it as the
+// deliberate retry). P1.CLRF clears the lock; it also re-arms port 1, which is harmless.
+$("pwrfClr").onclick=async()=>{
+  if(!await askConfirm("The outputs come back on. Clear only once the mains side and the inrush board are checked.",
+                       {title:"Clear the power fault?",ok:"Clear",danger:true})) return;
+  send("P1.CLRF=1"); toast("Power fault cleared");
+};
 // The limit goes out in 0.1 A; at or above the product max it sends 0
 // (= "the max"), which is also what the firmware stores for anything over.
 // An empty field puts the limit in force back and sends nothing: it used to
@@ -5476,11 +5519,18 @@ function btAdvName(name){
   // The 1-port word follows the unit's own advertised spelling ("JMB Zone" on FW-80, "zOne" once the
   // firmware takes the art name, user 2026-11-11), so the preview never disagrees with the unit.
   const n=+(kv.PORTS||0), zw=(/\b(zone)\b/i.exec(devName()||"")||[])[1]||"zOne", model=n>=8?"8ight":n>=4?"4our":zw;
-  const mac=(/-([0-9A-F]{4})$/i.exec(devName()||"")||[])[1]||"xxxx";
+  // BTM (the unit's Bluetooth address tail, reported in state from FW-85) also marks the newer
+  // rule (user, 2026-11-13: "hide the ble id code from the user"): a NAMED unit advertises
+  // "<model> <name>" with no #id-mac code, so the whole name fits (17 characters after zOne /
+  // 4our, 16 after 8ight); an unnamed unit keeps "JMB <model> #<id>-<mac>" so units fresh out
+  // of the box can still be told apart in the phone's list.
+  const mac=kv.BTM||(/-([0-9A-F]{4})$/i.exec(devName()||"")||[])[1]||"xxxx";
   const tail=" #"+String(+(kv.CID||0)).padStart(2,"0")+"-"+mac.toUpperCase();
   name=(name||"").trim(); if(!name) return "JMB "+model+tail;
   const has=name.toLowerCase().startsWith(model.toLowerCase()) && (name.length===model.length||name[model.length]===" ");
-  return (has?name:model+" "+name).slice(0,22-tail.length).replace(/ +$/,"")+tail;
+  const head=has?name:model+" "+name;
+  return ("BTM" in kv) ? head.slice(0,22).replace(/ +$/,"")
+                       : head.slice(0,22-tail.length).replace(/ +$/,"")+tail;
 }
 function btPrevPaint(){ const el=$("btPrev"); if(!el) return;
   el.textContent=("DLR" in kv)
@@ -5520,8 +5570,11 @@ $("btnCidApply").onclick=()=>{ setupTouched=Date.now(); delete fieldEdit.setCid;
   send("CID="+c); };
 // DMX loss release: blank or 0 = never (hold the last look, the default); 1-60 s = that
 // long after DMX loss, fade to black. Junk puts the value back.
-$("dlrRow").addEventListener("click",()=>{ if($("dlrRow").classList.contains("needfw"))
-  toast("Loss release needs the next controller firmware",3500); });   // one line: the toast clips (the summary already says it holds)
+// A long press opens no phone menu (copy, save image, open link) outside typed fields: with the
+// text selection off it was the other thing a held finger set off (user, 2026-11-13).
+document.addEventListener("contextmenu",e=>{ if(!(e.target.closest&&e.target.closest("input,textarea,[contenteditable]"))) e.preventDefault(); });
+document.addEventListener("click",e=>{ const r=e.target.closest&&e.target.closest(".needfw[data-why]");
+  if(r) toast(r.dataset.why,3500); });   // one line: the toast clips
 function dlrTxt(){ const v=+(kv.DLR||0); return v>0 ? String(v) : ""; }
 $("btnHoldApply").onclick=()=>{ setupTouched=Date.now(); delete fieldEdit.setHold;
   const d=dlrWant();
@@ -6849,7 +6902,7 @@ const SUP_TO="support@jmblighting.co.uk";
 // Controller status that goes in. A WHITELIST: a key the firmware gains later
 // stays out until it is added here on purpose. Never listed: NIP (network
 // address). Names (CN, BTN), the ID and port labels go in only with the tick.
-const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD","DLR",
+const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD","DLR","RDMEN","PWRF","CARD","BTM",
   "RDM","ANS","RB","RBOK","STM","SPC","CHL","TSEQ","TXA","TXN","LPX","LPS","LPN","LPA","LPG","BSY","BRT","BSM","BRM",
   "NET","NW","NRS","TF","PB","CL","CLM","CLK","CF","FC","FT","OL","SH","SHM","TCR","CX","CA","CXR","CXL","CXS","CXF",
   "SQ","SQN","BPM","SPR","TAPV","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
@@ -6976,7 +7029,7 @@ function demoState(){
   const W=(n,d)=>{ const w=d.wb||[255,255,255]; return `W${n}=${w[0]},${w[1]},${w[2]},${d.wbp||0};`; };
   const PWC=demoF.pwc.map((c,k)=>`PWC${k+1}=${c?`${c.hz},${pwActual(c.hz)}`:"0,0"};`).join("");
   onState(
-    `JMB;FW=demo;PORTS=${demoF.var};CID=${demoF.cid??7};DMX=1;FPS=44;DI=0;CRV=1;AM=${demoF.am??1};DLR=${demoF.dlr||0};SL=512;SC=0;ASC=3;ERR=0;`+
+    `JMB;FW=demo;PORTS=${demoF.var};CID=${demoF.cid??7};DMX=1;FPS=44;DI=0;CRV=1;AM=${demoF.am??1};DLR=${demoF.dlr||0};RDMEN=${demoF.rdm||0};PWRF=0;SL=512;SC=0;ASC=3;ERR=0;`+
     "RDM=42;ANS=42;AGE=23;"+
     `CAPON=${demoF.capon};CAPMS=${demoF.capon?Date.now()-demoF.capt0:0};CFL=43;CFH=45;`+
     `VAR=${demoF.var};VARM=${demoF.varm};BTN=${demoF.btn};`+
@@ -7116,6 +7169,7 @@ function demoCmd(s){
     if(T.length>=2){ const ms=Math.max(250,Math.min(1000,(T[T.length-1]-T[0])/(T.length-1))); demoF.bpm=Math.round(60000/ms); }
     demoState(); return; }
   if(m=s.match(/^CID=(\d+)/)){ demoF.cid=Math.min(9999,+m[1]); demoState(); return; }
+  if(m=s.match(/^RDMEN=(\d)/)){ demoF.rdm=+m[1]?1:0; demoState(); return; }
   if(m=s.match(/^DLR=(\d+)/)){ demoF.dlr=Math.min(60,+m[1]); demoState(); return; }   // DMX loss release
   if(m=s.match(/^SPREAD=(\d+)/)){ demoF.spr=+m[1]; demoState(); return; }   // was never echoed: the next state line put the slider back (2026-10-03)
   // CRMX Link / Unlink (user, 2026-10-04: "make sure the pills and prompts say
