@@ -330,7 +330,7 @@ change the output.)</p>
 <h2>5. RDM</h2>
 <p><strong>RDM is off by default.</strong> Out of the box the controller is a plain one-way DMX
 buffer: it answers no RDM and the app's Diagnostics scan is greyed. Switch it on
-in the app under Setup → Settings → <strong>RDM</strong> when you want a desk or the app to
+in the app under Setup → Controller → <strong>RDM</strong> when you want a desk or the app to
 find and set fixtures.</p>
 <p>With RDM on, the controller is a full E1.20 responder: discovery, identify (flashes the
 ports and strobes the main screen <strong>HERE</strong>), device info, start address,
@@ -373,8 +373,9 @@ output (§6 Setup).</p>
 desktop (on <strong>iPhone</strong>, open it in the <strong>Bluefy</strong> browser, which supplies the
 Bluetooth that iOS Safari lacks). On Android it is also on <strong>Google Play</strong> as
 <em>JMB Lighting</em>; otherwise choose <strong>Add to Home screen</strong> for a full-screen,
-offline-capable app. Tap <strong>Connect</strong> and pick your controller from
-the list. The factory PIN (<strong>0123</strong>) is tried for you, so a new controller opens
+offline-capable app. Tap your model (<strong>zOne</strong>, <strong>4our</strong> or <strong>8ight</strong>) and
+pick your controller from the list; <em>Not listed? Show all units</em> lists every
+unit. The factory PIN (<strong>0123</strong>) is tried for you, so a new controller opens
 straight away. A controller with its own PIN (set in Setup → Change PIN) asks
 for it once per phone, then remembers it for that controller only — a PIN typed
 for one unit is never offered to another. After five wrong PINs the
@@ -581,9 +582,9 @@ the wire. Each tool answers a specific question:</p>
 </li>
 </ul>
 <h3>Setup — controller and housekeeping</h3>
-<p>The controller's own settings sit under <strong>Settings</strong> in the Controller card.
+<p>The controller's own settings open from the <strong>Controller</strong> card's title.
 Closed, one line shows what is set (name, ID, what happens on DMX loss and the current limit);
-tap it to open the fields. The buttons beneath stay in view either
+tap the title to open the fields. The buttons beneath stay in view either
 way. <strong>DMX loss release</strong> is blank (never) by default: when DMX is lost the
 last look holds until you set something else. Enter 1–60 s and the outputs fade
 to black that long after the signal goes; DMX coming back lights them again.

@@ -531,7 +531,13 @@
                  stroke-linecap:round; stroke-linejoin:round; transition:transform .2s; }
   .ddrow[aria-expanded="true"] .chev { transform:rotate(180deg); }
   .ddrow[aria-expanded="true"] { border-color:var(--acc); }
-  #ctlSum { margin:7px 2px 0; }
+  #ctlSum { margin:0 2px; }
+  /* A card title that opens its card (Controller): the chevron sits after the name. */
+  .ddhead { cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .ddhead label { display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+  .ddhead .chev { width:18px; height:18px; fill:none; stroke:var(--dim); stroke-width:2;
+                  stroke-linecap:round; stroke-linejoin:round; transition:transform .2s; }
+  .ddhead[aria-expanded="true"] .chev { transform:rotate(180deg); stroke:var(--acc); }
   #ctlRows { margin-top:12px; }
   .hashelp > .ctitle .mini { padding-right:34px; }   /* clear of the hand in the corner */
   .subhead { border-top:1px solid var(--line); margin-top:12px; padding-top:10px; font-weight:600; font-size:15px; }
@@ -710,6 +716,12 @@
     filter:drop-shadow(0 6px 10px rgba(120,90,255,.28)); }
   #unitPick img{ height:52px; }
   #unitPick span{ font-size:12px; color:var(--dim); }
+  /* The catch-all under the model pictures (user, 2026-11-14), replacing the header Connect. */
+  #unitAll { display:block; margin:8px auto 0; padding:6px 8px; background:none; border:0;
+             color:var(--dim); font-size:12.5px; text-decoration:underline; text-underline-offset:3px; }
+  #unitAll.hidden { display:none; }
+  /* The header button is only Exit in demo now; the connect screen connects by model. */
+  body:not(.demo) header #btnConnect { display:none; }
   .unitshot{ text-align:center; margin:-2px 0 10px; }
   .unitshot img{ width:74%; max-height:112px; }
   .unitshot b{ display:block; margin-top:2px; }
@@ -892,15 +904,15 @@
          thing a phone without a controller can use (app review 2026-10-29). -->
     <div id="helloMsg">
     <b>Not connected</b>
-    <div class="mini">Tap your model, then pick your controller from the list
-    by its ID. Connect at the top lists every unit. Chrome/Edge only — on iPhone
-    use the Bluefy browser. Bluetooth on.</div>
+    <div class="mini">Tap your model, then pick your controller from the list.
+    Chrome/Edge only — on iPhone use the Bluefy browser. Bluetooth on.</div>
     </div>
     <div id="unitPick">
       <button data-ports="1"><img src="unit-zone.webp" alt=""><span>zOne</span></button>   <!-- the art name, like 4our / 8ight (user, 2026-11-11) -->
       <button data-ports="4"><img src="unit-four.webp" alt=""><span>4our</span></button>
       <button data-ports="8"><img src="unit-eight.webp" alt=""><span>8ight</span></button>
     </div>
+    <button type="button" id="unitAll">Not listed? Show all units</button>
     <div class="ctlrow" id="helloRow">
       <button id="btnDemo">Demo mode</button>
     </div>
@@ -1043,7 +1055,7 @@
     </div>
 
     <div class="card">
-      <div class="ctlrow" id="rdmScanRow" data-why="RDM is off: switch it on in Setup, Settings">
+      <div class="ctlrow" id="rdmScanRow" data-why="RDM is off: switch it on in Setup, Controller">
         <b style="flex:1">RDM universe</b>
         <button id="btnRdmStop" class="hidden">Stop</button>
         <button id="btnRdmScan" class="primary">Scan</button>
@@ -1112,14 +1124,13 @@
       </div>
     </div>
     <div class="card">
-      <div class="ctitle"><label>Controller</label><span class="mini" id="ctlUp"></span></div>   <!-- powered hours as the card's status (user, 2026-10-02) -->
-      <!-- The settings fields sit behind a drop-down (user, 2026-10-03), closed
-           at every launch; closed, one line prints what is set, so nothing is
-           hidden that matters. The action buttons below stay in view. -->
-      <button type="button" class="ddrow" id="ctlDD" aria-expanded="false" aria-controls="ctlRows">
-        <span>Settings</span>
-        <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
+      <!-- The Controller title IS the drop-down (user, 2026-11-13: "settings doesn't need its own
+           box"; before that a Settings box under the title, 2026-10-03). Closed at every launch;
+           closed, one line prints what is set; the action buttons below stay in view. Powered
+           hours stay as the card's status (user, 2026-10-02). -->
+      <div class="ctitle ddhead" id="ctlDD" role="button" tabindex="0" aria-expanded="false" aria-controls="ctlRows">
+        <label>Controller<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></label>
+        <span class="mini" id="ctlUp"></span></div>
       <div class="mini" id="ctlSum"></div>
       <div class="rows hidden" id="ctlRows">
         <!-- One name (user, 2026-10-02): it is the controller's name on the
@@ -1705,7 +1716,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-13a.rdm";
+const APP_VER="2026-11-14a.back";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1824,6 +1835,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 // busy = a connection is under way: the Demo row steps aside until it ends.
 function hello(html,busy){ $("hello").classList.remove("hidden"); $("helloMsg").innerHTML=html;
   $("helloRow").classList.toggle("hidden",!!busy); $("unitPick").classList.toggle("hidden",!!busy);
+  $("unitAll").classList.toggle("hidden",!!busy);
   try{ window.scrollTo(0,0); }catch(_){} }
 // The unit on the other end of a connection, as a picture (user, 2026-11-11): the
 // model chosen on the connect screen, else the model in its advertised name
@@ -2071,7 +2083,7 @@ async function connect(ports){
       if(/cancel/i.test((e&&(e.message||e.name))||String(e))) return;   // any shell's cancel, whatever it names it
       diagPush("ev","chooser failed: "+(e&&e.message||e));
       hello("<b>Bluetooth isn't available.</b><div class='mini'>Turn the phone's Bluetooth on"+
-        " and allow Bluetooth for this app, then tap Connect again.<br>("+esc(e&&e.message||e)+")</div>");
+        " and allow Bluetooth for this app, then tap your model again.<br>("+esc(e&&e.message||e)+")</div>");
       return;
     }
     hello(unitShot()+"<b>Connecting…</b>"+jbarsHTML("connBars"),true); jbarsSet($("connBars"), null);
@@ -2143,7 +2155,7 @@ async function onDisconnected(){
       }catch(_){}
     }
     $("btnConnect").classList.remove("hidden");
-    hello("<b>Disconnected.</b><div class='mini'>Tap Connect to rejoin.</div>");
+    hello("<b>Disconnected.</b><div class='mini'>Tap your model to rejoin.</div>");
     $("ports").innerHTML=""; $("portInfo").innerHTML=""; ports.length=0; prunePortCards();
   }finally{ busy=false; }
 }
@@ -2737,7 +2749,7 @@ function pillInfoPaint(){
       break;
     case "chipCid":
       title="Controller ID "+(kv.CID??"—");
-      txt="This unit's number: on its screens, in its Bluetooth name and in its RDM label. Change it in Setup → Controller → Settings.";
+      txt="This unit's number: on its screens, in its Bluetooth name and in its RDM label. Change it in Setup → Controller.";
       break;
     case "chipCfold":
       title=fc<100?"Current fold active":"Current fold";
@@ -5193,6 +5205,7 @@ function ctlDD(open){
   $("ctlSum").classList.toggle("hidden",open);
 }
 $("ctlDD").onclick=()=>ctlDD($("ctlDD").getAttribute("aria-expanded")!=="true");
+$("ctlDD").onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); $("ctlDD").click(); } };
 $("setLim").onkeydown=e=>{ if(e.key!=="Enter") return;
   if(hasCtlLimit()) $("btnLimLock").click(); else e.target.blur(); };   // blur → change → budgetApply
 $("btnLimLock").onclick=()=>{ setupTouched=Date.now();
@@ -6259,7 +6272,7 @@ $("pinCancel").onclick=()=>{
   const live=NBLE()?NBLE().connected:!!(dev&&dev.gatt&&dev.gatt.connected);
   $("btnDisc").onclick();
   if(!live){ hideOverlay(); cmdChar=null; $("btnConnect").classList.remove("hidden");
-    hello("<b>Disconnected.</b><div class='mini'>Tap Connect to rejoin.</div>"); }
+    hello("<b>Disconnected.</b><div class='mini'>Tap your model to rejoin.</div>"); }
 };
 $("btnPin").onclick=async()=>{
   // "Default: 0123" (user, 2026-10-04): the factory PIN, so it can be put back.
@@ -6284,6 +6297,7 @@ $("btnConnect").onclick=()=>{
   connect();
 };
 document.querySelectorAll("#unitPick button").forEach(b=>b.onclick=()=>connect(+b.dataset.ports));
+$("unitAll").onclick=()=>connect();     // every unit, whatever its model or firmware
 // Demo is marked by the header alone (the DEMO pill went on the user's word,
 // 2026-10-04): Connect reads Exit and the name reads Demo Rig.
 function setDemoUi(on){
@@ -7225,6 +7239,45 @@ $("btnDemo").onclick=()=>{
   clearInterval(demoTimer);
   demoTimer=setInterval(demoState,3000);   // keep state fresh across tab hops
 };
+// ---------- Phone back button (user, 2026-11-13) ----------
+// "one back press takes you to the tab you were in before opening the pop up; then an additional
+// press takes you home": back closes an open pop-up first (as its own Cancel / close would), then
+// goes to Control, and only on Control with nothing open does it leave the app. One guard entry
+// sits in the history while there is something for back to do; it is taken out again when the
+// screen gets back to Control with nothing open by any other route.
+const BACK_POPS=[                       // topmost first: the pop-up, and how it closes itself
+  ["cfOv",    ()=>$("cfNo").click()],   // a confirm: back = Cancel
+  ["overlay", ()=>$("pinCancel").click()],   // the PIN prompt: back = its Disconnect
+  ["cpOv",    ()=>cpDone()],            // the preset builder: as a tap outside it
+  ["pwOv",    ()=>$("pwClose").click()],
+  ["fxOv",    ()=>$("fxClose").click()],
+  ["supOv",   ()=>$("supClose").click()],
+  ["pcOv",    ()=>pcClose()],
+  ["btOv",    ()=>closeBtSheet()],
+  ["pillInfo",()=>pillInfoClose()],
+];
+function backPop(){ return BACK_POPS.find(([id])=>{ const e=$(id); return e && !e.classList.contains("hidden"); }); }
+function backWant(){ return !!backPop() || (!!document.body.dataset.tab && activeTabName()!=="control"); }
+let backSkip=false;                     // our own history.back() is in flight: never send a second
+function backSync(){
+  if(backSkip) return;
+  const has=!!(history.state && history.state.jmbBack), want=backWant();
+  if(want && !has) history.pushState({jmbBack:1},"");
+  else if(!want && has){ backSkip=true; history.back(); }
+}
+addEventListener("popstate",()=>{
+  if(backSkip){ backSkip=false; setTimeout(backSync,0); return; }
+  const p=backPop();
+  if(p) p[1]();
+  else if(document.body.dataset.tab && activeTabName()!=="control") selectTab("control");
+  setTimeout(backSync,0);
+});
+{ const mo=new MutationObserver(()=>backSync());
+  BACK_POPS.forEach(([id])=>{ const e=$(id); if(e) mo.observe(e,{attributes:true,attributeFilter:["class"]}); });
+  mo.observe(document.body,{attributes:true,attributeFilter:["data-tab"]});
+  const nav=$("nav"); if(nav) mo.observe(nav,{attributes:true,subtree:true,attributeFilter:["class"]});
+  backSync(); }
+
 // ?demo[&tab=colour] — auto-start demo mode (store-screenshot capture via
 // headless Chrome; also handy for sharing a live demo link). Tab optional.
 {
