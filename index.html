@@ -1716,7 +1716,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-14a.back";
+const APP_VER="2026-11-14b.home";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -7242,9 +7242,10 @@ $("btnDemo").onclick=()=>{
 // ---------- Phone back button (user, 2026-11-13) ----------
 // "one back press takes you to the tab you were in before opening the pop up; then an additional
 // press takes you home": back closes an open pop-up first (as its own Cancel / close would), then
-// goes to Control, and only on Control with nothing open does it leave the app. One guard entry
-// sits in the history while there is something for back to do; it is taken out again when the
-// screen gets back to Control with nothing open by any other route.
+// goes to Control. On Control with nothing open it backs out to the connect screen, as Disconnect
+// does (demo: exits the demo) (user, 2026-11-14: "back out to connect screen not close"); only on
+// the connect screen does back leave the app. One guard entry sits in the history while a tab is
+// showing or a pop-up is open; it is taken out when the connect screen comes back by any route.
 const BACK_POPS=[                       // topmost first: the pop-up, and how it closes itself
   ["cfOv",    ()=>$("cfNo").click()],   // a confirm: back = Cancel
   ["overlay", ()=>$("pinCancel").click()],   // the PIN prompt: back = its Disconnect
@@ -7257,7 +7258,7 @@ const BACK_POPS=[                       // topmost first: the pop-up, and how it
   ["pillInfo",()=>pillInfoClose()],
 ];
 function backPop(){ return BACK_POPS.find(([id])=>{ const e=$(id); return e && !e.classList.contains("hidden"); }); }
-function backWant(){ return !!backPop() || (!!document.body.dataset.tab && activeTabName()!=="control"); }
+function backWant(){ return !!backPop() || !!document.body.dataset.tab; }
 let backSkip=false;                     // our own history.back() is in flight: never send a second
 function backSync(){
   if(backSkip) return;
@@ -7270,6 +7271,7 @@ addEventListener("popstate",()=>{
   const p=backPop();
   if(p) p[1]();
   else if(document.body.dataset.tab && activeTabName()!=="control") selectTab("control");
+  else if(document.body.dataset.tab){ if(demoOn) exitDemo(); else $("btnDisc").onclick(); }   // Control: out to the connect screen
   setTimeout(backSync,0);
 });
 { const mo=new MutationObserver(()=>backSync());
