@@ -1716,7 +1716,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-14b.home";
+const APP_VER="2026-11-14c.calm";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2102,7 +2102,7 @@ async function connect(ports){
     // The connect screen STAYS under the PIN overlay so the intro (mark flies
     // from the row under the splash) can run once the PIN is accepted — hiding
     // it here skipped the intro on every real connection (user, 2026-09-13).
-    hello(unitShot()+"<b>Connected.</b><div class='mini'>Unlocking…</div>",true);
+    hello(unitShot()+"<b>Unlocking…</b>"+jbarsHTML("connBars"),true); jbarsSet($("connBars"), null);   // same shape as Connecting
     // A real link supersedes the demo entirely: stop its seeder and drop its
     // ports so the controller's own count builds the cards from scratch.
     if(typeof demoOn!=="undefined" && demoOn){
@@ -2114,8 +2114,7 @@ async function connect(ports){
     resetUnitState(true);
     zLoad();                                   // this controller's held dimmers, if any
     authed=false;
-    askPin();
-    autoPin();        // factory PIN, or this controller's remembered PIN
+    autoPin();        // factory PIN, or this controller's remembered PIN; the PIN box opens only if it fails
   }finally{
     busy=false;
     $("btnConnect").disabled=false;
@@ -2148,8 +2147,7 @@ async function onDisconnected(){
         await gattSetup();
         diagPush("ev","reconnected");
         resetUnitState(false);                // same unit: keep the cards, rebuild the state
-        hello("<b>Reconnected.</b><div class='mini'>Unlocking…</div>",true);   // stays for the intro
-        askPin();
+        hello("<b>Unlocking…</b>"+jbarsHTML("connBars"),true); jbarsSet($("connBars"), null);   // stays for the intro
         autoPin();
         return;
       }catch(_){}
@@ -2497,10 +2495,13 @@ function autoPin(){
     if(fallback){
       send("GET").then(pinWait(1000,()=>{
         pinPending=prev;
-        send("PIN="+prev).then(pinWait(1500,pinNoAnswer));
+        send("PIN="+prev).then(pinWait(1500,()=>{ askPin(); pinNoAnswer(); }));
       }));
       return;
     }
+    // Only now does the PIN box open (and the phone keyboard with it): it used to open at once
+    // and close again a beat later on every normal connect, jolting the screen (2026-11-14).
+    askPin();
     if(saved) pinNoAnswer(); else $("pinErr").textContent="This controller has its own PIN.";
   }));
 }
@@ -5324,10 +5325,24 @@ function portUpdateAvailable(){
   const info = otaManifest && otaManifest.stm_port;
   if(!info || !(stmCaps()&1)) return false;
   const have = (kv.SPC||"").toLowerCase().replace(/^0+/,"");
-  const want = String(info.crc32||"").toLowerCase().replace(/^0+/,"");
+  // A sealed port file's crc32 is of the file sent; the unit reports the CRC of the image it
+  // stored, so compare with image_crc32 when the manifest carries it (FW-72).
+  const want = String(info.image_crc32||info.crc32||"").toLowerCase().replace(/^0+/,"");
   return !have || have!==want;
 }
 function otaUpdateAvailable(){ return ctrlUpdateAvailable() || portUpdateAvailable(); }
+// Sealed updates (FW-72): only a unit that can open the published file is offered it. Returns why
+// not, or "" when it can. Older firmware (no UPE) cannot open a sealed file; a sealing unit refuses
+// a plain one; a different key fingerprint means a different key.
+function otaSealBlock(){
+  if(!otaManifest) return "";
+  const enc=!!otaManifest.encrypted, upe=kv.UPE==="1";
+  if(enc && !upe) return "This controller needs a one-time USB update before it can take the new sealed firmware updates.";
+  if(!enc && upe) return "The published firmware isn't sealed, and this controller only takes sealed updates.";
+  if(enc && otaManifest.key_fp && kv.UKF && String(otaManifest.key_fp).toLowerCase()!==String(kv.UKF).toLowerCase())
+    return "This controller holds a different update key ("+kv.UKF+"), so it can't open the published file.";
+  return "";
+}
 
 function renderIdentMsg(){
   const el=$("identMsg"); if(!el) return;
@@ -5910,6 +5925,9 @@ function renderOta(){
                       : " — this controller predates build reporting.")
           : "This controller is running the published build ("+otaManifest.build
             +")"+(portUpdateAvailable()?" — a newer port module image is available.":". Nothing to install.");
+      { const blk=ok && otaSealBlock();
+        if(blk){ hb.disabled=true; hb.textContent="Can't update over Bluetooth";
+                 if(cb){ cb.hidden=true; cb.disabled=true; } hm.textContent=blk; } }
     }
   }
   // Port-module section. Hidden entirely on units whose SWD topology cannot be
@@ -6129,6 +6147,7 @@ async function runStmRollback(){
 // (fullUpdRunning is declared beside otaBusy.)
 async function runFullUpdate(ctrlOnly){
   if(fullUpdRunning) return;
+  { const blk=otaSealBlock(); if(blk){ setOtaMsg(blk); return; } }
   fullUpdRunning=true; renderOta();
   try{ return await runFullUpdateOnce(ctrlOnly); }
   finally{ fullUpdRunning=false; renderOta(); }
@@ -6223,7 +6242,10 @@ async function runOta(file, opts){
   opts=opts||{};
   if(!file||!otacChar||!otadChar){ setOtaMsg("Connect to an update-capable controller first."); return; }
   const buf=await file.arrayBuffer(), size=buf.byteLength;
-  if(new Uint8Array(buf)[0]!==0xE9){ setOtaMsg("That isn't an ESP32 firmware .bin (bad magic byte)."); return; }
+  // A plain image starts 0xE9; a sealed one (FW-72) starts "JMBX" and the unit checks the real
+  // image after opening it.
+  { const b=new Uint8Array(buf,0,Math.min(4,size)), sealed=size>=4&&b[0]===0x4A&&b[1]===0x4D&&b[2]===0x42&&b[3]===0x58;
+    if(b[0]!==0xE9 && !sealed){ setOtaMsg("That isn't a JMB controller firmware file."); return; } }
   const crc=(opts.crc!==undefined) ? opts.crc : await crc32Async(buf);
   if(!opts.skipConfirm &&
      !await askConfirm(`${file.name} (${(size/1024).toFixed(0)} KB). The controller reboots into the new firmware when done.`,{title:"Flash firmware?",ok:"Flash"})) return;
@@ -6916,7 +6938,7 @@ const SUP_TO="support@jmblighting.co.uk";
 // Controller status that goes in. A WHITELIST: a key the firmware gains later
 // stays out until it is added here on purpose. Never listed: NIP (network
 // address). Names (CN, BTN), the ID and port labels go in only with the tick.
-const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD","DLR","RDMEN","PWRF","CARD","BTM",
+const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD","DLR","RDMEN","PWRF","CARD","BTM","UPE","UKF",
   "RDM","ANS","RB","RBOK","STM","SPC","CHL","TSEQ","TXA","TXN","LPX","LPS","LPN","LPA","LPG","BSY","BRT","BSM","BRM",
   "NET","NW","NRS","TF","PB","CL","CLM","CLK","CF","FC","FT","OL","SH","SHM","TCR","CX","CA","CXR","CXL","CXS","CXF",
   "SQ","SQN","BPM","SPR","TAPV","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
