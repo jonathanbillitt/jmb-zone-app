@@ -1716,7 +1716,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-14c.calm";
+const APP_VER="2026-11-14d.cancel";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1833,7 +1833,9 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const $=id=>document.getElementById(id);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 // busy = a connection is under way: the Demo row steps aside until it ends.
+const HELLO0=$("helloMsg").innerHTML;     // the connect screen's own words, put back by a cancel
 function hello(html,busy){ $("hello").classList.remove("hidden"); $("helloMsg").innerHTML=html;
+  try{ backSync(); }catch(_){}             // the back guard follows a connect in progress (defined below)
   $("helloRow").classList.toggle("hidden",!!busy); $("unitPick").classList.toggle("hidden",!!busy);
   $("unitAll").classList.toggle("hidden",!!busy);
   try{ window.scrollTo(0,0); }catch(_){} }
@@ -2059,9 +2061,11 @@ async function gattSetup(){
   }
   throw lastErr||new Error("unknown");
 }
+let connAbort=false;                       // back pressed while connecting (user, 2026-11-14)
 async function connect(ports){
   if(busy) return;
-  busy=true; userDisc=false; pickedPorts=ports||0;
+  busy=true; userDisc=false; pickedPorts=ports||0; connAbort=false;
+  try{ backSync(); }catch(_){}
   $("btnConnect").disabled=true;
   try{
     try{
@@ -2086,9 +2090,11 @@ async function connect(ports){
         " and allow Bluetooth for this app, then tap your model again.<br>("+esc(e&&e.message||e)+")</div>");
       return;
     }
+    if(connAbort){ dev=null; hello(HELLO0); return; }     // back while the list was up: nothing picked
     hello(unitShot()+"<b>Connecting…</b>"+jbarsHTML("connBars"),true); jbarsSet($("connBars"), null);
     try{ await gattSetup(); diagPush("ev","link up"); }
     catch(e){
+      if(connAbort){ hello(HELLO0); return; }              // cancelled by back: no error card
       diagPush("ev","connect failed: "+(e&&e.message||e));
       hello("<b>Couldn't reach the controller.</b>"+
         "<div class='mini'>("+(e&&e.message||e)+")<br>Android may hold a stale "+
@@ -2097,6 +2103,7 @@ async function connect(ports){
         "disconnect, and retry here.</div>");
       return;
     }
+    if(connAbort){ userDisc=true; connDrop(); hello(HELLO0); return; }
     $("title").textContent=devName()||"JMB Lighting";
     $("btnConnect").classList.add("hidden");
     // The connect screen STAYS under the PIN overlay so the intro (mark flies
@@ -2118,7 +2125,13 @@ async function connect(ports){
   }finally{
     busy=false;
     $("btnConnect").disabled=false;
+    try{ backSync(); }catch(_){}
   }
+}
+// Drop a half-made link without the Disconnect button's screen (a back press while connecting).
+function connDrop(){
+  try{ if(NBLE()){ NBLE().disconnect(); return; } }catch(_){}
+  const d0=dev; dev=null; try{ if(d0&&d0.gatt&&d0.gatt.connected) d0.gatt.disconnect(); }catch(_){}
 }
 // Set by Disconnect: a drop the user asked for is not reconnected. The web path
 // clears dev for the same effect; the native shell keeps its device id, so its
@@ -2153,7 +2166,8 @@ async function onDisconnected(){
       }catch(_){}
     }
     $("btnConnect").classList.remove("hidden");
-    hello("<b>Disconnected.</b><div class='mini'>Tap your model to rejoin.</div>");
+    hello(connAbort ? HELLO0      // a connect cancelled by back: just the connect screen again
+          : "<b>Disconnected.</b><div class='mini'>Tap your model to rejoin.</div>");
     $("ports").innerHTML=""; $("portInfo").innerHTML=""; ports.length=0; prunePortCards();
   }finally{ busy=false; }
 }
@@ -7280,7 +7294,7 @@ const BACK_POPS=[                       // topmost first: the pop-up, and how it
   ["pillInfo",()=>pillInfoClose()],
 ];
 function backPop(){ return BACK_POPS.find(([id])=>{ const e=$(id); return e && !e.classList.contains("hidden"); }); }
-function backWant(){ return !!backPop() || !!document.body.dataset.tab; }
+function backWant(){ return !!backPop() || !!document.body.dataset.tab || busy || (bleConnected() && !authed); }
 let backSkip=false;                     // our own history.back() is in flight: never send a second
 function backSync(){
   if(backSkip) return;
@@ -7294,6 +7308,8 @@ addEventListener("popstate",()=>{
   if(p) p[1]();
   else if(document.body.dataset.tab && activeTabName()!=="control") selectTab("control");
   else if(document.body.dataset.tab){ if(demoOn) exitDemo(); else $("btnDisc").onclick(); }   // Control: out to the connect screen
+  else if(busy){ connAbort=true; userDisc=true; connDrop(); hello(HELLO0); }   // the unit list or Connecting: cancel, stay
+  else if(bleConnected() && !authed) $("pinCancel").onclick();                // Unlocking: as the PIN box's Disconnect
   setTimeout(backSync,0);
 });
 { const mo=new MutationObserver(()=>backSync());
