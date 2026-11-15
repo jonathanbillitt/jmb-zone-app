@@ -957,7 +957,7 @@
       <div class="mini" id="cctMix" style="text-align:center"></div>
       <div class="mini">Hue/Sat and Kelvin are two ways of choosing — the last
       column you touch wins. ΔUV tints green (+) or magenta (−). Applies as
-      manual colour to the selected ports.</div>
+      manual colour to the selected ports: tap ports on or off, All for every port.</div>
     </div>
   </div>
 
@@ -1716,7 +1716,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-14d.cancel";
+const APP_VER="2026-11-15a.ports";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2339,7 +2339,7 @@ function resetUnitState(full){
   if(full){ for(const k in zHeld) delete zHeld[k];
     lastUp=null;                           // a different unit's uptime is no restart
     ports.length=0; prunePortCards(); $("ports").innerHTML=""; $("portInfo").innerHTML="";
-    colTgt="all"; }                        // a port 6 target must not reach a 1-port unit
+    colSel.clear(); colSelTouched=false; }  // a port 6 target must not reach a 1-port unit; a new unit starts on All
 }
 function sendRaw(s){
   diagCmd(s);
@@ -2613,7 +2613,7 @@ function onState(str){
       if(c2) c2.remove();
       delete wheels[i+".D"]; delete wheels[i+".S"];
     }
-    if(colTgt!=="all" && +colTgt>n) colTgt="all";
+    for(const p of [...colSel]) if(p>n) colSel.delete(p);
   }
   ports.length=n;
   for(const k in pstr){
@@ -2692,6 +2692,7 @@ function onState(str){
   if(n){ const cn=hexDec(kv.CN);
     $("title").textContent=(cn||devName()||"JMB Lighting")+" · "+n+"-port"; }
   if(n && n!==colPortsN){ renderColourTargets(n); colPortsN=n; }
+  else colTgtPaint();                      // a new unit on the same port count starts on All again
   renderControl(); renderPortInfo(); renderDiag(); renderSetup();
   renderProductMark(); renderOta();
   wbPaintAll(); wbRefresh(); pwPaint();
@@ -3594,7 +3595,9 @@ renderScenes();
 // the other faders moving. Hue/Sat grabs redefine the chroma outright, so
 // they reset the trim; Kelvin moves keep it.
 const col={base:[255,214,170], duv:0, dim:100, _h:30};
-let colTgt="all", colPortsN=0; const colEngaged={};
+// The ports the Colour tab works on: any set of them, each pill toggles (user, 2026-11-14).
+// Untouched, it is every port; All selects every port, or clears them when all are on.
+const colSel=new Set(); let colSelTouched=false, colPortsN=0; const colEngaged={};
 function hsv255(h,s,v){
   h=((h%360)+360)%360;
   const c=v*s, x=c*(1-Math.abs((h/60)%2-1)), m=v-c;
@@ -3680,8 +3683,10 @@ function ledWhiteRemap(rgb){
   return rgb.map((v,i)=>v*(1-w)+warm[i]*w);
 }
 function colTargetList(){
-  return colTgt==="all" ? ports.map((_,i)=>i+1) : [+colTgt];
+  if(!colSelTouched) return ports.map((_,i)=>i+1);
+  return [...colSel].filter(p=>p>=1 && p<=ports.length).sort((a,b)=>a-b);
 }
+const colAllOn=()=>ports.length>0 && colTargetList().length===ports.length;
 // What the picker last sent to each port, and the picker colour it came from.
 // The tape remap runs at send time, so a port's RGB is already remapped: seeding
 // the picker from it and remapping again warmed the colour on every visit to
@@ -3703,7 +3708,7 @@ function pushColour(){
   // packets total instead of two per port (per-port bursts overflowed the
   // Android BLE queue and later ports silently missed writes).
   const mixed = list.some(isCct) && list.some(p=>!isCct(p));
-  if(colTgt==="all" && !mixed){
+  if(colAllOn() && !mixed){
     if(!colEngaged.all){ send("ALL.FX=0"); send("ALL.MAN=1"); colEngaged.all=true; }
     if(list.length && isCct(list[0]))
       sendThrottled("all.RGB",`ALL.RGB=${mix.ww},${mix.cw},0`);
@@ -3865,23 +3870,33 @@ function paintCols(){
     sw.style.boxShadow=`0 0 22px rgba(${dr},${dg},${db},.55)`;
   }
 }
+function colTgtPaint(){
+  const on=new Set(colTargetList());
+  $("colTargets").querySelectorAll(".tgt").forEach(b=>b.classList.toggle("sel",
+    b.dataset.p==="all" ? colAllOn() : on.has(+b.dataset.p)));
+}
 function renderColourTargets(n){
   const root=$("colTargets"); root.innerHTML="";
+  root.classList.toggle("hidden", n<=1);   // one port: nothing to choose (user, 2026-11-14)
   const mk=(val,label)=>{
     const b=document.createElement("button");
-    b.className="tgt"+(colTgt===val?" sel":"");
+    b.className="tgt"; b.dataset.p=val;
     b.textContent=label;
-    b.onclick=()=>{ colTgt=val;
-      root.querySelectorAll(".tgt").forEach(x=>x.classList.remove("sel"));
-      b.classList.add("sel");
+    b.onclick=()=>{
+      const cur=new Set(colTargetList());
+      if(val==="all"){ const wasAll=colAllOn(); colSel.clear(); if(!wasAll) for(let p=1;p<=ports.length;p++) colSel.add(p); }
+      else{ colSel.clear(); cur.forEach(p=>colSel.add(p)); const p=+val; colSel.has(p)?colSel.delete(p):colSel.add(p); }
+      colSelTouched=true;
+      colTgtPaint();
       Object.keys(colEngaged).forEach(k=>delete colEngaged[k]);
-      seedColour();                     // faders show the new target's truth
+      seedColour();                     // faders show the first selected port's truth
     };
     root.appendChild(b);
   };
   mk("all","All");
   // Five columns: All, then P1-P4; P5-P8 line up under P1-P4 (user, 2026-10-02).
   for(let p=1;p<=n;p++){ mk(String(p),"P"+p); if(p>4) root.lastChild.style.gridColumn=String(((p-1)%4)+2); }
+  colTgtPaint();
 }
 buildCols();
 
