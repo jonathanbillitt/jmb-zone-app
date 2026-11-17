@@ -370,6 +370,23 @@
   .wbline.r input[type=range] { accent-color:var(--r); }   .wbline.g input[type=range] { accent-color:var(--g); }
   .wbline.b input[type=range] { accent-color:var(--b); }   .wbline.ww input[type=range] { accent-color:#ffb454; }
   .wbline.cw input[type=range] { accent-color:#bfe3ff; }   .wbline.uv input[type=range] { accent-color:#b16aff; }
+  /* Patch sheet Apply flow (2026-11-17): mode centred, a stem splitting to two arrows, one per
+     target button (their centres sit at a quarter and three quarters of the row). */
+  /* Three columns, the outer two equal: the select itself sits dead centre over the stem. */
+  .fanhead { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; column-gap:10px; }
+  .fanhead label { width:auto; justify-self:end; }
+  .fanflow { position:relative; height:24px; margin:-6px 0 0; }
+  .fanflow::before { content:""; position:absolute; left:50%; top:0; height:9px;
+                     border-left:2px solid var(--acc); transform:translateX(-1px); opacity:.75; }
+  .fanflow .bar { position:absolute; left:25%; right:25%; top:9px; height:9px;
+                  border:2px solid var(--acc); border-bottom:0; border-radius:7px 7px 0 0; opacity:.75; }
+  .fanflow .bar::before, .fanflow .bar::after { content:""; position:absolute; bottom:-7px;
+                  border:5px solid transparent; border-top:7px solid var(--acc); border-bottom:0; }
+  .fanflow .bar::before { left:-6px; }  .fanflow .bar::after { right:-6px; }
+  .fanflow.hidden { display:none; }
+  .fanbtns { gap:10px; }
+  .flowbtn { flex:1; padding:8px 10px; white-space:nowrap; }
+  .flowbtn:not(:disabled) { border-color:var(--acc); color:var(--acc); }
   .wbline.wt input[type=range] { accent-color:#f5f5f5; }   .wbline.am input[type=range] { accent-color:#ffb000; }   /* five-output: white, amber */
   .wbline.pv input[type=range] { accent-color:#f5f5f5; }
   .wbline .wbnum { width:60px; flex-shrink:0; text-align:right; font-size:14px; font-variant-numeric:tabular-nums;
@@ -1746,7 +1763,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-17f.quiet";
+const APP_VER="2026-11-17g.flow";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2913,6 +2930,7 @@ function renderControl(){
       if(fm && document.activeElement!==fm) fm.value=kv.AM??"0";
       if(fr) fr.classList.toggle("hidden",!show);
       if(fbs) fbs.classList.toggle("hidden",!show);
+      { const ff=$("fanFlow"+p); if(ff) ff.classList.toggle("hidden",!show); }
       if(fb) fb.textContent = n===2 ? "Port 2" : `Ports 2–${n}`;
       if(fc){ const ok=kv.CHP==="1"; fc.disabled=!ok; fc.title=ok?"":"Needs a firmware update"; } }
     // The preset builder needs a firmware that keeps presets (it echoes CPD<k>);
@@ -3076,21 +3094,25 @@ function buildCard(p){
         <!-- Sequential addressing lives with the address (user, 2026-10-02):
              the Apply mode the panel and RDM fan out by, and a button that
              patches the ports after this one from this port's address. -->
-        <div class="row" id="fanRow${p}"><label>Apply</label>
+        <!-- Mode above the Apply flow (user, 2026-11-17), so the flow ends the sheet. -->
+        <div class="row"><label>Mode</label>
+          <select id="pers${p}" style="flex:1;min-width:0">${PERS_ORDER.map(i=>`<option value="${i}">${persOptionText(i)}</option>`).join("")}</select>
+          <button id="cpe${p}" style="padding:6px 10px">Custom…</button>
+        </div>
+        <!-- A small flow (user, 2026-11-17): the Apply mode centred, a line splitting to the two
+             targets, which are outlined so they read as buttons. -->
+        <div class="row fanhead" id="fanRow${p}"><label>Apply</label>
           <select id="fanM${p}" style="width:96px">
             <option value="0">Same</option><option value="1">Seq</option>
             <option value="2">Offset</option></select>
         </div>
+        <div class="fanflow" id="fanFlow${p}" aria-hidden="true"><span class="bar"></span></div>
         <!-- Port 1 only (user, 2026-10-02): the two targets, like the white
              balance block's All ports / Chain pair. Chain needs the CHPATCH
              baton in firmware (state CHP=1); greyed until the unit reports it. -->
-        <div class="row" id="fanBtns${p}">
-          <button id="fan${p}" style="flex:1;padding:6px 10px;white-space:nowrap">Ports</button>
-          <button id="fanC${p}" style="flex:1;padding:6px 10px;white-space:nowrap">Universe</button>
-        </div>
-        <div class="row"><label>Mode</label>
-          <select id="pers${p}" style="flex:1;min-width:0">${PERS_ORDER.map(i=>`<option value="${i}">${persOptionText(i)}</option>`).join("")}</select>
-          <button id="cpe${p}" style="padding:6px 10px">Custom…</button>
+        <div class="row fanbtns" id="fanBtns${p}">
+          <button id="fan${p}" class="flowbtn">Ports</button>
+          <button id="fanC${p}" class="flowbtn">Universe</button>
         </div>
         <div class="mini">Address, head and mode are the desk patch. The label names the port across the app.</div>
         <div class="mini">Apply patches the later ports from this address, Seq by footprint, Offset by stride, and asks if the Mode follows.</div>
