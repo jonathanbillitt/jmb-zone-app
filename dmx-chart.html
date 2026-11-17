@@ -210,7 +210,7 @@ across an 8-port).</p>
 <tr>
 <td>next</td>
 <td>Effect speed</td>
-<td>128 = designed tempo; exponential — 0 ≈ ⅛×, 255 = 8×. Beat effects (Club, Party, Pulse, Strobe, Police): 0 stop (Strobe/Police off) · 1–51 ¼× · 52–102 ½× · 103–153 1× · 154–204 2× · 205–255 4× the tempo</td>
+<td>128 = designed tempo; exponential — 0 ≈ ⅛×, 255 = 8×. Beat effects (Dim Chase, Club, Party, Pulse, Strobe, Police): 0 stop (Strobe/Police off) · 1–51 ¼× · 52–102 ½× · 103–153 1× · 154–204 2× · 205–255 4× the tempo</td>
 </tr>
 <tr>
 <td>last</td>
@@ -226,7 +226,7 @@ scales last.</p>
 <div class="page-break"></div>
 
 <h2>Effect ranges (CH8)</h2>
-<p>21 effects, each an <strong>11-value band</strong> from 10 up (the last extends to 255):</p>
+<p>23 effects, each an <strong>11-value band</strong> from 10 up (the last extends to 255):</p>
 <table>
 <thead>
 <tr>
@@ -300,13 +300,28 @@ scales last.</p>
 <tr>
 <td>109–119</td>
 <td>Aurora</td>
-<td>230–255</td>
+<td>230–240</td>
 <td>Clouds</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>241–251</td>
+<td>Dim Chase</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>252–255</td>
+<td>Dim Random</td>
 </tr>
 </tbody>
 </table>
-<p>Notes: Siren and Police alternate phase across ports (lightbar feel);
-Club, Party, Pulse, Strobe and Police run on the rig's beat clock (128 BPM
+<p>Notes: <strong>Dim Chase</strong> and <strong>Dim Random</strong> move only the level: the desk's
+colour channels stay the colour source (Dim Chase lights one port per beat
+in turn across the unit; Dim Random pulses each port softly at random).
+Siren and Police alternate phase across ports (lightbar feel);
+Dim Chase, Club, Party, Pulse, Strobe and Police run on the rig's beat clock (128 BPM
 by default; the app's tap tempo puts the downbeat on the music). Party hops
 hue every 4th beat and renders greens as teal — never black, never strobes;
 Club keeps to deep blue through crimson; Traffic
