@@ -1,11 +1,11 @@
 {
-  "version": "3.1.0",
-  "build": "ab5506b-20261117",
+  "version": "3.1.1",
+  "build": "b174d99-20261117",
   "size": 1265704,
-  "crc32": "47c428b2",
-  "sha256": "716a5919d3acd5085e6e7fd8060def4cc954b93f648da446db418d3a555e2496",
+  "crc32": "e543f83d",
+  "sha256": "21b01db85f48485b7ab5296b811038125470de847f5ea26240e7bc78a0b55e23",
   "date": "2026-11-17",
-  "notes": "Version 3.1.0 for 3.x controllers (3.1.4 MCU, 3.6.4 zOne): colour order per port (for strips wired in a different order) and Run dark (screens and indicators off after a set idle time, outputs untouched); port firmware 2.8.10 unchanged",
+  "notes": "Version 3.1.1 for 3.x controllers (3.1.4 MCU, 3.6.4 zOne): more reliable Bluetooth updates (update replies can no longer be lost on a busy link; a transfer the app drops is cleaned up at once); port firmware 2.8.10 unchanged",
   "file": "firmware.jmbx",
   "encrypted": true,
   "host": "3x",
@@ -14,8 +14,8 @@
   "stm_port": {
     "file": "stm_port.jmbx",
     "size": 19680,
-    "crc32": "76bf7787",
-    "sha256": "952ac0d4db43408e7b3cf8379c33754b8c9136be20f424b1a979434e67a4fd73",
+    "crc32": "4c714fbb",
+    "sha256": "d62c87e32a7cd649c0f922f7e03ffe567aa57c754c7b31525f2a398c8932def1",
     "target": "port5",
     "image_crc32": "b0d54e7c"
   }
