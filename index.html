@@ -370,6 +370,7 @@
   .wbline.r input[type=range] { accent-color:var(--r); }   .wbline.g input[type=range] { accent-color:var(--g); }
   .wbline.b input[type=range] { accent-color:var(--b); }   .wbline.ww input[type=range] { accent-color:#ffb454; }
   .wbline.cw input[type=range] { accent-color:#bfe3ff; }   .wbline.uv input[type=range] { accent-color:#b16aff; }
+  .wbline.wt input[type=range] { accent-color:#f5f5f5; }   .wbline.am input[type=range] { accent-color:#ffb000; }   /* five-output: white, amber */
   .wbline.pv input[type=range] { accent-color:#f5f5f5; }
   .wbline .wbnum { width:60px; flex-shrink:0; text-align:right; font-size:14px; font-variant-numeric:tabular-nums;
                    background:var(--card2); color:var(--text); border:1px solid var(--line); border-radius:7px;
@@ -1735,7 +1736,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-17b.onetap";
+const APP_VER="2026-11-17c.wb5";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -3033,7 +3034,7 @@ function buildCard(p){
           <button id="chOut${p}">Output</button>
           <div class="pv" id="pvCrv${p}">—</div>
           <div class="pv" id="pvPwm${p}">—</div>
-          <div class="pv hidden" id="wbr${p}">WB <span id="wbv${p}">—</span></div>
+          <div class="pv hidden" id="wbr${p}" style="white-space:normal">WB <span id="wbv${p}">—</span></div>   <!-- five trims can take two lines: values stay visible -->
         </div>
         <div class="pcol">
           <button id="chProt${p}">Protection</button>
@@ -5836,9 +5837,10 @@ function portQueue(list,skipped){
       q.push(`P${p}.LABEL=${lv?hexEnc(lv):"0"}`);
     }
     if(t.pw!==undefined) q.push(`P${p}.PWM=${t.pw}`);
-    if(Array.isArray(t.wb) && t.wb.length===3 && wbOf(p)){
+    if(Array.isArray(t.wb) && (t.wb.length===3 || t.wb.length===5) && wbOf(p)){
       const c=v=>Math.max(0,Math.min(255,Math.round(+v||0)));
       q.push(`P${p}.WBR=${c(t.wb[0])}`,`P${p}.WBG=${c(t.wb[1])}`,`P${p}.WBB=${c(t.wb[2])}`);
+      if(t.wb.length===5 && wbOf(p).five) q.push(`P${p}.WBW=${c(t.wb[3])}`,`P${p}.WBA=${c(t.wb[4])}`);
       hot[p+".WB"]=Date.now()+4000;
     }
     if(t.oc!==undefined) q.push(`P${p}.OCP=${t.oc}`);
@@ -5882,7 +5884,7 @@ $("btnExport").onclick=()=>{
                          pw:m.PW??0,oc:m.OC??6500,ot:m.OT??80,cv:m.CV??0})),
     scenes:loadScenes() };
   // White balance and the PWM library's custom entries, when the firmware has them
-  data.ports.forEach((t,i)=>{ const w=wbOf(i+1); if(w) t.wb=[w.R,w.G,w.B]; });
+  data.ports.forEach((t,i)=>{ const w=wbOf(i+1); if(w) t.wb=WB_CH(w).map(c=>w[c]); });
   if(pwLim()) data.pwc=[0,1,2].map(k=>{ const c=pwCustom(k); return c?{hz:c.hz}:null; });
   if("CPD1" in kv) data.cpd=[1,2,3,4].map(k=>cpdOf(k)?kv["CPD"+k]:null);   // the four custom presets, as sent
   // octet-stream (not application/json) so the browser keeps the .jmb name as-is
@@ -6542,7 +6544,14 @@ $("btSwitch").onclick=()=>{
 // a curve — PWLIM had four numbers and PWC<k> three; both forms are read, the
 // curve is ignored: the port keeps its own preset curve, user's decision.)
 const wbOf=p=>{ const a=String(kv["W"+p]??"").split(",").map(Number);
-  return (a.length>=3 && a.slice(0,3).every(n=>n>=0&&n<=255)) ? {R:a[0],G:a[1],B:a[2],pv:a[3]|0} : null; };
+  if(a.length>=6 && a.slice(0,5).every(n=>n>=0&&n<=255))          // five-output: R,G,B,WH,AM,preview
+    return {R:a[0],G:a[1],B:a[2],W:a[3],A:a[4],pv:a[5]|0,five:true};
+  return (a.length>=3 && a.slice(0,3).every(n=>n>=0&&n<=255)) ? {R:a[0],G:a[1],B:a[2],W:255,A:255,pv:a[3]|0,five:false} : null; };
+// The trims a port's record carries, in order, and the record written back (optimistic).
+const WB_CH=w=>w&&w.five?["R","G","B","W","A"]:["R","G","B"];
+const wbRec=(p,v)=>{ const w=wbOf(p), five=!!(w&&w.five), pv=w?w.pv:0;
+  return (five?[v.R,v.G,v.B,v.W??255,v.A??255,pv]:[v.R,v.G,v.B,pv]).join(","); };
+const wbTrimmed=w=>!!w && WB_CH(w).some(c=>w[c]<255);
 const pwLim=()=>{ const a=String(kv.PWLIM??"").split(",").map(Number);
   return (a.length>=2 && a[0]>0 && a[1]>a[0]) ? {fmin:a[0],fmax:a[1]} : null; };
 const pwCustom=k=>{ const a=String(kv["PWC"+(k+1)]??"").split(",").map(Number);
@@ -6557,22 +6566,35 @@ const PORT_FW_CUSTOM=0x0207;                     // port firmware 2.7
 const portsOn=entry=>ports.map((m,i)=>(m.PW===entry?i+1:0)).filter(Boolean);
 
 // ----- white balance block (inside the Output sheet) -----
-let wbPort=0, wbKeep=null, wbArmed=false, wbVals={R:255,G:255,B:255};
+let wbPort=0, wbKeep=null, wbArmed=false, wbVals={R:255,G:255,B:255,W:255,A:255};
 // Rows per personality kind. Five-colour personalities (red, green, blue, two
 // whites on the .3 boards' fifth and fourth outputs) will add W and A rows here
 // once the firmware carries them (FW-16); the layout already fits five lines.
+// On a five-output module (W<n> with six values) white and amber are outputs 4 and 5: RGBW
+// personalities add a White row, RGBWA and the custom presets White and Amber, and tuneable
+// white sits on W (cool) and A (warm) there instead of G / R (firmware, WBW / WBA).
 const WB_ROWS={ rgb:[["R","Red","r"],["G","Green","g"],["B","Blue","b"]],
+                rgbw:[["R","Red","r"],["G","Green","g"],["B","Blue","b"],["W","White","wt"]],
+                rgbwa:[["R","Red","r"],["G","Green","g"],["B","Blue","b"],["W","White","wt"],["A","Amber","am"]],
                 cct:[["G","Cool","cw"],["R","Warm","ww"]],
+                cct5:[["W","Cool","cw"],["A","Warm","ww"]],
                 dim:[["ALL","Level","uv"]] };
-const wbKind=pe=>(pe===2||pe===3)?"cct":(pe===5||pe===6)?"dim":"rgb";
+function wbKind(pe,p){
+  const five=!!(wbOf(p||wbPort)||{}).five;
+  if(pe===2||pe===3) return five?"cct5":"cct";
+  if(pe===5||pe===6) return "dim";
+  if(!five) return "rgb";
+  if(pe===7||pe===8||pe===11) return "rgbw";
+  if(pe===9||pe===10||pe===12||pe>=13) return "rgbwa";
+  return "rgb";
+}
 function wbSend(ch,v){
   const p=wbPort; if(!p) return;
   if(!wbArmed) wbArm();                   // first touch: the port goes to full for judging
   hot[p+".WB"]=Date.now();
-  const chs = ch==="ALL" ? ["R","G","B"] : [ch];
+  const chs = ch==="ALL" ? WB_CH(wbOf(p)) : [ch];
   for(const c of chs){ wbVals[c]=v; sendThrottled(`wb${p}${c}`,`P${p}.WB${c}=${v}`); }
-  const cur=(kv["W"+p]||"255,255,255,0").split(",");
-  kv["W"+p]=[wbVals.R,wbVals.G,wbVals.B,cur[3]||0].join(",");   // optimistic
+  kv["W"+p]=wbRec(p,wbVals);                                     // optimistic
   wbPaintCard(p);
 }
 function wbSet(ch,v){
@@ -6615,15 +6637,15 @@ function wbArm(){
 }
 function wbOpen(p){
   const w=wbOf(p); if(!w) return;
-  wbPort=p; wbArmed=false; wbVals={R:w.R,G:w.G,B:w.B};
-  const kind=wbKind((ports[p-1]||{}).PE??0);
+  wbPort=p; wbArmed=false; wbVals={R:w.R,G:w.G,B:w.B,W:w.W,A:w.A};
+  const kind=wbKind((ports[p-1]||{}).PE??0,p);
   $("wbRows").innerHTML=WB_ROWS[kind].map(([ch,name,cls])=>`
     <div class="wbline ${cls}"><label>${name}</label>
       <input type="range" id="wbS${ch}" min="0" max="255" step="1">
       <input type="number" class="wbnum" id="wbN${ch}" min="0" max="255" step="1" inputmode="numeric"></div>`).join("");
   for(const [ch] of WB_ROWS[kind]){
     // Level (one slider for a single-colour port) follows the highest trim
-    const v0 = ch==="ALL" ? Math.max(w.R,w.G,w.B) : w[ch];
+    const v0 = ch==="ALL" ? Math.max(...WB_CH(w).map(c=>w[c])) : w[ch];
     wbSet(ch,v0);
     $("wbS"+ch).addEventListener("input",e=>wbSend(ch,wbSet(ch,e.target.value)));
     $("wbN"+ch).addEventListener("change",e=>wbSend(ch,wbSet(ch,e.target.value)));   // typed exact value
@@ -6656,11 +6678,11 @@ function wbRefresh(){
   if(!wbOf(wbPort) || wbPort>ports.length){ pcClose(); return; }
   wbNote();
   if(Date.now()-(hot[wbPort+".WB"]||0) < HOT_MS) return;
-  const w=wbOf(wbPort), kind=wbKind((ports[wbPort-1]||{}).PE??0);
-  wbVals={R:w.R,G:w.G,B:w.B};
+  const w=wbOf(wbPort), kind=wbKind((ports[wbPort-1]||{}).PE??0,wbPort);
+  wbVals={R:w.R,G:w.G,B:w.B,W:w.W,A:w.A};
   for(const [ch] of WB_ROWS[kind]){
     const s=$("wbS"+ch); if(!s||document.activeElement===s) continue;
-    wbSet(ch, ch==="ALL" ? Math.max(w.R,w.G,w.B) : w[ch]);
+    wbSet(ch, ch==="ALL" ? Math.max(...WB_CH(w).map(c=>w[c])) : w[ch]);
   }
 }
 // Port card: the Adjust row, its read-out and the orange WB badge.
@@ -6668,14 +6690,16 @@ function wbPaintCard(p){
   // The card's WB line (wbr/wbv) and the orange WB badge.
   const w=wbOf(p), row=$("wbr"+p), bd=$("wbg"+p), tx=$("wbv"+p);
   if(row) row.classList.toggle("hidden",!w);
-  const on=!!w && (w.R<255||w.G<255||w.B<255);
+  const on=wbTrimmed(w);
   if(bd) bd.classList.toggle("hidden",!on);
   if(w){
-    const kind=wbKind((ports[p-1]||{}).PE??0), lv=Math.max(w.R,w.G,w.B);
+    const kind=wbKind((ports[p-1]||{}).PE??0,p), lv=Math.max(...WB_CH(w).map(c=>w[c]));
     if(tx) tx.textContent = !on ? "full"
       : kind==="cct" ? `${w.G} / ${w.R}`
+      : kind==="cct5" ? `${w.W} / ${w.A}`
       : kind==="dim" ? `${lv}`
-      : `${w.R}·${w.G}·${w.B}`;
+      // Only the trimmed outputs, letter and value (R230 W180): five full numbers ran off the card.
+      : WB_ROWS[kind].filter(([c])=>w[c]<255).map(([c])=>c+w[c]).join(" ");
   }
 }
 function wbPaintAll(){
@@ -6685,25 +6709,25 @@ function wbPaintAll(){
   b.classList.toggle("hidden",!have);
   { const wc=$("wbResetCap"); if(wc) wc.classList.toggle("na",!have); }   // (caption gone with the dashboard, 2026-10-02)
   $("prepGrid").classList.toggle("solo",!have);
-  const any=ports.some((_,i)=>{ const w=wbOf(i+1); return w && (w.R<255||w.G<255||w.B<255); });
+  const any=ports.some((_,i)=>wbTrimmed(wbOf(i+1)));
   b.classList.toggle("glow",any); b.disabled=!any; b.style.opacity=any?"":".45";
 }
 $("wbReset").onclick=()=>{
   const p=wbPort; if(!p) return;
   hot[p+".WB"]=Date.now();
   send(`P${p}.WBX=1`);
-  wbVals={R:255,G:255,B:255};
-  kv["W"+p]="255,255,255,"+((kv["W"+p]||"").split(",")[3]||0);
-  for(const ch of ["R","G","B","ALL"]) if($("wbS"+ch)) wbSet(ch,255);
+  wbVals={R:255,G:255,B:255,W:255,A:255};
+  kv["W"+p]=wbRec(p,wbVals);
+  for(const ch of ["R","G","B","W","A","ALL"]) if($("wbS"+ch)) wbSet(ch,255);
   wbPaintAll();
 };
 // This port's trims to every port on the controller (per-port commands, so
 // any firmware with white balance takes them), or down the chain (CHWB baton:
 // this unit's ports first, then every armed unit).
-const wbTrio=()=>`${wbVals.R} · ${wbVals.G} · ${wbVals.B}`;
+const wbFive=()=>!!(wbOf(wbPort)||{}).five;
+const wbTrio=()=>(wbFive()?["R","G","B","W","A"]:["R","G","B"]).map(c=>wbVals[c]).join(" · ");
 function wbStampAll(){
-  ports.forEach((_,i)=>{ const k=i+1; hot[k+".WB"]=Date.now();
-    kv["W"+k]=[wbVals.R,wbVals.G,wbVals.B,(kv["W"+k]||"").split(",")[3]||0].join(","); });
+  ports.forEach((_,i)=>{ const k=i+1; hot[k+".WB"]=Date.now(); kv["W"+k]=wbRec(k,wbVals); });
   wbPaintAll();
 }
 $("wbAll").onclick=async()=>{
@@ -6713,7 +6737,8 @@ $("wbAll").onclick=async()=>{
         {title:"White balance to all ports?",ok:"Send"})) return;
   const q=[];
   ports.forEach((_,i)=>{ const k=i+1; if(k===p) return;
-    q.push(`P${k}.WBR=${wbVals.R}`,`P${k}.WBG=${wbVals.G}`,`P${k}.WBB=${wbVals.B}`); });
+    q.push(`P${k}.WBR=${wbVals.R}`,`P${k}.WBG=${wbVals.G}`,`P${k}.WBB=${wbVals.B}`);
+    if(wbFive()) q.push(`P${k}.WBW=${wbVals.W}`,`P${k}.WBA=${wbVals.A}`); });
   wbStampAll();
   await applyQueue(q,"White balance");
   toast("White balance sent to all ports");
@@ -6722,7 +6747,8 @@ $("wbChain").onclick=async()=>{
   const p=wbPort; if(!p) return;
   if(!await askConfirm(`This unit's ports and every armed unit down the DMX line take Port ${p}'s white balance (${wbTrio()}). Arm each downstream unit first: Setup → Universe → Listen.`,
         {title:"White balance across the universe?",ok:"Send"})) return;
-  send(`CHWB=${wbVals.R},${wbVals.G},${wbVals.B}`);
+  send(wbFive() ? `CHWB=${wbVals.R},${wbVals.G},${wbVals.B},${wbVals.W},${wbVals.A}`
+                 : `CHWB=${wbVals.R},${wbVals.G},${wbVals.B}`);
   wbStampAll();
   setTimeout(()=>send("GET"),800);
 };
@@ -6731,7 +6757,7 @@ $("btnWbReset").onclick=async()=>{
         {title:"Reset white balance?",ok:"Reset",danger:true})) return;
   send("ALL.WBX=1");
   ports.forEach((_,i)=>{ const p=i+1; hot[p+".WB"]=Date.now();
-    kv["W"+p]="255,255,255,"+((kv["W"+p]||"").split(",")[3]||0); });
+    kv["W"+p]=wbRec(p,{R:255,G:255,B:255,W:255,A:255}); });
   wbPaintAll();
   setTimeout(()=>send("GET"),600);
 };
@@ -7238,7 +7264,7 @@ function demoTxState(){
 function demoState(){
   const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M${d.m??1},R${d.r},G${d.g},B${d.b},WH${d.wh??0},AM${d.am??0},D${d.d??80},O1,F00,X${d.x},S${d.s??128},H${d.h??n},`+
     `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW${d.pw??2},OC${d.oc??6750},OT${d.ot??80},CV${d.cv??0},TX${1000*n},TO0,EC0,PH1,PF519,KA1000,KB1000,L${d.l||0};`;
-  const W=(n,d)=>{ const w=d.wb||[255,255,255]; return `W${n}=${w[0]},${w[1]},${w[2]},${d.wbp||0};`; };
+  const W=(n,d)=>{ const w=d.wb||[255,255,255,255,255]; return `W${n}=${w[0]},${w[1]},${w[2]},${w[3]??255},${w[4]??255},${d.wbp||0};`; };
   const PWC=demoF.pwc.map((c,k)=>`PWC${k+1}=${c?`${c.hz},${pwActual(c.hz)}`:"0,0"};`).join("");
   onState(
     `JMB;FW=demo;PORTS=${demoF.var};CID=${demoF.cid??7};DMX=1;FPS=44;DI=0;CRV=1;AM=${demoF.am??1};DLR=${demoF.dlr||0};RDMEN=${demoF.rdm||0};PWRF=0;CARD=${demoF.card??1};RFW=12,3,0,0;PRS=${Array.from({length:demoF.var},(_,i)=>i===1?"3:1:1:0:2":"1:0:1:0:2").join(",")};SL=512;SC=0;ASC=3;ERR=0;`+
@@ -7338,12 +7364,12 @@ function demoCmd(s){
   if(m=s.match(/^P(\d)\.OCP=(\d+)/)){ demoP[+m[1]-1].oc=Math.max(250,Math.min(6750,+m[2])); demoState(); return; }
   if(m=s.match(/^P(\d)\.OT=(\d+)/)){ demoP[+m[1]-1].ot=Math.max(40,Math.min(110,+m[2])); demoState(); return; }
   // White balance + PWM library
-  if(m=s.match(/^P(\d)\.WB(R|G|B)=(\d+)/)){ const d=demoP[+m[1]-1]; d.wb=d.wb||[255,255,255];
-    d.wb["RGB".indexOf(m[2])]=Math.max(0,Math.min(255,+m[3])); return; }
-  if(m=s.match(/^P(\d)\.WBX=/)){ demoP[+m[1]-1].wb=[255,255,255]; demoState(); return; }
+  if(m=s.match(/^P(\d)\.WB(R|G|B|W|A)=(\d+)/)){ const d=demoP[+m[1]-1]; d.wb=d.wb||[255,255,255,255,255];
+    d.wb["RGBWA".indexOf(m[2])]=Math.max(0,Math.min(255,+m[3])); return; }
+  if(m=s.match(/^P(\d)\.WBX=/)){ demoP[+m[1]-1].wb=[255,255,255,255,255]; demoState(); return; }
   if(m=s.match(/^P(\d)\.WBP=(\d+)/)){ demoP[+m[1]-1].wbp=Math.min(100,+m[2]); return; }   // 0 = off, else the level %
-  if(s.startsWith("ALL.WBX=")){ demoP.forEach(d=>{ d.wb=[255,255,255]; }); demoState(); return; }
-  if(m=s.match(/^CHWB=(\d+),(\d+),(\d+)/)){ const w=[+m[1],+m[2],+m[3]].map(v=>Math.max(0,Math.min(255,v)));
+  if(s.startsWith("ALL.WBX=")){ demoP.forEach(d=>{ d.wb=[255,255,255,255,255]; }); demoState(); return; }
+  if(m=s.match(/^CHWB=(\d+),(\d+),(\d+)(?:,(\d+),(\d+))?/)){ const w=[+m[1],+m[2],+m[3],+(m[4]??255),+(m[5]??255)].map(v=>Math.max(0,Math.min(255,v)));
     demoP.forEach(d=>{ d.wb=w.slice(); }); demoState(); return; }
   if(m=s.match(/^PWC(\d)=(\d+)/)){ const k=+m[1]-1, hz=+m[2];
     if(k>=0&&k<3){
