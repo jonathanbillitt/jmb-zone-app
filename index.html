@@ -1766,7 +1766,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-17h.offset";
+const APP_VER="2026-11-17i.help";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -5568,6 +5568,13 @@ showDevSwitch((()=>{ try{ return localStorage.getItem("jmbDevShow")==="1"||local
 // notes out of the way. Off = no hands at all, notes stay hidden. On by default.
 function setHelper(on){
   document.body.classList.toggle("nohelp",!on);
+  // Off closes every note a hand had opened: with the hands gone there was nothing left to close
+  // them with, so they stayed stuck on screen (user, 2026-11-17).
+  if(!on){
+    document.querySelectorAll(".help").forEach(n=>n.classList.add("hidden"));
+    document.querySelectorAll(".ib.on").forEach(b=>{ b.classList.remove("on"); b.title="Show notes"; b.setAttribute("aria-label","Show notes"); });
+    if(typeof fitCols==="function"){ try{ fitCols(); fitControl(); }catch(_){} }
+  }
   if(typeof movePill==="function") movePill();   // the tab slots change width with the labels
   if(typeof scnBarPlace==="function") scnBarPlace();   // and the nav's height changes too
   $("helpMode").checked=!!on;
