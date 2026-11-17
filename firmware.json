@@ -1,11 +1,11 @@
 {
-  "version": "3.0.0",
-  "build": "b67ca0b-20261117",
+  "version": "3.1.0",
+  "build": "ab5506b-20261117",
   "size": 1265704,
-  "crc32": "d6b81dbd",
-  "sha256": "99d23405a0026f2d42187d3e6dcc5b852dea720edebe3f53381188aef7fe4453",
+  "crc32": "47c428b2",
+  "sha256": "716a5919d3acd5085e6e7fd8060def4cc954b93f648da446db418d3a555e2496",
   "date": "2026-11-17",
-  "notes": "Version 3.0.0, the first numbered release for 3.x controllers (3.1.4 MCU, 3.6.4 zOne). Same features as the 17 Nov build: Dim Chase and Dim Random, Bluetooth port-module updates on 4-port units, DMX card 3.2.4 RDM tools and CRMX to the DMX OUT; port firmware 2.8.10",
+  "notes": "Version 3.1.0 for 3.x controllers (3.1.4 MCU, 3.6.4 zOne): colour order per port (for strips wired in a different order) and Run dark (screens and indicators off after a set idle time, outputs untouched); port firmware 2.8.10 unchanged",
   "file": "firmware.jmbx",
   "encrypted": true,
   "host": "3x",
@@ -14,8 +14,8 @@
   "stm_port": {
     "file": "stm_port.jmbx",
     "size": 19680,
-    "crc32": "d41664b0",
-    "sha256": "97bbf8a5747115a3e11d3ba4feb057dc59e2ceafe4a8e2521734e7c8f29f8996",
+    "crc32": "76bf7787",
+    "sha256": "952ac0d4db43408e7b3cf8379c33754b8c9136be20f424b1a979434e67a4fd73",
     "target": "port5",
     "image_crc32": "b0d54e7c"
   }
