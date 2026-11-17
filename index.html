@@ -983,8 +983,8 @@
       wherever the rig is; effects dip out and in rather than snapping.</div>
       <div class="mini">Tick scenes to pick them: Delete removes every ticked one,
       and a ticked scene dragged takes the others along as a block.</div>
-      <div class="mini">Tap a name to rename it; hold it to lift and drag. Up to
-      100 scenes live in this phone's browser.</div>
+      <div class="mini">Tap a name to rename it; hold it to lift and drag.
+      <span id="scnWhere">Up to 100 scenes live in this phone's browser.</span></div>
       <div class="mini">Go recalls the next scene in the list; Stop halts a run.
       Cue steps once per Go; Follow runs on by itself, round and round.</div>
       <div class="mini">Wait is how long a scene holds after its fade before
@@ -1195,6 +1195,16 @@
           <select id="setRdm" style="width:90px"><option value="0">Off</option>
             <option value="1">On</option></select>
           <span class="mini" style="margin:0">on: desks and the Diagnostics scan can find and set RDM fixtures · off: one-way DMX only</span>
+        </div>
+        <!-- Run dark (FW-76, user 2026-11-08 "after idle, wakes on touch"): screens and the switchable
+             indicators go dark after this long with no knob and no app command. One picker: Off or a time. -->
+        <div class="row" id="dkRow" data-why="Run dark needs the next controller firmware"><label style="line-height:1.15">Run dark</label>
+          <select id="setDk" style="width:110px">
+            <option value="0">Off</option><option value="30">after 30 s</option><option value="60">after 1 min</option>
+            <option value="120">after 2 min</option><option value="300">after 5 min</option>
+            <option value="600">after 10 min</option><option value="1800">after 30 min</option><option value="3600">after 1 h</option>
+          </select>
+          <span class="mini" style="margin:0" id="dkNote" data-help>screens and indicators go dark when nobody touches the unit; a knob turn or the app wakes them</span>
         </div>
         <div class="mini" id="foldStatus" style="margin-top:4px"></div>
         <!-- Model under the folds, so the foot of the card is all buttons
@@ -1736,7 +1746,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-17c.wb5";
+const APP_VER="2026-11-17d.scenes";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2365,7 +2375,8 @@ function resetUnitState(full){
   if(full){ for(const k in zHeld) delete zHeld[k];
     lastUp=null;                           // a different unit's uptime is no restart
     ports.length=0; prunePortCards(); $("ports").innerHTML=""; $("portInfo").innerHTML="";
-    colSel.clear(); colSelTouched=false; }  // a port 6 target must not reach a 1-port unit; a new unit starts on All
+    colSel.clear(); colSelTouched=false; }
+  ctlScenes=[]; ctlScVer=null; scCycle=null; scLastP=""; scOffered=false;  // a port 6 target must not reach a 1-port unit; a new unit starts on All
 }
 function sendRaw(s){
   diagCmd(s);
@@ -2623,13 +2634,16 @@ function onState(str){
     const now=Date.now();
     if(lastHdr) for(const k of Object.keys(kv)) if(/^W[FC]\d+$/.test(k) && !cycKeys.has(k)) delete kv[k];
     cycKeys.clear(); lastHdr=now; if(!firstHdr) firstHdr=now;
+    scCycle=null;                         // controller scenes: this cycle's SC<i> records
   }
   for(const part of str.split(";")){
     const i=part.indexOf("=");
     if(i<0) continue;
     const k=part.slice(0,i), v=part.slice(i+1);
+    if(/^SC\d+$/.test(k)){ (scCycle||(scCycle={}))[+k.slice(2)]=v; continue; }   // a scene list record
     if(/^P\d+$/.test(k)) pstr[k]=v; else { kv[k]=v; cycKeys.add(k); }
   }
+  scState();                              // controller scenes: list, active, Follow
   const n=+(kv.PORTS||0);
   while(ports.length<n) ports.push({});
   if(ports.length>n){                     // variant shrank (8→4 reconnect):
@@ -2924,6 +2938,7 @@ function renderControl(){
       $("rows"+p).querySelectorAll("input[type=range]").forEach(s=>{ s.disabled=fxOn; }); }
     pwPaintCard(p,m);                       // options first, then the value
     pcPaintSet(p,m);
+    coPaint(p,m);
     setIf(p,"PWM", el=>el.value=m.PW??0);
     setIf(p,"OCP", el=>el.value=((m.OC??ocpCapA()*1000)/1000).toFixed(2));
     // Ceiling follows the fitted shunt (SH): 6.5 A on 10 mΩ, 6.75 A on 5 mΩ.
@@ -3086,6 +3101,11 @@ function buildCard(p){
           <select id="crv${p}" style="width:130px">
             <option value="0">Linear</option><option value="1">Soft 1.6</option>
             <option value="2">Theatre 2.2</option></select></div>
+        <!-- Colour order (FW-75, user 2026-11-17): the order the strip's colours are wired in.
+             Shown when the unit reports CO=; hidden on a custom patch, whose roles say it already. -->
+        <div class="row hidden" id="cor${p}"><label style="line-height:1.15">Colour order</label>
+          <select id="co${p}" style="width:130px"></select></div>
+        <div class="mini" id="con${p}" data-help style="display:none">Pick the order that makes Red show red on the strip; the sliders and white balance stay per colour.</div>
         <div class="row"><label>PWM</label>
           <select id="pwm${p}" style="width:170px">
             <option value="0">Smooth 8 kHz</option>
@@ -3333,6 +3353,92 @@ function makeWheel(host,{label,min=0,max=100,value=min,fmt=v=>v,onInput}){
   return { set:v=>{ cur=v; paint(); } };
 }
 
+// ---------- Scenes on the controller (docs/SCENES_DESIGN.md; user 2026-11-17 "lets give them all a go") ----------
+// A unit that reports SCN keeps the scene list itself (up to 100, play order) and does the fades
+// and Follow; the Scenes tab is its remote: Save / Capture -> SCSAVE, rename and times -> SCSET,
+// delete -> SCDEL, reorder -> SCMOVE, Recall -> SCGO=<i>, Go -> SCGO=0 (Cue) or SCRUN=1 (Follow),
+// Stop -> SCRUN=0. The list arrives as SC<i>=fade,wait,name-hex records in the first state after
+// connect or after a change (or after SCLIST); SCV is its version, SCP=<active>,<follow>. The demo
+// and older firmware keep the phone's own list.
+let scCycle=null, ctlScenes=[], ctlScVer=null, scListT=0, scCheckT=0, scLastP="", scOffered=false;
+const scCtl=()=>("SCN" in kv) && !demoOn && bleConnected();
+const scActive=()=>scCtl() ? (+(String(kv.SCP||"0").split(",")[0])||0)-1 : activeSceneIdx;
+const scFollowing=()=>scCtl() && String(kv.SCP||"").split(",")[1]==="1";
+function scState(){
+  if(!("SCN" in kv)) return;
+  const n=+(kv.SCN||0);
+  if(n===0){ ctlScenes=[]; ctlScVer=kv.SCV; }
+  else if(scCycle){
+    const a=[];
+    for(let i=1;i<=n;i++){ const v=scCycle[i]; if(v==null){ a.length=0; break; }
+      const [f,w,h]=String(v).split(",");
+      a.push({name:(h&&h!=="0"?hexDec(h):"")||("Scene "+i), fade:+f||0, wait:+w||0}); }
+    if(a.length===n){ ctlScenes=a; ctlScVer=kv.SCV; }
+  }
+  // A version change with no list in its state (a missed notify): ask for the list.
+  clearTimeout(scCheckT);
+  scCheckT=setTimeout(()=>{ if(scCtl() && kv.SCV!==ctlScVer && Date.now()-scListT>2000){ scListT=Date.now(); send("SCLIST"); } },900);
+  const sig=kv.SCV+"|"+kv.SCP+"|"+ctlScenes.length;
+  if(sig!==scLastP){ scLastP=sig;
+    if(activeTabName()==="scenes" && !sceneEditing()) renderScenes();
+    scnPaint(); }
+  if(ctlScVer!=null && !scOffered) scOfferCopy();
+}
+// Never rebuild the list under a finger: a number being typed or a row being dragged.
+const sceneEditing=()=>{ const a=document.activeElement, l=$("sceneList");
+  return !!(l && ((a && l.contains(a) && a.tagName==="INPUT" && a.type==="number") || l.querySelector(".lift"))); };
+// The ports of a scene on the wire (SCD / SCPUT / SCPP): r,g,b,w,a,dim,fx,spd,man.
+const scPortWire=t=>[t.r??0,t.g??0,t.b??0,t.w??0,t.a??0,t.d??100,t.x??0,t.s??128,(t.m??1)?1:0]
+  .map(v=>Math.max(0,Math.round(+v||0))).join(",");
+// Append scenes to the controller (show-file import, the one-time copy): SCPUT with the header
+// and as many ports as fit one write, SCPP for the rest. The controller's SCN confirms.
+async function scPutAll(list,statusEl){
+  let n=ctlScenes.length, sent=0;
+  for(const sc of list){
+    if(n>=SCENE_MAX) break;
+    const nm=String(sc.name||"").replace(/[^\x20-\x7E]/g,"").trim().slice(0,24)||("Scene "+(n+1));
+    const f=Math.min(60,Math.max(0,Math.round(+sc.fade||0))), w=Math.min(3600,Math.max(0,Math.round(+(sc.wait??2)||0)));
+    const ports=(Array.isArray(sc.ports)?sc.ports:[]).slice(0,8).map(scPortWire);
+    const head=`SCPUT=${n+1},${f},${w},${hexEnc(nm)}`;
+    let k=0; while(k<ports.length && (head+","+ports.slice(0,k+1).join("|")).length<=180) k++;
+    send(k ? head+","+ports.slice(0,k).join("|") : head);
+    for(let q=k;q<ports.length;q++) send(`SCPP=${n+1},${q+1},${ports[q]}`);
+    n++; sent++;
+    if(statusEl) statusEl.textContent=`Sending scenes to the controller ${sent}/${list.length}…`;
+    await sleep(120);
+  }
+  setTimeout(()=>send("SCLIST"),800);
+  return sent;
+}
+// Read every scene's content back (show-file export): SCGET=<i>, then SCD<i> in a state.
+async function scFetchAll(statusEl){
+  const out=[];
+  for(let i=1;i<=ctlScenes.length;i++){
+    delete kv["SCD"+i]; send(`SCGET=${i}`);
+    const t0=Date.now(); while(!kv["SCD"+i] && Date.now()-t0<4000) await sleep(100);
+    const sc=ctlScenes[i-1], raw=String(kv["SCD"+i]||"");
+    out.push({name:sc.name, fade:sc.fade, wait:sc.wait,
+      ports:raw?raw.split("|").map(q=>{ const [r,g,b,w,a,d,x,sp,m]=q.split(",").map(Number); return {r,g,b,w,a,d,x,s:sp,m}; }):[]});
+    if(statusEl) statusEl.textContent=`Reading scenes from the controller ${i}/${ctlScenes.length}…`;
+  }
+  return out;
+}
+// Scenes saved on this phone before they moved onto the controller: offered once per controller
+// (user 2026-11-17: "Offer to copy once"). They stay on the phone either way.
+async function scOfferCopy(){
+  if(scOffered || !scCtl()) return; scOffered=true;
+  const mine=loadScenes(); if(!mine.length) return;
+  const key="jmb_scmig:"+(kv.BTM||devName()||"");
+  try{ if(localStorage.getItem(key)) return; localStorage.setItem(key,"1"); }catch(_){ return; }
+  const room=SCENE_MAX-ctlScenes.length; if(room<=0) return;
+  const k=Math.min(room,mine.length);
+  if(!await askConfirm(`This phone has ${mine.length} scene${mine.length===1?"":"s"} saved before scenes moved onto the controller. `
+       +`Copy ${k===mine.length?(k===1?"it":"them"):"the first "+k} to this controller? They stay on the phone either way.`,
+       {title:"Copy scenes to this controller?",ok:"Copy"})) return;
+  const sent=await scPutAll(mine.slice(0,k),null);
+  toast(sent+" scene"+(sent===1?"":"s")+" copied to the controller");
+}
+
 // ---------- Scenes tab ----------
 function loadScenes(){ try{
   // NORMALISE on every load: only {name, fade 0-60, ports[]} survive. Old app
@@ -3367,20 +3473,23 @@ function scnDelPaint(){
 }
 function renderScenes(){
   const list=$("sceneList"); list.innerHTML="";
-  const all=loadScenes();
+  const ctl=scCtl(), all=ctl ? ctlScenes : loadScenes(), act=scActive();
+  { const w=$("scnWhere"); if(w) w.textContent = ctl
+      ? "Up to 100 scenes live on this controller: the panel and every phone see the same list, and the controller runs the fades."
+      : "Up to 100 scenes live in this phone's browser."; }
   [...scnSel].forEach(i=>{ if(!(i<all.length)) scnSel.delete(i); });
   scnDelPaint();
   { const h=$("scnHead"); if(h) h.classList.toggle("hidden",!all.length); }
   all.forEach((sc,i)=>{
     const row=document.createElement("div");
     row.className="scene"; row.dataset.i=String(i);
-    if(i===activeSceneIdx) row.classList.add("active");
+    if(i===act) row.classList.add("active");
     const fv=(sc.fade==null)?2:Math.min(60,Math.max(0,+sc.fade||0));   // sanitise
     const wv=Math.min(3600,Math.max(0,+(sc.wait??2)||0));
     row.innerHTML=`<input type="checkbox" class="scsel" title="Pick this scene"${scnSel.has(i)?" checked":""}>
       <b class="scname" title="Tap to rename, hold to move">${esc(sc.name)}</b>
-      <input type="number" class="scwait" min="0" max="3600" step="0.5" value="${wv}" inputmode="decimal" title="Wait, seconds">
-      <input type="number" class="scfade" min="0" max="60" step="0.5" value="${fv}" inputmode="decimal" title="Fade, seconds">
+      <input type="number" class="scwait" min="0" max="3600" step="${ctl?1:0.5}" value="${wv}" inputmode="${ctl?"numeric":"decimal"}" title="Wait, seconds">
+      <input type="number" class="scfade" min="0" max="60" step="${ctl?1:0.5}" value="${fv}" inputmode="${ctl?"numeric":"decimal"}" title="Fade, seconds">
       <button class="primary">Recall</button>`;
     const fadeIn=row.querySelector(".scfade"), waitIn=row.querySelector(".scwait");
     const btnGo=row.querySelector("button");
@@ -3391,8 +3500,11 @@ function renderScenes(){
     // snap to 0.5 s, and block wheel-scroll from silently nudging it.
     const commitNum=(inp,key,max)=>()=>{
       let v=Math.min(max,Math.max(0,+inp.value||0));
-      v=Math.round(v*2)/2;
-      inp.value=v; sc[key]=v;
+      v=ctl ? Math.round(v) : Math.round(v*2)/2;        // the controller keeps whole seconds
+      const was=sc[key]; inp.value=v; sc[key]=v;
+      // Only a real change reaches the controller: each SCSET is a flash write (chip longevity),
+      // and Recall commits the fade first.
+      if(ctl){ if(v!==was) send(`SCSET=${i+1},${sc.fade},${sc.wait}`); return; }
       const all=loadScenes(); if(all[i]){ all[i][key]=v; saveScenes(all); }
     };
     const commitFade=commitNum(fadeIn,"fade",60), commitWait=commitNum(waitIn,"wait",3600);
@@ -3403,20 +3515,27 @@ function renderScenes(){
       const v=await askText("",{title:"Rename scene",value:sc.name,ok:"Rename",maxlength:24});
       if(v===null) return;
       const nm=v.trim(); if(!nm) return;
+      if(ctl){ sc.name=nm; send(`SCSET=${i+1},${sc.fade},${sc.wait},${hexEnc(nm)}`); renderScenes(); return; }
       const all=loadScenes(); all[i].name=nm; saveScenes(all); renderScenes();
     };
-    btnGo.onclick=()=>{ commitFade(); activeSceneIdx=i;
-                        recallScene(sc); renderScenes(); };
+    btnGo.onclick=()=>{ commitFade();
+      if(ctl){ send(`SCGO=${i+1}`); kv.SCP=`${i+1},0`; renderScenes(); scnPaint(); return; }   // the controller fades
+      activeSceneIdx=i; recallScene(sc); renderScenes(); };
     list.appendChild(row);
   });
 }
 $("btnScnDel").onclick=async()=>{
-  const all=loadScenes(), picks=[...scnSel].filter(i=>i<all.length).sort((a,b)=>a-b);
+  const ctl=scCtl(), all=ctl ? ctlScenes : loadScenes(), picks=[...scnSel].filter(i=>i<all.length).sort((a,b)=>a-b);
   if(!picks.length) return;
   const one=picks.length===1;
   if(!await askConfirm(one?`"${all[picks[0]].name}" goes for good.`:`${picks.length} scenes go for good.`,
         {title:one?"Delete scene?":`Delete ${picks.length} scenes?`,ok:"Delete",danger:true})) return;
   const keep=all.filter((_,i)=>!scnSel.has(i));
+  if(ctl){                                  // highest first, so the numbers below stay put
+    picks.slice().reverse().forEach(i=>send(`SCDEL=${i+1}`));
+    ctlScenes=keep; scnSel.clear(); renderScenes();
+    toast(one?"Scene deleted":`${picks.length} scenes deleted`); return;
+  }
   if(activeSceneIdx>=0)
     activeSceneIdx = scnSel.has(activeSceneIdx) ? -1 : activeSceneIdx - picks.filter(i=>i<activeSceneIdx).length;
   scnSel.clear(); saveScenes(keep);
@@ -3454,7 +3573,18 @@ function sceneDragArm(row){
     const drop=()=>{
       if(!lifted){ cancel(); return; }
       cleanup(); group.forEach(g=>g.classList.remove("lift"));
-      const order=[...list.children].map(r=>+r.dataset.i), all=loadScenes();
+      const order=[...list.children].map(r=>+r.dataset.i);
+      if(scCtl()){
+        // The new order as SCMOVE steps (each takes one scene out and puts it in at a place).
+        const cur=ctlScenes.map((_,k)=>k);
+        order.forEach((orig,k)=>{ const j=cur.indexOf(orig);
+          if(j!==k && j>=0){ send(`SCMOVE=${j+1},${k+1}`); cur.splice(j,1); cur.splice(k,0,orig); } });
+        ctlScenes=order.map(k=>ctlScenes[k]).filter(Boolean);
+        const picked=[...scnSel]; scnSel.clear();
+        picked.forEach(old=>{ const n=order.indexOf(old); if(n>=0) scnSel.add(n); });
+        setTimeout(renderScenes,0); return;
+      }
+      const all=loadScenes();
       const re=order.map(k=>all[k]).filter(Boolean);
       if(activeSceneIdx>=0) activeSceneIdx=order.indexOf(activeSceneIdx);
       const picked=[...scnSel]; scnSel.clear();
@@ -3473,6 +3603,13 @@ function sceneDragArm(row){
   });
 }
 $("btnSaveScene").onclick=async()=>{
+  if(scCtl()){
+    if(ctlScenes.length>=SCENE_MAX){ tellUser("This controller holds "+SCENE_MAX+" scenes — delete some first.",{title:"Scenes full"}); return; }
+    const nm=await askText("",{title:"Save scene",placeholder:"scene name",ok:"Save",maxlength:24});
+    if(!nm) return;
+    send(`SCSAVE=0,2,2,${hexEnc(nm.trim())}`);        // the controller captures its own live look
+    toast("Scene saved on the controller"); return;
+  }
   if(loadScenes().length>=SCENE_MAX){ tellUser("Scene limit reached ("+SCENE_MAX+") — delete some first.",{title:"Scenes full"}); return; }
   const name=await askText("",{title:"Save scene",placeholder:"scene name",ok:"Save",maxlength:24});
   if(!name) return;
@@ -3484,6 +3621,11 @@ $("btnSaveScene").onclick=async()=>{
 };
 // One-tap capture of the current look — no prompt, auto-named by time.
 $("btnCapture").onclick=()=>{
+  if(scCtl()){
+    if(ctlScenes.length>=SCENE_MAX){ tellUser("This controller holds "+SCENE_MAX+" scenes — delete some first.",{title:"Scenes full"}); return; }
+    const t=new Date(), hh=String(t.getHours()).padStart(2,"0"), mm=String(t.getMinutes()).padStart(2,"0");
+    send(`SCSAVE=0,2,2,${hexEnc(`Live ${hh}:${mm}`)}`); toast("Live look captured on the controller"); return;
+  }
   if(loadScenes().length>=SCENE_MAX){ tellUser("Scene limit reached ("+SCENE_MAX+") — delete some first.",{title:"Scenes full"}); return; }
   const snap=ports.map(m=>({r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
                             x:m.X??0,s:m.S??128}));
@@ -3500,14 +3642,20 @@ $("btnCapture").onclick=()=>{
 // until Stop or a switch to Cue. A row's own Recall moves the pointer too.
 let scnMode="cue", scnTimer=null;
 function scnPaint(){
+  const run=!!scnTimer || scFollowing();       // a controller's Follow shows here too
   $("scnFollow").classList.toggle("sel",scnMode==="follow");
   $("scnCue").classList.toggle("sel",scnMode==="cue");
-  $("scnGo").classList.toggle("glow",!!scnTimer);
-  $("scnStop").disabled=!scnTimer;
+  $("scnGo").classList.toggle("glow",run);
+  $("scnStop").disabled=!run;
   $("tab-scenes").classList.toggle("cuemode",scnMode==="cue");   // Wait greys in Cue, stays editable
 }
 function scnStop(){ clearTimeout(scnTimer); scnTimer=null; scnPaint(); }
 function scnGo(){
+  if(scCtl()){
+    if(!ctlScenes.length){ toast("No scenes yet"); return; }
+    send(scnMode==="follow" ? "SCRUN=1" : "SCGO=0");   // the controller steps, times and fades
+    setTimeout(scnPaint,300); return;
+  }
   const all=loadScenes();
   clearTimeout(scnTimer); scnTimer=null;
   if(!all.length){ toast("No scenes yet"); scnPaint(); return; }
@@ -3523,9 +3671,10 @@ function scnGo(){
   scnPaint();
 }
 $("scnGo").onclick=scnGo;
-$("scnStop").onclick=scnStop;
+// scnStop() is also the app's own clean-up on a drop: only the button tells a controller to stop.
+$("scnStop").onclick=()=>{ if(scFollowing()){ send("SCRUN=0"); kv.SCP=String(kv.SCP||"0").split(",")[0]+",0"; } scnStop(); };
 $("scnFollow").onclick=()=>{ scnMode="follow"; scnPaint(); };
-$("scnCue").onclick=()=>{ scnMode="cue"; scnStop(); };
+$("scnCue").onclick=()=>{ scnMode="cue"; if(scFollowing()){ send("SCRUN=0"); kv.SCP=String(kv.SCP||"0").split(",")[0]+",0"; } scnStop(); };
 scnPaint();
 let fadeTimer=null, recallGen=0;
 async function recallScene(sc){
@@ -5129,6 +5278,14 @@ function renderSetup(){
   { const off=kv.RDMEN==="0", b=$("btnRdmScan"); b.disabled=off && !rdmActive;
     $("rdmScanRow").classList.toggle("needfw",off && !rdmActive); }
   $("pwrfBan").classList.toggle("hidden",kv.PWRF!=="1");
+  { const ok="DK" in kv, s=$("setDk");
+    $("dkRow").classList.toggle("needfw",!ok); s.disabled=!ok;
+    if(ok && document.activeElement!==s){
+      const v=kv.DK==="1" ? String(+(kv.DKT||120)) : "0";
+      if(![...s.options].some(o=>o.value===v)) s.insertAdjacentHTML("beforeend",`<option value="${v}">after ${v} s</option>`);   // set on the panel
+      s.value=v; }
+    $("dkNote").textContent = kv.DKN==="1" ? "dark now: a knob turn or the app wakes it"
+      : "screens and indicators go dark when nobody touches the unit; a knob turn or the app wakes them"; }
   // Firmware before the controller limit (2.0.0, a024de9) has a PSU budget
   // instead: PB in 0.1 A, 0 = off, outputs scaled back together to stay
   // within it; no lock, no current fold. The row shows that, and never sends
@@ -5294,6 +5451,8 @@ function renderSetup(){
   }
 }
 $("setFold").onchange=e=>{ setupTouched=Date.now(); send("TFOLD="+ +e.target.value); };
+$("setDk").onchange=e=>{ setupTouched=Date.now(); const v=+e.target.value;
+  if(v>0){ send(`DKT=${Math.max(10,Math.min(3600,v))}`); send("DK=1"); } else send("DK=0"); };
 $("setCfold").onchange=e=>{ setupTouched=Date.now(); send("CFOLD="+ +e.target.value); };
 $("setRdm").onchange=e=>{ setupTouched=Date.now(); const on=e.target.value==="1";
   if(!on && rdmActive) rdmStop();                 // the firmware stops answering; close our session first
@@ -5874,7 +6033,8 @@ $("btnFactory").onclick=async()=>{
 };
 
 // ---------- settings export / import ----------
-$("btnExport").onclick=()=>{
+$("btnExport").onclick=async()=>{
+  const ctlSc = scCtl() ? await scFetchAll($("impStatus")) : null;   // the controller's scenes, read back
   const data={ app:"jmb-zone", ver:1, exported:new Date().toISOString(),
     device:devName(),
     cid:+(kv.CID||0), name:hexDec(kv.CN), amode:+(kv.AM||0),
@@ -5882,7 +6042,7 @@ $("btnExport").onclick=()=>{
                          r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
                          x:m.X??0,s:m.S??128,l:m.L||"",
                          pw:m.PW??0,oc:m.OC??6500,ot:m.OT??80,cv:m.CV??0})),
-    scenes:loadScenes() };
+    scenes:ctlSc||loadScenes() };
   // White balance and the PWM library's custom entries, when the firmware has them
   data.ports.forEach((t,i)=>{ const w=wbOf(i+1); if(w) t.wb=WB_CH(w).map(c=>w[c]); });
   if(pwLim()) data.pwc=[0,1,2].map(k=>{ const c=pwCustom(k); return c?{hz:c.hz}:null; });
@@ -5931,7 +6091,15 @@ $("impFile").addEventListener("change",async ev=>{
            "AMODE="+(data.amode||0)].concat(lib,portQueue(data.ports,skipped));
   await applyQueue(q,"Applying",$("impStatus"));
   if(skipped.length) $("impStatus").textContent+=` · Mode kept on port${skipped.length>1?"s":""} ${skipped.join(", ")}: this firmware can't run the file's Mode`;
-  if(nsc){ saveScenes(data.scenes.slice(0,100).filter(s=>s&&typeof s==="object")); renderScenes(); }
+  if(nsc){
+    const list=data.scenes.slice(0,100).filter(s=>s&&typeof s==="object");
+    if(scCtl()){                            // the file's scenes replace the controller's
+      for(let i=ctlScenes.length;i>=1;i--) send(`SCDEL=${i}`);
+      ctlScenes=[]; await sleep(300);
+      await scPutAll(list,$("impStatus"));
+    }else saveScenes(list);
+    renderScenes();
+  }
 });
 
 // ---------- BLE OTA (firmware update over Bluetooth) ----------
@@ -6537,6 +6705,33 @@ $("btSwitch").onclick=()=>{
   $("btnDisc").click();
   setTimeout(()=>connect(),400);
 };
+// ---------- colour order per port (FW-75) ----------
+// CO=<p1>,<p2>,... one 5-digit order per port: digit N = what output N carries (1 R, 2 G, 3 B, 4 W,
+// 5 A); 12345 = straight. A three-output module takes the six orders of R G B (45 fixed); a five-
+// output rig adds white and amber swapped. The unit refuses an invalid order and echoes the one in force.
+const CO_RGB=["123","132","213","231","312","321"];
+const CO_OPTS3=CO_RGB.map(o=>o+"45"), CO_OPTS5=CO_RGB.flatMap(o=>[o+"45",o+"54"]);
+const coName=(v,five)=>{ const L=String(v).split("").map(d=>"RGBWA"[(+d||1)-1]); return (five?L:L.slice(0,3)).join(""); };
+const coOf=p=>String(kv.CO??"").split(",")[p-1]||"12345";
+function coPaint(p,m){
+  const row=$("cor"+p), sel=$("co"+p), note=$("con"+p); if(!row||!sel) return;
+  const ok=("CO" in kv) && (+(m.PE??0))<13;
+  row.classList.toggle("hidden",!ok); if(note) note.style.display=ok?"":"none";   // its "hidden" belongs to the helper hand
+  if(!ok) return;
+  const five=+(kv.NCH||3)===5, opts=five?CO_OPTS5:CO_OPTS3, cur=coOf(p);
+  if(sel.dataset.five!==String(five)){ sel.innerHTML=opts.map(v=>`<option value="${v}">${coName(v,five)}</option>`).join(""); sel.dataset.five=String(five); }
+  if(document.activeElement===sel) return;
+  if(![...sel.options].some(o=>o.value===cur)) sel.insertAdjacentHTML("beforeend",`<option value="${cur}">${coName(cur,five)}</option>`);   // set on the panel
+  sel.value=cur;
+}
+document.addEventListener("change",e=>{
+  const id=e.target&&e.target.id||"", mt=/^co(\d)$/.exec(id); if(!mt) return;
+  const p=+mt[1], v=e.target.value; if(!/^[1-5]{5}$/.test(v)) return;
+  send(`P${p}.CO=${v}`);
+  const a=String(kv.CO??"").split(","); a[p-1]=v; kv.CO=a.join(",");      // optimistic; the state confirms
+  toast(`Port ${p}: colour order ${coName(v,+(kv.NCH||3)===5)}`);
+});
+
 // ---------- white balance + PWM library (2026-09-29) ----------
 // State keys (firmware ≥ this feature): W<n>=R,G,B,preview · PWLIM=fmin,fmax ·
 // PWC<k>=carrier,real carrier. An older firmware sends none of them, and
@@ -7140,7 +7335,7 @@ const SUP_TO="support@jmblighting.co.uk";
 // Controller status that goes in. A WHITELIST: a key the firmware gains later
 // stays out until it is added here on purpose. Never listed: NIP (network
 // address). Names (CN, BTN), the ID and port labels go in only with the tick.
-const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD","DLR","RDMEN","PWRF","CARD","BTM","UPE","UKF","RFW","PRS",
+const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD","DLR","RDMEN","PWRF","CARD","BTM","UPE","UKF","RFW","PRS","CO","DK","DKT","DKN",
   "RDM","ANS","RB","RBOK","STM","SPC","CHL","TSEQ","TXA","TXN","LPX","LPS","LPN","LPA","LPG","BSY","BRT","BSM","BRM",
   "NET","NW","NRS","TF","PB","CL","CLM","CLK","CF","FC","FT","OL","SH","SHM","TCR","CX","CA","CXR","CXL","CXS","CXF",
   "SQ","SQN","BPM","SPR","TAPV","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
@@ -7267,7 +7462,7 @@ function demoState(){
   const W=(n,d)=>{ const w=d.wb||[255,255,255,255,255]; return `W${n}=${w[0]},${w[1]},${w[2]},${w[3]??255},${w[4]??255},${d.wbp||0};`; };
   const PWC=demoF.pwc.map((c,k)=>`PWC${k+1}=${c?`${c.hz},${pwActual(c.hz)}`:"0,0"};`).join("");
   onState(
-    `JMB;FW=demo;PORTS=${demoF.var};CID=${demoF.cid??7};DMX=1;FPS=44;DI=0;CRV=1;AM=${demoF.am??1};DLR=${demoF.dlr||0};RDMEN=${demoF.rdm||0};PWRF=0;CARD=${demoF.card??1};RFW=12,3,0,0;PRS=${Array.from({length:demoF.var},(_,i)=>i===1?"3:1:1:0:2":"1:0:1:0:2").join(",")};SL=512;SC=0;ASC=3;ERR=0;`+
+    `JMB;FW=demo;PORTS=${demoF.var};CID=${demoF.cid??7};DMX=1;FPS=44;DI=0;CRV=1;AM=${demoF.am??1};DLR=${demoF.dlr||0};RDMEN=${demoF.rdm||0};PWRF=0;CO=${Array.from({length:demoF.var},(_,i)=>(demoF.co||[])[i]||"12345").join(",")};DK=${demoF.dk?1:0};DKT=${demoF.dkt||120};DKN=0;CARD=${demoF.card??1};RFW=12,3,0,0;PRS=${Array.from({length:demoF.var},(_,i)=>i===1?"3:1:1:0:2":"1:0:1:0:2").join(",")};SL=512;SC=0;ASC=3;ERR=0;`+
     "RDM=42;ANS=42;AGE=23;"+
     `CAPON=${demoF.capon};CAPMS=${demoF.capon?Date.now()-demoF.capt0:0};CFL=43;CFH=45;`+
     `VAR=${demoF.var};VARM=${demoF.varm};BTN=${demoF.btn};`+
@@ -7407,6 +7602,9 @@ function demoCmd(s){
     if(T.length>=2){ const ms=Math.max(250,Math.min(1000,(T[T.length-1]-T[0])/(T.length-1))); demoF.bpm=Math.round(60000/ms); }
     demoState(); return; }
   if(m=s.match(/^CID=(\d+)/)){ demoF.cid=Math.min(9999,+m[1]); demoState(); return; }
+  if(m=s.match(/^P(\d)\.CO=([1-5]{5})$/)){ (demoF.co=demoF.co||[])[+m[1]-1]=m[2]; demoState(); return; }
+  if(m=s.match(/^DK=(\d)/)){ demoF.dk=+m[1]?1:0; demoState(); return; }
+  if(m=s.match(/^DKT=(\d+)/)){ demoF.dkt=Math.max(10,Math.min(3600,+m[1])); demoState(); return; }
   if(m=s.match(/^CARDREV=(\d)/)){ demoF.card=+m[1]===1?1:0; demoState(); return; }
   if(m=s.match(/^RDMEN=(\d)/)){ demoF.rdm=+m[1]?1:0; demoState(); return; }
   if(m=s.match(/^DLR=(\d+)/)){ demoF.dlr=Math.min(60,+m[1]); demoState(); return; }   // DMX loss release

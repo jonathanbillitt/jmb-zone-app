@@ -295,8 +295,7 @@ the controller</strong>: each port's colour (white and amber too), level, effect
 effect rate. An effect is kept as a setting, so it runs again from the start on
 recall; tempo and spread are rig-wide and not part of a scene. A scene recalls
 with a crossfade from either surface and rides in the show
-file. <strong>Up to 100 scenes per phone</strong> (they live in the
-phone's browser storage, and in any show file you export).</p>
+file. <strong>Up to 100 scenes per controller</strong> (and in any show file you export).</p>
 <hr />
 <h2>4. The Universe (one screen addresses every unit down the line)</h2>
 <p>"Universe" is the set of units armed to <strong>Listen</strong> down the DMX line — the
@@ -494,6 +493,11 @@ shuts down at, and a
 <strong>Clear fault &amp; re-enable</strong> button that appears
 only while the port is latched. A latched port shows its fault in red on the
 card and on the header badge; tapping the badge opens the sheet.</p>
+<p><strong>Colour order.</strong> Under the curve in the Output sheet: the order the strip's
+colours are wired in, for tape whose terminals don't run red, green, blue (GRB,
+BRG and so on; on the five-output modules with white and amber too, e.g. BRGAW).
+Pick the one that makes Red show red; the sliders and the white balance stay per
+colour. A custom patch already names each output, so it has no colour order.</p>
 <p><strong>White balance.</strong> In the Output sheet, under the curve and PWM, is a master for
 each output the port's mode drives: Red, Green and Blue, plus White on RGBW and
 White and Amber on RGBWA, Cool and Warm on a tuneable-white port, one Level on a
@@ -531,7 +535,9 @@ down into a new order. Tick the box at the left of a scene to pick it:
 <strong>Delete</strong> at the top removes every ticked scene (after a confirm), and dragging
 a ticked scene moves all the ticked ones together as a block. <strong>The limit is 100
 scenes per controller</strong>; the app says so when it is reached, so delete a few
-before saving more.</p>
+before saving more. Scenes saved on a phone by an older app version, before
+scenes moved into the controller, are offered once per controller: the app asks
+whether to copy them across, and they stay on the phone either way.</p>
 <p>Each scene has two times, in seconds, under the <strong>Wait</strong> and <strong>Fade</strong> headings:
 Fade is the crossfade into the scene, Wait is how long it holds after that
 fade before the list moves on. The buttons along the foot of the tab run the
@@ -607,7 +613,11 @@ tap the title to open the fields. The buttons beneath stay in view either
 way. <strong>DMX loss release</strong> is blank (never) by default: when DMX is lost the
 last look holds until you set something else. Enter 1–60 s and the outputs fade
 to black that long after the signal goes; DMX coming back lights them again.
-<strong>RDM</strong> is off by default; see section 5.</p>
+<strong>RDM</strong> is off by default; see section 5. <strong>Run dark</strong> (off by default): pick a
+time from 30 seconds to an hour, and when nobody touches the unit for that long
+its screens and indicators go dark; a knob turn, the app or a fault wakes them,
+and the outputs are never touched. The blue power light and the CRMX link light
+are wired on and stay lit.</p>
 <p><strong>Controller and Bluetooth name</strong> (one field; the Bluetooth name changes at the
 next restart) and <strong>ID</strong>, which together are what the pairing list shows, the current limit and
 folds, and the <strong>CRMX by LumenRadio</strong> card: <strong>Unlink</strong> and <strong>Link</strong> (the
