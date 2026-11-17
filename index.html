@@ -1746,7 +1746,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-17e.clear";
+const APP_VER="2026-11-17f.quiet";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -3360,7 +3360,7 @@ function makeWheel(host,{label,min=0,max=100,value=min,fmt=v=>v,onInput}){
 // Stop -> SCRUN=0. The list arrives as SC<i>=fade,wait,name-hex records in the first state after
 // connect or after a change (or after SCLIST); SCV is its version, SCP=<active>,<follow>. The demo
 // and older firmware keep the phone's own list.
-let scCycle=null, ctlScenes=[], ctlScVer=null, scListT=0, scCheckT=0, scLastP="", scOffered=false;
+let scCycle=null, ctlScenes=[], ctlScVer=null, scListT=0, scCheckT=0, scLastP="", scOffered=false, scListFor=null, scListTries=0;
 const scCtl=()=>("SCN" in kv) && !demoOn && bleConnected();
 const scActive=()=>scCtl() ? (+(String(kv.SCP||"0").split(",")[0])||0)-1 : activeSceneIdx;
 const scFollowing=()=>scCtl() && String(kv.SCP||"").split(",")[1]==="1";
@@ -3377,7 +3377,15 @@ function scState(){
   }
   // A version change with no list in its state (a missed notify): ask for the list.
   clearTimeout(scCheckT);
-  scCheckT=setTimeout(()=>{ if(scCtl() && kv.SCV!==ctlScVer && Date.now()-scListT>2000){ scListT=Date.now(); send("SCLIST"); } },900);
+  // Never during a firmware update (each SCLIST makes the unit send its whole list through the
+  // notify queue the update's READY uses; 3.1.0 one-tap timeout, 2026-11-17), and at most three
+  // tries per list version, 2 / 5 / 10 s apart: a list lost on a busy link no longer turns into
+  // a request every 2 s.
+  if(kv.SCV!==scListFor){ scListFor=kv.SCV; scListTries=0; }
+  scCheckT=setTimeout(()=>{
+    if(!scCtl() || otaBusy || fullUpdRunning || otaChain || kv.SCV===ctlScVer || scListTries>=3) return;
+    if(Date.now()-scListT < [2000,5000,10000][scListTries]) return;
+    scListT=Date.now(); scListTries++; send("SCLIST"); },900);
   const sig=kv.SCV+"|"+kv.SCP+"|"+ctlScenes.length;
   if(sig!==scLastP){ scLastP=sig;
     if(activeTabName()==="scenes" && !sceneEditing()) renderScenes();
