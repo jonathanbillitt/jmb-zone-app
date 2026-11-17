@@ -1516,7 +1516,8 @@
   </div>
   <div class="mini" id="fxTapHint" data-help>Tap in time with the music: each tap
     puts the downbeat on it, and a few taps set the tempo. Or type a BPM; 128 is
-    the designed tempo. Club, Party, Pulse, Strobe and Police lock to the beat.</div>
+    the designed tempo. Dim Chase, Club, Party, Pulse, Strobe and Police lock to the beat.
+    The port icons follow an effect closely but not exactly; the lights are always the true picture.</div>
   <div class="row" style="margin-top:10px"><label>Spread</label>
     <input type="range" id="fxSpread" min="0" max="100" step="5" style="flex:1">
     <span id="fxSpreadV" style="width:38px;text-align:right"></span>
@@ -1734,7 +1735,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-17a.dim";
+const APP_VER="2026-11-17b.onetap";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2172,10 +2173,16 @@ async function onDisconnected(){
   scnStop(); recallGen++; clearInterval(fadeTimer); fadeTimer=null;
   try{
     if((dev || NBLE()) && !userDisc){   // native path keeps deviceId, not dev — allow reconnect
-      hello("<b>Link dropped — reconnecting…</b>"+jbarsHTML("connBars"),true); jbarsSet($("connBars"), null);
+      hello(otaChain ? "<b>Controller restarting…</b><div class='mini'>reconnecting, then the port modules</div>"+jbarsHTML("connBars")
+                     : "<b>Link dropped — reconnecting…</b>"+jbarsHTML("connBars"),true); jbarsSet($("connBars"), null);
       try{
-        await sleep(800);
-        await gattSetup();
+        // After a controller update the unit takes ~10 s to restart: keep trying for about a
+        // minute so the port step can follow (one-tap update, 2026-11-17).
+        await sleep(otaChain?4000:800);
+        for(let k=0;;k++){
+          try{ await gattSetup(); break; }
+          catch(e){ if(!otaChain || k>=8 || userDisc) throw e; await sleep(4000); }
+        }
         diagPush("ev","reconnected");
         resetUnitState(false);                // same unit: keep the cards, rebuild the state
         hello("<b>Unlocking…</b>"+jbarsHTML("connBars"),true); jbarsSet($("connBars"), null);   // stays for the intro
@@ -2713,6 +2720,7 @@ function onState(str){
   else colTgtPaint();                      // a new unit on the same port count starts on All again
   renderControl(); renderPortInfo(); renderDiag(); renderSetup();
   renderProductMark(); renderOta();
+  otaChainCheck();                          // one-tap update: the port step after the restart
   wbPaintAll(); wbRefresh(); pwPaint();
 }
 // (hexEnc lives later in the file — the printable-filtering version; a plain
@@ -6296,53 +6304,30 @@ async function runFullUpdateOnce(ctrlOnly){
   // The port step runs only when the published port image differs from the
   // one the controller last flashed (SPC) — a controller-only build no longer
   // drags every port through a reflash (user, 2026-09-14).
-  const stmInfo = (!ctrlOnly && (stmCaps()&1) && otaManifest.stm_port && portUpdateAvailable())
-                ? otaManifest.stm_port : null;
-  const both = !!stmInfo;
+  // ONE TAP (Jonathan 2026-11-17, after the first 4our update): the controller first, then, once
+  // it has restarted on the new build and the app has reconnected, the port modules. A controller
+  // too old to carry a port update over Bluetooth (a 4our before 72a1c25) still takes the firmware
+  // that can, and the port step is decided on the NEW firmware's caps. A controller already on
+  // the published build runs only the port modules, straight away. (Before: ports first, on the
+  // old firmware, then the controller.)
+  const ctrlNeeded = ctrlUpdateAvailable();
+  const portNow    = !ctrlNeeded && !ctrlOnly && !!(stmCaps()&1) && !!otaManifest.stm_port && portUpdateAvailable();
+  const portAfter  = ctrlNeeded && !ctrlOnly && !!otaManifest.stm_port;
+  if(!ctrlNeeded && !portNow) return;
   if(!await askConfirm(
-      (both ? "The port module is reprogrammed first — every output goes dark for "
-            + "a few seconds — and then the controller restarts into its new "
-            + "firmware. "
+      (ctrlNeeded
+        ? (portAfter
+            ? "The controller is updated first and restarts (about 10 seconds). The app then "
+              +"reconnects by itself and updates the port modules if they need it (every output "
+              +"goes dark for a few seconds). "
             : "The controller restarts into the new firmware when it finishes. ")
+        : "Every output goes dark for a few seconds while the port modules are reprogrammed. ")
       + "Keep the app open and the phone unlocked, and do not power the unit off.",
-      {title: both ? (ctrlUpdateAvailable() ? "Update controller and port module?" : "Update port module?")
-                   : "Update controller?",
+      {title: ctrlNeeded ? (portAfter ? "Update controller and port modules?" : "Update controller?")
+                         : "Update port modules?",
        ok:"Update"})) return;
 
-  if(stmInfo){
-    otaBusy=true; otaAbort=false; renderOta();
-    try{
-      otaSetPhase("downloading the port module image");
-      setStmState("downloading…");
-      const sv=await fetchVerified(stmInfo,"stm_port.bin");
-      await stmStageAndFlash(sv.buf, sv.crc);
-      setStmState("✓ updated");
-      setStmMsg("Port module updated. Continuing with the controller…");
-    }catch(e){
-      try{ await otacChar.writeValueWithResponse(otaEnc("STM ABORT")); }catch(_){}
-      setStmState("failed");
-      setStmMsg("The port module could not be updated: "+((e&&e.message)||e)
-        +". It keeps the firmware it had — nothing was committed.");
-      otaBusy=false; renderOta();
-      // A port step can fail BECAUSE the controller's own firmware is too old to
-      // carry it — which is the one case where continuing is the fix rather than
-      // a risk. The port was left untouched, so the controller update is safe to
-      // run; ask rather than assume, then carry straight on.
-      if(!await askConfirm("The port module could not be updated, and nothing on "
-        +"it was changed. This is often fixed by updating the controller first. "
-        +"Update the controller now and try the port module again afterwards?",
-        {title:"Continue with the controller?",ok:"Update controller"})){
-        return;
-      }
-    }
-    otaBusy=false; renderOta();
-    // Controller already on the published build: the port was the whole job.
-    if(!ctrlUpdateAvailable()){
-      setOtaState("✓ port module updated");
-      setOtaMsg("The controller is already on build "+otaManifest.build+"; only the port module needed updating.");
-      otaSetPhase(""); return;
-    }
-  }
+  if(portNow){ await otaPortStep(false); return; }
 
   otaSetPhase("downloading the controller image");
   setOtaState("downloading…");
@@ -6350,12 +6335,68 @@ async function runFullUpdateOnce(ctrlOnly){
   try{ v=await fetchVerified(otaManifest,"firmware.bin"); }
   catch(e){
     setOtaState("download failed");
-    setOtaMsg("Could not download the controller firmware: "+((e&&e.message)||e)
-      +(both?" — the port module was updated, the controller was not.":" — nothing was sent."));
+    setOtaMsg("Could not download the controller firmware: "+((e&&e.message)||e)+" — nothing was sent.");
     return;
   }
-  await runOta(new File([v.buf], otaManifest.version+" build "+otaManifest.build),
-               {skipConfirm:true, crc:v.crc});
+  const ok=await runOta(new File([v.buf], otaManifest.version+" build "+otaManifest.build),
+                        {skipConfirm:true, crc:v.crc});
+  // Only a controller that took the update goes on to the port modules.
+  if(ok && portAfter){
+    otaChain={build:otaManifest.build, until:Date.now()+10*60000, seen:0};
+    setOtaState("controller restarting…");
+    setOtaMsg("✓ Controller sent. It is restarting into the new firmware; the app reconnects "
+      +"by itself and then updates the port modules. Keep the app open.");
+  }
+}
+// The port modules' step: download, send, FLASH, STMOK. after = it follows a controller update.
+async function otaPortStep(after){
+  const stmInfo=otaManifest && otaManifest.stm_port; if(!stmInfo || !otacChar) return false;
+  otaBusy=true; otaAbort=false; renderOta();
+  try{
+    otaSetPhase("downloading the port module image");
+    setOtaState(after ? "port modules…" : "downloading…");
+    setStmState("downloading…");
+    const sv=await fetchVerified(stmInfo,"stm_port.bin");
+    await stmStageAndFlash(sv.buf, sv.crc);
+    setStmState("✓ updated"); setStmMsg("");
+    setOtaState(after ? "✓ controller and port modules updated" : "✓ port modules updated");
+    setOtaMsg(after ? "The controller and its port modules are on build "+otaManifest.build+"."
+                    : "The port modules are updated.");
+    return true;
+  }catch(e){
+    try{ await otacChar.writeValueWithResponse(otaEnc("STM ABORT")); }catch(_){}
+    setStmState("failed");
+    setStmMsg("The port modules could not be updated: "+((e&&e.message)||e)
+      +". They keep the firmware they had; nothing was committed."
+      +(after ? " The controller update itself went through: tap Update again for the ports." : ""));
+    if(after) setOtaState("✓ controller updated · ports failed");
+    return false;
+  }finally{ otaBusy=false; otaSetPhase(""); renderOta(); }
+}
+// After the controller restarts: once the app is back in and the unit reports the new build, the
+// port step runs by itself. A different build means the controller rolled back: ports left alone.
+// Gives up after 10 minutes (the app was closed, the unit was switched off).
+let otaChain=null;
+function otaChainCheck(){
+  const c=otaChain; if(!c || otaBusy || fullUpdRunning || !authed || !otacChar) return;
+  if(Date.now()>c.until){ otaChain=null; return; }
+  if(!kv.FWB) return;
+  if(kv.FWB!==c.build){ otaChain=null; setOtaState("failed");
+    setOtaMsg("The controller came back on build "+kv.FWB+", not "+c.build
+      +": it kept its previous firmware, so the port modules were left alone."); return; }
+  if(!c.seen) c.seen=Date.now();
+  if(!(stmCaps()&1) && Date.now()-c.seen<15000) return;   // the new firmware reports its caps a moment in
+  otaChain=null;
+  if(!(stmCaps()&1) || !portUpdateAvailable()){
+    setOtaState("✓ controller updated");
+    setOtaMsg("The controller is on build "+c.build+(portUpdateAvailable()
+      ? ". This unit's port modules can't be updated over Bluetooth."
+      : "; its port modules were already up to date."));
+    return;
+  }
+  try{ selectTab("setup"); }catch(_){}
+  fullUpdRunning=true; renderOta();
+  otaPortStep(true).finally(()=>{ fullUpdRunning=false; renderOta(); });
 }
 
 $("btnOtaHosted").onclick=async()=>{
@@ -6385,6 +6426,7 @@ async function runOta(file, opts){
   $("btnOtaCancel").classList.remove("hidden");
   setOtaState("starting…"); otaProgress(0);
   try{
+    var otaOk=false;                          // the caller chains the port step on success
     otaSetPhase("opening the controller update session");
     await otacChar.writeValueWithResponse(otaEnc(`BEGIN ${size} ${crc.toString(16)}`));
     let r=await waitOta(m=>m==="READY"||m.startsWith("ERR"),8000);
@@ -6406,6 +6448,7 @@ async function runOta(file, opts){
     setOtaMsg("✓ Update sent — the controller is rebooting into the new firmware. "
       +"If the new build fails to start, it automatically reverts to the previous "
       +"version. Reconnect in a few seconds.");
+    otaOk=true;
   }catch(e){
     try{ await otacChar.writeValueWithResponse(otaEnc("ABORT")); }catch(_){}
     setOtaState("failed"); otaHideBar();
@@ -6414,6 +6457,7 @@ async function runOta(file, opts){
   }finally{
     otaBusy=false; $("btnOtaCancel").classList.add("hidden"); renderOta();
   }
+  return otaOk;
 }
 
 $("btnDisc").onclick=()=>{ userDisc=true;
