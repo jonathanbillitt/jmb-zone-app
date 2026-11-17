@@ -1256,10 +1256,10 @@
       <div class="mini">Everything back to as shipped: patch, looks, names, PIN, limits, presets and the CRMX link. The controller restarts.</div>
       <div class="devonly" style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">
         <!-- The DMX card fitted (firmware CARDREV, S15 / FW-83). The host cannot detect it, so it
-             is set when the card is fitted; 3.2.4 on a 3.2.3 card stops its DMX output. -->
+             is set when the card is fitted; 3.2.5 on a 3.2.3 card stops its DMX output. -->
         <div class="row" id="cardRow" data-why="The DMX card setting needs the next controller firmware"><label>DMX card</label>
           <select id="setCard" style="width:130px"><option value="0">3.2.3 (bench only)</option>
-            <option value="1">3.2.4</option></select>
+            <option value="1">3.2.5</option></select>
           <button id="btnCard" disabled>Set</button>
         </div>
         <div class="row"><label>Shunt</label>
@@ -1746,7 +1746,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-17d.scenes";
+const APP_VER="2026-11-17e.clear";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -4698,7 +4698,7 @@ const FLASH_LOCK=["open","next power-on","on"];
 function devHealthPaint(){
   const el=$("devHealth"); if(!el) return;
   const L=[];
-  if(kv.CARD!=null) L.push("DMX card: "+(kv.CARD==="1"?"3.2.4":"3.2.3 (bench only)"));
+  if(kv.CARD!=null) L.push("DMX card: "+(kv.CARD==="1"?"3.2.5":"3.2.3 (bench only)"));
   if(kv.RFW!=null){ const [w,s,l,o]=String(kv.RFW).split(",");
     L.push("RDM "+(kv.RDMEN==="1"?"on":"off")+": windows "+(w??"?")+" · silent "+(s??"?")+" · late "+(l??"?")+" · own replies late "+(o??"?")); }
   // One line per port (a phone-width line each): last restart · restarts · config · latch · flash lock.
@@ -5143,7 +5143,7 @@ function onRdm(str){
                   : why==="FULL"  ? "device table full (16 max)"
                   : why==="NOISY" ? "aborted — too much traffic on the line "+
                                     "(unplug the desk, then scan)"
-                  : why==="CARD"  ? "this firmware can't scan through the 3.2.4 DMX card: update the controller"
+                  : why==="CARD"  ? "this firmware can't scan through the 3.2.5 DMX card: update the controller"
                   : why==="HOLD"  ? "stopped — the DMX card didn't hand the line over (try again)"
                   : "error";
       rdmActive=false;
@@ -5548,8 +5548,8 @@ $("btnCal").onclick=()=>{
 };
 $("setCard").onchange=()=>{ $("setCard").dataset.edit="1"; devHealthPaint(); };
 $("btnCard").onclick=async()=>{
-  const v=$("setCard").value, name=v==="1"?"3.2.4":"3.2.3 (bench only)";
-  if(!await askConfirm("Set this only to the DMX card actually fitted. 3.2.4 on a 3.2.3 card stops its DMX output passing anything on.",
+  const v=$("setCard").value, name=v==="1"?"3.2.5":"3.2.3 (bench only)";
+  if(!await askConfirm("Set this only to the DMX card actually fitted. 3.2.5 on a 3.2.3 card stops its DMX output passing anything on.",
                        {title:"DMX card: "+name+"?",ok:"Set",danger:true})){ delete $("setCard").dataset.edit; devHealthPaint(); return; }
   delete $("setCard").dataset.edit; $("btnCard").disabled=true; send("CARDREV="+v); toast("DMX card set to "+name);
 };
@@ -5915,11 +5915,12 @@ $("btnPrep").onclick=async()=>{
   if(!demoOn) try{ localStorage.setItem(undoKey(),JSON.stringify(snapshotPorts())); }catch(_){}
   // Clear to a clean programming base: effect OFF, colour full, speed at
   // designed tempo, dimmer down — nothing lights until you raise a wheel.
+  const five=+(kv.NCH||3)===5;             // White and Amber are outputs on the five-output rigs
   ports.forEach((m,i)=>{ const p=i+1;
-    for(const k of ["R","G","B","D","S","X"]) hot[p+"."+k]=Date.now();
+    for(const k of ["R","G","B","WH","AM","D","S","X"]) hot[p+"."+k]=Date.now();
     // Park the UI where the clear actually put things — faders/effect used to
     // stay wherever they were, lying about the port state underneath.
-    for(const c of ["R","G","B"]){
+    for(const c of five?["R","G","B","WH","AM"]:["R","G","B"]){
       const el=$(c.toLowerCase()+p);
       if(el){ el.value=100; $("v"+c+p).textContent=100; }
     }
@@ -5930,11 +5931,13 @@ $("btnPrep").onclick=async()=>{
     if(wheels[p+".D"]) wheels[p+".D"].set(0);
     if(wheels[p+".S"]) wheels[p+".S"].set(128);
     m.R=m.G=m.B=100; m.D=0; m.S=128; m.M=1; m.X=0;
+    if(five){ m.WH=100; m.AM=100; }
   });
   sendLook("ALL.DIM=0");                   // dimmer down FIRST — never a
   sendLook("ALL.MAN=1");                   // full-white blast on the way
   sendLook("ALL.FX=0");                    // kill any running effect
   sendLook("ALL.RGB=100,100,100");
+  if(five){ sendLook("ALL.WH=100"); sendLook("ALL.AM=100"); }   // every output full, white and amber too
   sendLook("ALL.FXS=128");
 };
 // statusEl: where the progress and "done" line goes. Only Import passes one
@@ -5957,8 +5960,9 @@ try{ localStorage.removeItem("jmb_undo"); }catch(_){}     // the old shared key
 // Undo puts back only what Clear all takes: the looks. The patch (mode,
 // address, head) was never touched by Clear all, so it is not restored.
 function snapshotPorts(){
-  return ports.map(m=>({m:m.M??0,r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,
-                        x:m.X??0,s:m.S??128}));
+  return ports.map(m=>{ const t={m:m.M??0,r:m.R??0,g:m.G??0,b:m.B??0,d:m.D??100,x:m.X??0,s:m.S??128};
+    if(m.WH!=null) t.w=m.WH; if(m.AM!=null) t.a=m.AM;       // five-output: white and amber too
+    return t; });
 }
 function lookQueue(list){
   const q=[];
@@ -5969,7 +5973,9 @@ function lookQueue(list){
     // an effect port on 0,0,0 in manual black at the dimmer (white) until FX landed.
     q.push(`P${p}.FX=${n(t.x)}`,`P${p}.FXS=${n(t.s??128)}`,
            `P${p}.RGB=${n(t.r)},${n(t.g)},${n(t.b)}`,`P${p}.DIM=${n(t.d??100)}`,`P${p}.MAN=${t.m?1:0}`);
-    for(const k of ["R","G","B","D","X","S"]) hot[p+"."+k]=Date.now()+4000;
+    if(t.w!=null) q.push(`P${p}.WH=${n(t.w)}`);
+    if(t.a!=null) q.push(`P${p}.AM=${n(t.a)}`);
+    for(const k of ["R","G","B","WH","AM","D","X","S"]) hot[p+"."+k]=Date.now()+4000;
   });
   return q;
 }
@@ -7537,6 +7543,7 @@ function demoCmd(s){
     d.r=+m[2]; d.g=+m[3]; d.b=+m[4]; return; }
   if(m=s.match(/^P(\d)\.(R|G|B|WH|AM)=(\d+)/)){ demoP[+m[1]-1][m[2].toLowerCase()]=+m[3]; return; }   // WH / AM = the fourth and fifth outputs
   if(m=s.match(/^ALL\.RGB=(\d+),(\d+),(\d+)/)){ demoP.forEach(d=>{d.r=+m[1];d.g=+m[2];d.b=+m[3];}); return; }
+  if(m=s.match(/^ALL\.(WH|AM)=(\d+)/)){ demoP.forEach(d=>{ d[m[1].toLowerCase()]=+m[2]; }); return; }   // Clear all on a five-output rig
   if(m=s.match(/^P(\d)\.FX=(\d+)/)){ demoP[+m[1]-1].x=+m[2]; demoState(); return; }
   // Clear all / Reset all ports send these too (user, chore 6: the demo used to
   // put the defaults straight back). Demo defaults return only when Demo mode
