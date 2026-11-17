@@ -373,8 +373,11 @@
   /* Patch sheet Apply flow (2026-11-17): mode centred, a stem splitting to two arrows, one per
      target button (their centres sit at a quarter and three quarters of the row). */
   /* Three columns, the outer two equal: the select itself sits dead centre over the stem. */
-  .fanhead { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; column-gap:10px; }
+  .fanhead { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; column-gap:10px; }
   .fanhead label { width:auto; justify-self:end; }
+  .fanstep { justify-self:start; display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--dim); white-space:nowrap; }
+  .fanstep.hidden { display:none; }
+  .row .fanstep input[type=number] { width:56px; }   /* beats the rows' wider number fields */
   .fanflow { position:relative; height:24px; margin:-6px 0 0; }
   .fanflow::before { content:""; position:absolute; left:50%; top:0; height:9px;
                      border-left:2px solid var(--acc); transform:translateX(-1px); opacity:.75; }
@@ -1763,7 +1766,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-17g.flow";
+const APP_VER="2026-11-17h.offset";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2928,6 +2931,7 @@ function renderControl(){
     { const n=ports.length, show=p===1 && n>=2;
       const fr=$("fanRow"+p), fbs=$("fanBtns"+p), fb=$("fan"+p), fc=$("fanC"+p), fm=$("fanM"+p);
       if(fm && document.activeElement!==fm) fm.value=kv.AM??"0";
+      fanStepPaint(p);
       if(fr) fr.classList.toggle("hidden",!show);
       if(fbs) fbs.classList.toggle("hidden",!show);
       { const ff=$("fanFlow"+p); if(ff) ff.classList.toggle("hidden",!show); }
@@ -3105,6 +3109,7 @@ function buildCard(p){
           <select id="fanM${p}" style="width:96px">
             <option value="0">Same</option><option value="1">Seq</option>
             <option value="2">Offset</option></select>
+          <span class="fanstep hidden" id="fanS${p}"></span>
         </div>
         <div class="fanflow" id="fanFlow${p}" aria-hidden="true"><span class="bar"></span></div>
         <!-- Port 1 only (user, 2026-10-02): the two targets, like the white
@@ -3115,7 +3120,7 @@ function buildCard(p){
           <button id="fanC${p}" class="flowbtn">Universe</button>
         </div>
         <div class="mini">Address, head and mode are the desk patch. The label names the port across the app.</div>
-        <div class="mini">Apply patches the later ports from this address, Seq by footprint, Offset by stride, and asks if the Mode follows.</div>
+        <div class="mini">Apply patches the later ports from this address: Seq by footprint, Offset every so many channels (blank = automatic). It asks if the Mode follows.</div>
         <div class="mini">Universe carries the patch on to every unit armed to Listen, each following on from the last.</div>
       </div>
       <div class="psheet rows" id="psOut${p}" data-title="Port ${p} · Output">
@@ -3241,7 +3246,7 @@ function buildCard(p){
   });
   // One Apply mode for the controller (state AM): the panel's All Ports edit
   // and a desk's RDM base address fan out by it too.
-  d.querySelector("#fanM"+p).addEventListener("change",e=>send("AMODE="+ +e.target.value));
+  d.querySelector("#fanM"+p).addEventListener("change",e=>{ send("AMODE="+ +e.target.value); fanStepPaint(p); });
   d.querySelector("#fan"+p).addEventListener("click",()=>fanOut(p,false));
   d.querySelector("#fanC"+p).addEventListener("click",()=>fanOut(p,true));
   d.querySelector("#pers"+p).addEventListener("change",e=>{
@@ -7066,9 +7071,26 @@ function pcPaintSet(p,m){
 // firmware needs nothing new. Heads follow +1 in Seq and Offset, as on the
 // panel. A port on a custom preset is passed over: it listens on the preset's
 // own channels and its Address field is not used.
+// The step in force: the unit's own (state OFS: automatic, or the one set with OFSU), else the
+// app's copy of the automatic rule for firmware that does not report it.
 function fanStride(){
+  if(+kv.OFS>0) return Math.min(512,+kv.OFS);
   let s=0; for(let c=0;c<13;c++) if(persAvail(c)) s=Math.max(s,PERS_CH[c]||0);
   return s||10;
+}
+// Offset's step beside the Apply select (user 2026-11-17: "a 16ch mode every 20 channels or 50"):
+// a field when the unit stores a chosen step (state OFSU, 0 = automatic), else the automatic step
+// shown read-only. Blank = automatic.
+function fanStepPaint(p){
+  const el=$("fanS"+p), fm=$("fanM"+p); if(!el||!fm) return;
+  const on=fm.value==="2"; el.classList.toggle("hidden",!on); if(!on) return;
+  if(!("OFSU" in kv)){ el.textContent=`${fanStride()} ch`; el.title="channels between ports"; return; }
+  let f=$("fanSt"+p);
+  if(!f){ el.innerHTML=`<input type="number" id="fanSt${p}" min="1" max="512" step="1" inputmode="numeric" placeholder="auto" title="channels between ports; blank = automatic"> ch`;
+    f=$("fanSt"+p);
+    f.addEventListener("change",()=>{ const v=f.value.trim(), n=v===""?0:Math.max(1,Math.min(512,Math.round(+v||0)));
+      f.value=n?String(n):""; send(`OFSU=${n}`); kv.OFSU=String(n); if(n) kv.OFS=String(n); toast(n?`Offset every ${n} channels`:"Offset step: automatic"); }); }
+  if(document.activeElement!==f){ const u=+(kv.OFSU||0); f.value=u?String(u):""; f.placeholder=String(fanStride()); }
 }
 // chain=true also sends the patch on down the DMX line (CHPATCH baton: the
 // next address and head after this unit's last port, the mode, and the Mode
@@ -7111,7 +7133,11 @@ async function fanOut(p,chain){
     else if(mode===2) na=a+stride;
     if(mode!==0) nh=(h+1)%10000;
     na=Math.max(1,Math.min(512,na));
-    await send(`CHPATCH=${na},${nh},${mode},${withMode?pe0:-1}`);
+    // Offset: the step the user CHOSE travels (OFSU; 0 = automatic, so each unit keeps its own
+    // widest-mode step: a three-output sender's automatic 10 must not overlap a five-output unit's
+    // 14-channel ports downstream; firmware chat, FW-90).
+    const chosenStep = (mode===2 && kv.OFSU!==undefined) ? `,${Math.max(0,+kv.OFSU||0)}` : "";
+    await send(`CHPATCH=${na},${nh},${mode},${withMode?pe0:-1}${chosenStep}`);
     chainNote=` · universe from ${na}`;
   }
   // Applied: the sheet closes and a message says what was set (user,
@@ -7371,7 +7397,7 @@ const SUP_TO="support@jmblighting.co.uk";
 // Controller status that goes in. A WHITELIST: a key the firmware gains later
 // stays out until it is added here on purpose. Never listed: NIP (network
 // address). Names (CN, BTN), the ID and port labels go in only with the tick.
-const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD","DLR","RDMEN","PWRF","CARD","BTM","UPE","UKF","RFW","PRS","CO","DK","DKT","DKN",
+const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD","DLR","RDMEN","PWRF","CARD","BTM","UPE","UKF","RFW","PRS","CO","DK","DKT","DKN","OFS","OFSU",
   "RDM","ANS","RB","RBOK","STM","SPC","CHL","TSEQ","TXA","TXN","LPX","LPS","LPN","LPA","LPG","BSY","BRT","BSM","BRM",
   "NET","NW","NRS","TF","PB","CL","CLM","CLK","CF","FC","FT","OL","SH","SHM","TCR","CX","CA","CXR","CXL","CXS","CXF",
   "SQ","SQN","BPM","SPR","TAPV","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
@@ -7506,7 +7532,7 @@ function demoState(){
     `NET=${demoF.net};NW=${demoF.net};NUN=${demoF.nun};SRC=${demoF.net?1:0};`+
     `NIP=192.168.1.42;NRS=-52;TF=${demoF.tf};PB=${demoF.cl};`+demoLimits()+`CX=${demoF.cx??3};CXF=${(demoF.cx??3)>=2?1:0};CA=1;`+   // CX follows Link / Unlink (user, 2026-10-04)
     `SH=${demoF.sh||5};SHM=${demoF.sh?1:0};`+     // 5 mΩ on every product since 2026-09-23: the ceiling reads 6.75 A
-    "NCH=5;CHP=1;CHS=1;FR=1;"+                  // the demo is a five-channel unit with the universe batons and a factory reset: no firmware greying
+    "NCH=5;CHP=1;CHS=1;FR=1;"+`OFS=${demoF.ofsu||14};OFSU=${demoF.ofsu||0};`+   // Offset step: automatic 14 on a five-output rig, or the one set                  // the demo is a five-channel unit with the universe batons and a factory reset: no firmware greying
     "PWLIM=2000,25000;"+PWC+demoF.cpd.map((c,k)=>`CPD${k+1}=${c||"0"};`).join("")+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)).join("")+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
     `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=${demoF.spr};TAPV=1;`+demoTxState()+
@@ -7642,6 +7668,7 @@ function demoCmd(s){
   if(m=s.match(/^P(\d)\.CO=([1-5]{5})$/)){ (demoF.co=demoF.co||[])[+m[1]-1]=m[2]; demoState(); return; }
   if(m=s.match(/^DK=(\d)/)){ demoF.dk=+m[1]?1:0; demoState(); return; }
   if(m=s.match(/^DKT=(\d+)/)){ demoF.dkt=Math.max(10,Math.min(3600,+m[1])); demoState(); return; }
+  if(m=s.match(/^OFSU=(\d+)/)){ demoF.ofsu=Math.min(512,+m[1]); demoState(); return; }
   if(m=s.match(/^CARDREV=(\d)/)){ demoF.card=+m[1]===1?1:0; demoState(); return; }
   if(m=s.match(/^RDMEN=(\d)/)){ demoF.rdm=+m[1]?1:0; demoState(); return; }
   if(m=s.match(/^DLR=(\d+)/)){ demoF.dlr=Math.min(60,+m[1]); demoState(); return; }   // DMX loss release
