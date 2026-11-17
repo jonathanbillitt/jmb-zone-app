@@ -1,11 +1,11 @@
 {
-  "version": "3.1.1",
-  "build": "b174d99-20261117",
-  "size": 1265704,
-  "crc32": "e543f83d",
-  "sha256": "21b01db85f48485b7ab5296b811038125470de847f5ea26240e7bc78a0b55e23",
+  "version": "3.2.0",
+  "build": "9ce68b9-20261117",
+  "size": 1269800,
+  "crc32": "cd5cdf45",
+  "sha256": "7674d135bd7b2f078a93e9cf4f996706b3cb65cdf325cd54edd224fb86ac1ba5",
   "date": "2026-11-17",
-  "notes": "Version 3.1.1 for 3.x controllers (3.1.4 MCU, 3.6.4 zOne): more reliable Bluetooth updates (update replies can no longer be lost on a busy link; a transfer the app drops is cleaned up at once); port firmware 2.8.10 unchanged",
+  "notes": "Version 3.2.0 for 3.x controllers (3.1.4 MCU, 3.6.4 zOne): faster Bluetooth updates (the unit asks your phone for a quicker connection while an update transfers, from the update after this one) and a settable Offset step (Apply = Offset can space ports any 1-512 channels apart, or stay automatic); port firmware 2.8.10 unchanged",
   "file": "firmware.jmbx",
   "encrypted": true,
   "host": "3x",
@@ -14,8 +14,8 @@
   "stm_port": {
     "file": "stm_port.jmbx",
     "size": 19680,
-    "crc32": "4c714fbb",
-    "sha256": "d62c87e32a7cd649c0f922f7e03ffe567aa57c754c7b31525f2a398c8932def1",
+    "crc32": "f2835bb4",
+    "sha256": "67087c681e0dfe35b1fc5f6eef0272117ee4681df3a23e31d84ed95070e5cb93",
     "target": "port5",
     "image_crc32": "b0d54e7c"
   }
