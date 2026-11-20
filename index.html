@@ -1766,7 +1766,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-17i.help";
+const APP_VER="2026-11-20a.pwm";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -3134,10 +3134,12 @@ function buildCard(p){
           <select id="co${p}" style="width:130px"></select></div>
         <div class="mini" id="con${p}" data-help style="display:none">Pick the order that makes Red show red on the strip; the sliders and white balance stay per colour.</div>
         <div class="row"><label>PWM</label>
-          <select id="pwm${p}" style="width:170px">
-            <option value="0">Smooth 8 kHz</option>
-            <option value="1">Silent 20 kHz</option>
+          <select id="pwm${p}" style="width:230px">
+            <option value="0">Smooth 8 kHz (50 Hz)</option>
+            <option value="1">Silent 20 kHz (50 Hz)</option>
             <option value="2">Camera 15.6 kHz</option>
+            <option value="7" hidden>Camera 19.2 kHz (50/60 Hz)</option>
+            <option value="6" hidden>Scrambled (any)</option>
             <option value="3" hidden>Custom 1</option>
             <option value="4" hidden>Custom 2</option>
             <option value="5" hidden>Custom 3</option>
@@ -3145,6 +3147,7 @@ function buildCard(p){
           <button class="hidden" id="pwe${p}" style="margin-left:8px;padding:6px 10px">Custom…</button></div>
         <div class="mini hidden" id="pwn${p}" style="margin:0;color:var(--warn)"></div>
         <div class="mini">Smooth for the eye, Silent above hearing, Camera for 25 and 50 fps shutters.</div>
+        <div class="mini" data-help>Brackets show the mains frequency each setting is exact for: no stripes at that frequency's usual shutter speeds. Camera 19.2k suits both 50 and 60 Hz; Scrambled, whose timing varies at random, suits anything.</div>
         <div id="wbHost${p}"></div>   <!-- the white balance block mounts here while the sheet is open -->
       </div>
       <div class="psheet rows" id="psProt${p}" data-title="Port ${p} · Protection">
@@ -4604,16 +4607,49 @@ function fxStep(s,x,i,S,sf,spread,dtr,now,sprMs){
   const whole=Math.floor(s.vtf); s.vt+=whole; s.vtf=f(s.vtf-whole);
   s.rgb=fxCompute(x,i,s.vt+spread,s,vdt,now,S,sprMs);
 }
+// Demo: the test sequences on the swatches, as the firmware drives the outputs (main.cpp TEST_CMY / TEST_RGB;
+// user 2026-11-20: "in app demo mode test isn't showing rgbwa values"). Step: R → G → B → W → A → all, 1 s
+// each, raw on every physical output whatever the Mode. Fade: a crossfade wheel over the outputs the port's
+// Mode drives (output k full while k+1 rises, then k falls), 1 s per colour, each port a quarter-cycle behind
+// the last; Dim (or one output) breathes 0 → full → 0 over the port's set colour. Levels 0-100 per output.
+function testLevels(mm,i,now,tq){
+  const lv={R:0,G:0,B:0,WH:0,AM:0};
+  if(tq===2){ const s=Math.floor(now/1000)%6; CH_KEYS.forEach((k,c)=>{ if(s===c||s===5) lv[k]=100; }); return {lv,m:{PE:9}}; }   // shown as the five outputs' own colours
+  const pe=mm.PE??0, SEG=500, dim=(pe===5||pe===6);
+  const keys=[...new Set(portRows(mm).map(r=>r.key))].sort((a,b)=>CH_KEYS.indexOf(a)-CH_KEYS.indexOf(b));
+  if(dim||keys.length===1){
+    const cyc=2*SEG, ph=(now+i*cyc/4)%cyc, l=(ph<SEG?ph:cyc-ph)/SEG;
+    if(dim){ const any=CH_KEYS.some(k=>+(mm[k]||0)>0); CH_KEYS.forEach(k=>lv[k]=(any?+(mm[k]||0):100)*l); }
+    else lv[keys[0]]=100*l;
+    return {lv,m:mm};
+  }
+  const n=keys.length, cyc=2*n*SEG, ph=(now+i*cyc/4)%cyc, seg=Math.floor(ph/SEG), f=100*(ph%SEG)/SEG, k=seg>>1, k1=(k+1)%n;
+  if(seg&1){ lv[keys[k]]=100-f; lv[keys[k1]]=100; } else { lv[keys[k]]=100; lv[keys[k1]]=f; }
+  return {lv,m:mm};
+}
 let fxRaf=0;
 function fxTick(now){
   fxRaf=0;
   fxBeatSync(now);
   let any=false;
+  const tq=+(kv.TSEQ||0);
   ports.forEach((mm,i)=>{
     const p=i+1, x=+(mm.X||0), sw=$("sw"+p); if(!sw) return;
+    if(tq && demoOn){                                   // the demo plays the test on the swatch
+      const {lv,m}=testLevels(mm,i,now,tq), [cr,cg,cb]=swatchMix(m,lv), l=cr+cg+cb;
+      if(fxSt[p]) delete fxSt[p];
+      swOwned[p]="test"; any=true;
+      sw.style.background=`rgb(${cr|0},${cg|0},${cb|0})`;
+      sw.style.boxShadow=l>40?`0 0 ${(8+l/40)|0}px rgba(${cr|0},${cg|0},${cb|0},.6)`:"none";
+      return;
+    }
+    if(swOwned[p]==="test"){                            // the test stopped: back to the port's own colour
+      swOwned[p]=false; const [cr,cg,cb]=swatchMix(mm,mm);
+      sw.style.background=`rgb(${cr},${cg},${cb})`; sw.style.boxShadow=(cr+cg+cb>40)?`0 0 14px rgba(${cr},${cg},${cb},.55)`:"none";
+    }
     // Live DMX outranks effects on a real unit; the demo's "DMX" is scenery, so
     // its previews run regardless (it exists to show things off).
-    if(!x || (kv.DMX==="1" && !demoOn) || (+(kv.TSEQ||0))!==0){
+    if(!x || (kv.DMX==="1" && !demoOn) || tq!==0){
       if(fxSt[p]){ delete fxSt[p]; if(swOwned[p]==="fx") swOwned[p]=false; }
       return;
     }
@@ -6806,6 +6842,17 @@ const fmtKhz=hz=>(hz/1000).toFixed(hz%1000?1:0)+" kHz";
 const pwActual=hz=>{ const span=Math.floor((16000000+Math.floor(hz/2))/hz);
   return Math.floor((16000000+Math.floor(span/2))/span); };
 const PORT_FW_CUSTOM=0x0207;                     // port firmware 2.7
+// FW-93 (2026-11-20): library entry 6 = Scrambled, Camera's 15.6 kHz with every period and the fine dimming
+// steps placed at random; after the custom slots so 0-5 keep their numbers. Needs port firmware 2.9: the
+// controller refuses the set below that and the state snaps back.
+const PWM_SCRAMBLED=6, PORT_FW_SCRAMBLED=0x0209;  // port firmware 2.9
+// FW-95 (2026-11-20): entry 7 = Camera 19.2 kHz, exactly 2400 x 8 Hz (833/833/834 counts), a whole number of pulses at
+// 1/48, 1/50, 1/60, 1/100 and 1/120; port firmware 2.9 like Scrambled. Every entry names in brackets the mains family it
+// is EXACT for (no stripes at that family's usual shutters): 8k and 20k (50 Hz), 15.6k none (5^6 Hz), Scrambled (any),
+// 19.2k (50/60 Hz), a custom (50 Hz) when its REAL carrier divides by 100 - never (60 Hz): a whole 16 MHz count cannot
+// hold the factor of 3 (the firmware's jmb_pwm_family, port_state.h).
+const PWM_CAM19=7, PWM_NEEDS_29=v=>v===PWM_SCRAMBLED||v===PWM_CAM19;
+const pwFamily=hz=>hz%100===0?" (50 Hz)":"";
 const portsOn=entry=>ports.map((m,i)=>(m.PW===entry?i+1:0)).filter(Boolean);
 
 // ----- white balance block (inside the Output sheet) -----
@@ -7032,9 +7079,11 @@ function pcClose(){
 $("pcClose").onclick=pcClose;
 $("pcOv").addEventListener("click",e=>{ if(e.target===$("pcOv")) pcClose(); });
 const CRV_NAMES=["Linear","Soft 1.6","Theatre 2.2"];
-const PWM_STOCK=["Smooth 8 kHz","Silent 20 kHz","Camera 15.6 kHz"];
+const PWM_STOCK=["Smooth 8 kHz","Silent 20 kHz","Camera 15.6 kHz"];   // the card's names: no mains bracket, the card's column is 98 px (the picker carries the brackets, FW-95)
 function pwName(m){
   const pw=m.PW??0; if(pw<3) return PWM_STOCK[pw]||"—";
+  if(pw===PWM_SCRAMBLED) return "Scrambled";
+  if(pw===PWM_CAM19) return "Camera 19.2 kHz";
   const c=pwCustom(pw-3); return c ? `C${pw-2} · ${fmtKhz(c.act)}` : `Custom ${pw-2}`;
 }
 // The printed values read the state, never the fields, so a field mid-edit is
@@ -7061,7 +7110,7 @@ function pcPaintSet(p,m){
   { const bh=$("pbH"+p); if(bh) bh.textContent=String(m.H??0); }
   const slot=(m.PW??0)-3, c=slot>=0?pwCustom(slot):null;
   put("pvCrv"+p, CRV_NAMES[m.CV??0]||"Linear");
-  const pf=+(m.PF||0), old=!!c && pf<PORT_FW_CUSTOM && m.O===1;
+  const pf=+(m.PF||0), old=((!!c && pf<PORT_FW_CUSTOM) || (PWM_NEEDS_29(m.PW??0) && pf<PORT_FW_SCRAMBLED)) && m.O===1;
   put("pvPwm"+p, old ? "Camera 15.6 kHz" : pwName(m), old?"warn":"");
   put("pvOcp"+p, `Limit ${((m.OC??ocpCapA()*1000)/1000).toFixed(2)} A`);
   put("pvOt"+p, `Trip ${m.OT??80} °C`);
@@ -7199,11 +7248,11 @@ function pwOpen(){
     $("pwC"+k).onclick=async()=>{
       const used=portsOn(3+k);
       if(used.length && !await askConfirm(`Port${used.length>1?"s":""} ${used.join(", ")} `+
-            `${used.length>1?"go":"goes"} back to Camera 15.6 kHz.`,
+            `${used.length>1?"go":"goes"} back to the default carrier (Camera 19.2k; Camera 15.6 kHz on port firmware before 2.9).`,
             {title:`Clear Custom ${k+1}?`,ok:"Clear",danger:true})) return;
       hot["PWC"+k]=Date.now();
       kv["PWC"+(k+1)]="0,0";
-      used.forEach(p=>{ if(ports[p-1]) ports[p-1].PW=2; });
+      used.forEach(p=>{ if(ports[p-1]) ports[p-1].PW=PWM_CAM19; });   // the firmware's fallback since 116594b (a 2.x host reports 2; the next state says)
       f.value=""; note();
       send(`PWC${k+1}=0`);
       pwPaint(); renderControl();
@@ -7245,19 +7294,25 @@ function pwPaintCard(p,m){
   const lib=!!pwLim(), sel=$("pwm"+p), pf=+(m.PF||0);
   if(sel) for(const o of sel.options){
     const v=+o.value; if(v<3) continue;
-    const c=pwCustom(v-3);
     optSet(o,"hidden",!lib);
+    if(PWM_NEEDS_29(v)){                                     // FW-93 / FW-95: greyed below port firmware 2.9, as the customs below 2.7
+      optSet(o,"disabled",pf<PORT_FW_SCRAMBLED);
+      optSet(o,"textContent",(v===PWM_CAM19?"Camera 19.2 kHz (50/60 Hz)":"Scrambled (any)")+(pf<PORT_FW_SCRAMBLED?" — port firmware 2.9":""));
+      continue;
+    }
+    const c=pwCustom(v-3);
     optSet(o,"disabled",!c || pf<PORT_FW_CUSTOM);
     optSet(o,"textContent", !c ? `Custom ${v-2} (not set)`
-      : `Custom ${v-2} · ${fmtKhz(c.act)}`+(pf<PORT_FW_CUSTOM?" — port firmware 2.7":""));
+      : `Custom ${v-2} · ${fmtKhz(c.act)}${pwFamily(c.act)}`+(pf<PORT_FW_CUSTOM?" — port firmware 2.7":""));
   }
   const pe=$("pwe"+p); if(pe) pe.classList.toggle("hidden",!lib);
-  const slot=(m.PW??0)-3, c=slot>=0?pwCustom(slot):null;
+  const pw=m.PW??0, slot=pw-3, c=(slot>=0&&!PWM_NEEDS_29(pw))?pwCustom(slot):null;
   // A port that cannot run the entry it holds is on the stock Camera carrier.
   const pn=$("pwn"+p);
-  if(pn){ const bad=!!c && pf<PORT_FW_CUSTOM && m.O===1;
+  if(pn){ const need=PWM_NEEDS_29(pw) ? PORT_FW_SCRAMBLED : PORT_FW_CUSTOM;
+    const bad=(!!c || PWM_NEEDS_29(pw)) && pf<need && m.O===1;
     pn.classList.toggle("hidden",!bad);
-    if(bad) pn.textContent="This port's firmware is older than 2.7: it is running Camera 15.6 kHz."; }
+    if(bad) pn.textContent=`This port's firmware is older than ${need===PORT_FW_SCRAMBLED?"2.9":"2.7"}: it is running Camera 15.6 kHz.`; }
 }
 
 // ---------- custom personalities: four controller-held presets (preview, 2026-10-01) ----------
@@ -7527,7 +7582,7 @@ function demoTxState(){
 }
 function demoState(){
   const P=(n,d)=>`P${n}=A${d.a},PE${d.pe},M${d.m??1},R${d.r},G${d.g},B${d.b},WH${d.wh??0},AM${d.am??0},D${d.d??80},O1,F00,X${d.x},S${d.s??128},H${d.h??n},`+
-    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW${d.pw??2},OC${d.oc??6750},OT${d.ot??80},CV${d.cv??0},TX${1000*n},TO0,EC0,PH1,PF519,KA1000,KB1000,L${d.l||0};`;
+    `IA${120+n*40},IB${118+n*40},T${240+n*15},RX${1000*n},CE0,PW${d.pw??7},OC${d.oc??6750},OT${d.ot??80},CV${d.cv??0},TX${1000*n},TO0,EC0,PH1,PF521,KA1000,KB1000,L${d.l||0};`;
   const W=(n,d)=>{ const w=d.wb||[255,255,255,255,255]; return `W${n}=${w[0]},${w[1]},${w[2]},${w[3]??255},${w[4]??255},${d.wbp||0};`; };
   const PWC=demoF.pwc.map((c,k)=>`PWC${k+1}=${c?`${c.hz},${pwActual(c.hz)}`:"0,0"};`).join("");
   onState(
@@ -7638,7 +7693,7 @@ function demoCmd(s){
     demoP.forEach(d=>{ d.wb=w.slice(); }); demoState(); return; }
   if(m=s.match(/^PWC(\d)=(\d+)/)){ const k=+m[1]-1, hz=+m[2];
     if(k>=0&&k<3){
-      if(!hz){ demoF.pwc[k]=null; demoP.forEach(d=>{ if(d.pw===3+k) d.pw=2; }); }
+      if(!hz){ demoF.pwc[k]=null; demoP.forEach(d=>{ if(d.pw===3+k) d.pw=PWM_CAM19; }); }   // to the default carrier, as the firmware (116594b)
       else demoF.pwc[k]={hz:Math.max(2000,Math.min(25000,hz))};
       demoState(); }
     return; }
@@ -7648,7 +7703,7 @@ function demoCmd(s){
       demoState(); }
     return; }
   if(m=s.match(/^P(\d)\.PWM=(\d+)/)){ const v=+m[2], d=demoP[+m[1]-1];
-    if(v<3 || (v<6 && demoF.pwc[v-3])) d.pw=v;
+    if(v<3 || PWM_NEEDS_29(v) || (v<6 && demoF.pwc[v-3])) d.pw=v;
     demoState(); return; }
   if(m=s.match(/^P(\d)\.CURVE=(\d+)/)){ demoP[+m[1]-1].cv=Math.min(2,+m[2]); demoState(); return; }
   // Model switch: the demo becomes a Zone / 4our / 8ight on the spot (a real

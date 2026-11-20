@@ -49,13 +49,13 @@ blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #b7ade6; 
 </style></head><body>
 <div id="jmbsearch"><div class="jsrow"><input type="search" placeholder="Search this manual — e.g. current limit" aria-label="Search this manual"><a class="jpdf" href="dmx-chart.pdf" download>PDF</a></div><div class="jr"></div></div>
 <h1>JMB Lighting — DMX Personality Chart</h1>
-<p>JMB Zone / 4our / 8ight · Firmware 2.x · 2026-10-02 (five-channel set added)</p>
+<p>JMB Zone / 4our / 8ight · Hardware 3.0.0 · Firmware 3.2.0 · 2026-11-19</p>
 <h2>Personalities (per port)</h2>
 <p>The number is the one the panel, the app and an RDM console all show. The
 RGBW and RGBWA personalities need a <strong>five-output port module</strong> (the .3
-boards: outputs red, green, blue, white, amber on XLR pins 2–6, the white
-and amber terminals printed CW / WW); on a three-output module they are
-greyed out and cannot be selected.</p>
+boards: outputs red, green, blue, white, amber on XLR pins 2–6, printed
+1 V+ 2 R 3 G 4 B 5 W 6 A); on a three-output module they are greyed out and
+cannot be selected.</p>
 <table>
 <thead>
 <tr>
@@ -146,9 +146,10 @@ greyed out and cannot be selected.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>CW/WW on a five-output module</strong> drives the white (cool) and amber (warm)
-terminals and leaves red, green and blue dark; on a three-output module cool
-rides the green terminal and warm the red one, as it always has.</p>
+<p><strong>CW/WW on a five-output module</strong> puts cool white on W (pin 5) and warm white
+on A (pin 6), and leaves red, green and blue dark. Wire a tuneable-white tape's
+cool lead to W and its warm lead to A. On a three-output module cool rides the
+green terminal and warm the red one, as it always has.</p>
 <p><strong>Dim personalities</strong> patch a port like a classic dimmer channel: the one
 DMX level scales the port's <em>set colour</em> (chosen in the app). With no colour
 set it acts as white — every output carries the level — so a single-colour
