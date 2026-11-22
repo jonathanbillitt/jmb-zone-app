@@ -1547,7 +1547,7 @@
   </div>
   <div class="mini" id="fxTapHint" data-help>Tap in time with the music: each tap
     puts the downbeat on it, and a few taps set the tempo. Or type a BPM; 128 is
-    the designed tempo. Dim Chase, Club, Party, Pulse, Strobe and Police lock to the beat.
+    the designed tempo. Dim Snap, Dim Fade, Club, Party, Pulse, Strobe and Police lock to the beat.
     The port icons follow an effect closely but not exactly; the lights are always the true picture.</div>
   <div class="row" style="margin-top:10px"><label>Spread</label>
     <input type="range" id="fxSpread" min="0" max="100" step="5" style="flex:1">
@@ -1748,17 +1748,20 @@ function persPaintOptions(p){
 const FX_NAMES = ["Off","Candle","Fire","Fireworks","Water","Siren","Laser","Club",
                   "Lightning","Rainbow","Aurora","Sunset","TV Sim","Strobe","Police",
                   "Pulse","Party","Traffic","Fluoro","Paparazzi","Explosion","Clouds",
-                  "Dim Chase","Dim Random"];
-// The list order (effects.h FX_DISPLAY_ORDER): Off, the two intensity-only effects, then the rest.
-// The IDs stay as numbered; scenes and desks keep their meaning.
-const FX_ORDER = [0,22,23,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21];
+                  "Dim Snap","Dim Random","Dim Fade"];
+// The list order (effects.h FX_DISPLAY_ORDER): Off, the three intensity-only effects, then the rest.
+// The IDs stay as numbered; scenes and desks keep their meaning (22 was Dim Chase until 2026-11-21).
+const FX_ORDER = [0,22,24,23,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21];
+// Effect IDs the unit knows: FXN in the state (firmware 2026-11-21 on); a build without it has 24
+// (Off .. Dim Random) and would clamp Dim Fade (24) to Dim Random, so the picker hides what is missing.
+const fxKnown = x => demoOn || +x < (+kv.FXN || 24);
 // Intensity-only effects (FW-86): they move only the level of the port's own colour, so the
 // colour sliders stay live while they run and set that colour the usual way.
-const FX_DIM = new Set([22,23]);
+const FX_DIM = new Set([22,23,24]);
 const fxOwnsColour = x => +x>0 && !FX_DIM.has(+x);
 // Effects that read on a white-only (CW/WW) strip — intensity/warm based. On a
 // CCT port the colour-only effects (Rainbow, Aurora, Police, Party…) are hidden.
-const CCT_FX = new Set([0,1,2,8,12,13,15,18,19,20,22,23]);
+const CCT_FX = new Set([0,1,2,8,12,13,15,18,19,20,22,23,24]);
 const AMODES = ["Same","Seq","Offset"];
 const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
                 [0x10,"GROUND"],[0x20,"LINK"],[0x40,"24V"],[0x80,"LATCHED"]];
@@ -1766,7 +1769,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-20a.pwm";
+const APP_VER="2026-11-22a.speed";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2948,13 +2951,13 @@ function renderControl(){
       const cct=(m.PE===2||m.PE===3), dim1=(m.PE===5||m.PE===6);
       // Monochrome ports (CCT + Dim) only offer effects that read on them.
       const xs=$("x"+p);
-      if(xs) for(const o of xs.options) optSet(o,"hidden",(cct||dim1) && !CCT_FX.has(+o.value));
+      if(xs) for(const o of xs.options) optSet(o,"hidden",((cct||dim1) && !CCT_FX.has(+o.value)) || !fxKnown(o.value));
     }
     setIf(p,"X",   el=>el.value=m.X??0);
     // Effect running → the colour sliders are LOCKED (dulled and disabled)
     // until the effect is set to Off (user, 2026-09-13: "make them not work
     // unless the effect is cleared"). The effect owns the colour.
-    // Dim Chase / Dim Random leave them live: they set the colour the effect pulses (FW-86).
+    // Dim Snap / Dim Fade / Dim Random leave them live: they set the colour the effect pulses (FW-86).
     { const fxOn=fxOwnsColour(m.X||0);
       $("rows"+p).querySelectorAll(".row").forEach(r=>r.classList.toggle("fxtrim",fxOn));
       $("rows"+p).querySelectorAll("input[type=range]").forEach(s=>{ s.disabled=fxOn; }); }
@@ -3304,7 +3307,7 @@ function buildCard(p){
       sendThrottled(p+".FX"+field,`P${p}.FX${field}=${e.target.value}`);
     }else{
       touch(field);
-      // Touching a colour IS the intent — no toggle needed. Under Dim Chase / Dim Random the
+      // Touching a colour IS the intent — no toggle needed. Under Dim Snap / Dim Fade / Dim Random the
       // colour is what the effect pulses, so the effect keeps running (no manual takeover).
       if(!FX_DIM.has(+(m.X||0))) ensureMan(p);
       const dimPers=((m.PE===5)||(m.PE===6));
@@ -3334,16 +3337,20 @@ function buildCard(p){
   return d;
 }
 
-// The Speed wheel's read-out. On a unit with the beat clock (TAPV) the beat
-// effects take Speed in five musical bands, so the wheel says what the band
-// does: ¼× … 4× of the tempo, or flashes per beat on Strobe; 0 stops a look
-// (Strobe and Police go dark). Everything else reads the raw 0–255.
+// The Speed wheel's read-out, the same as the panel (effects.h fx_speed_text; Jonathan 2026-11-22: "keep speed scale
+// uniform and logical"): × the designed tempo. 0 stops a look (Strobe and Police: Off). On a unit with the beat clock
+// (TAPV) a beat effect shows its musical band, ¼× … 4× of the tempo, or flashes per beat on Strobe; everything else the
+// multiplier its clock runs at, 8^((v-128)/127): 0.13× … 1.0× (128) … 8.0×. DMX stays 0–255.
 function fxSpeedText(p,v){
   const x=+((ports[p-1]||{}).X||0);
-  if(kv.TAPV!=="1" || !FX_BEAT_FX.has(x)) return String(v);
   if(v===0) return (x===13||x===14) ? "Off" : "Stop";
-  if(x===13) return fxStrobePerBeat(v)+"/beat";
-  return {0.25:"¼×",0.5:"½×",1:"1×",2:"2×",4:"4×"}[fxBeatMult(v)];
+  if(kv.TAPV==="1" && FX_BEAT_FX.has(x)){
+    if(x===13) return fxStrobePerBeat(v)+"/beat";
+    return {0.25:"¼×",0.5:"½×",1:"1×",2:"2×",4:"4×"}[fxBeatMult(v)];
+  }
+  const m=Math.fround(Math.pow(8,(v-128)/127));          // rounded half up in integers, as fx_speed_text
+  if(m<0.995){ const c=Math.floor(m*100+0.5); return Math.floor(c/100)+"."+String(c%100).padStart(2,"0")+"×"; }
+  const c=Math.floor(m*10+0.5); return Math.floor(c/10)+"."+(c%10)+"×";
 }
 // ---------- side jog-wheel control ----------
 // MQ-console intensity-wheel feel: drag up/down anywhere on the wheel; the
@@ -3924,7 +3931,7 @@ function pushColour(){
   // ALL + uniform personalities → the firmware's ALL.* commands: two radio
   // packets total instead of two per port (per-port bursts overflowed the
   // Android BLE queue and later ports silently missed writes).
-  // A port on Dim Chase / Dim Random keeps its effect: the picker sets the colour it pulses
+  // A port on Dim Snap / Dim Fade / Dim Random keeps its effect: the picker sets the colour it pulses
   // (FW-86), so those ports go port by port without the FX=0 / MAN=1 takeover.
   const dimFx=p=>FX_DIM.has(+((ports[p-1]||{}).X||0));
   const mixed = (list.some(isCct) && list.some(p=>!isCct(p))) || list.some(dimFx);
@@ -4376,8 +4383,8 @@ const fxTailQ=(t,t0,len)=>{ const e=t-t0; if(e>=len) return 0; const q=1-e/len; 
 const FX_DESIGN_BEAT_MS=468.75;                          // 128 BPM
 const fxBeat={ms:FX_DESIGN_BEAT_MS, anchor:0, bpm:128, taps:[]};
 const fxBeatClamp=ms=>Math.max(250,Math.min(1000,ms));   // 240 … 60 BPM
-const FX_BEAT_FX=new Set([7,13,14,15,16,22]);            // Club, Strobe, Police, Pulse, Party, Dim Chase
-let fxChaseN=1;                                          // g_fx_chase_n: the ports Dim Chase steps across
+const FX_BEAT_FX=new Set([7,13,14,15,16,22,24]);         // Club, Strobe, Police, Pulse, Party, Dim Snap, Dim Fade
+let fxChaseN=1;                                          // g_fx_chase_n: the ports Dim Snap / Dim Fade step across
 const fxBeatMult=sp=>sp===0?0:sp<=51?0.25:sp<=102?0.5:sp<=153?1:sp<=204?2:4;   // fx_beat_mult
 function fxBeatsRaw(now,pf,mult,sprMs){                   // fx_beats_raw
   return (Math.max(0,now-fxBeat.anchor)+pf*sprMs)/fxBeat.ms*mult;
@@ -4559,7 +4566,7 @@ function fxCompute(fx, idx, t, s, vdt, now, sp, sprMs){
     let sun=0.5+0.30*Math.sin(m(t,47000)*0.0001337+pf*0.6)+0.12*Math.sin(m(t,19000)*0.0003307+pf*1.1)+0.05*Math.sin(m(t,7000)*0.0008976);
     sun=Math.max(0,Math.min(1,sun)); return hsv(214-16*sun,0.05+0.11*(1-sun),0.30+0.70*sun); }
   // Intensity-only (FW-86): the LEVEL as r = g = b; fxTick lays it over the port's own colour.
-  case 22:{ // Dim Chase: one port lit per beat in turn (a one-port unit flashes on every beat);
+  case 22:{ // Dim Snap (was Dim Chase): one port lit per beat in turn (a one-port unit flashes on every beat);
     // full for 35 % of the step, a squared fall to dark by 70 %. Beat clock, no spread.
     const n=fxChaseN||1, pos=fxBeatPos(s,now,sp,0,sprMs), st=Math.floor(pos), f=Math.fround(pos-st);
     let v=0;
@@ -4573,6 +4580,13 @@ function fxCompute(fx, idx, t, s, vdt, now, sp, sprMs){
       if(e>=s.p1){ s.stage=0; s.lvl=0; s.t_next=t+150+(fxRand(s)%1100); }
       else s.lvl=s.tgt*0.5*(1-Math.cos((e/s.p1)*6.2832)); }
     return [s.lvl,s.lvl,s.lvl]; }
+  case 24:{ // Dim Fade: Dim Snap's chase faded - a raised cosine per port, peaking on its own beat and dark one
+    // beat either side (half a beat on a one-port unit). Beat clock, no spread.
+    const n=fxChaseN||1, pos=fxBeatPos(s,now,sp,0,sprMs);
+    let d=(pos-(idx%n))%n; if(d<0) d+=n; if(d>=n*0.5) d-=n;
+    const w=n===1?0.5:1, ad=Math.fround(Math.abs(d));
+    const v=ad<w?Math.fround(0.5+0.5*Math.cos(Math.fround(ad/w*Math.fround(3.14159265)))):0;
+    return [v,v,v]; }
   default: return [0,0,0];
   }
 }
@@ -4662,7 +4676,7 @@ function fxTick(now){
     // Step the engine on the controller's 10 ms push grid, carrying the virtual
     // clock's fraction of a ms, with the rig spread on the port's time.
     const sprMs=Math.max(0,Math.min(100,+(kv.SPR||0)))*8, spread=Math.round(i*sprMs);   // g_fx_spread_ms; × port
-    fxChaseN=ports.length||1;                           // Dim Chase steps across the unit's ports
+    fxChaseN=ports.length||1;                           // Dim Snap / Dim Fade step across the unit's ports
     // The state's R/G/B are the MANUAL colour, not the effect trims (those are
     // not reported, and the sliders are locked at full while an effect runs),
     // so the effect previews untrimmed. Multiplying by R/G/B turned Fire near
@@ -4677,7 +4691,7 @@ function fxTick(now){
     // the look, not the curve), dimmer included.
     const [r,g,b]=s.duty.map(v=>Math.pow(v,1/ge));
     if(FX_DIM.has(x)){
-      // Dim Chase / Dim Random: the level over the port's own colour on all five outputs; no
+      // Dim Snap / Dim Fade / Dim Random: the level over the port's own colour on all five outputs; no
       // colour set = white on every output (main.cpp).
       const any=CH_KEYS.some(k=>+(mm[k]||0)>0), lv={};
       CH_KEYS.forEach(k=>lv[k]=(any?+(mm[k]||0):100)*r);
@@ -7462,7 +7476,7 @@ const SUP_TO="support@jmblighting.co.uk";
 const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD","DLR","RDMEN","PWRF","CARD","BTM","UPE","UKF","RFW","PRS","CO","DK","DKT","DKN","OFS","OFSU",
   "RDM","ANS","RB","RBOK","STM","SPC","CHL","TSEQ","TXA","TXN","LPX","LPS","LPN","LPA","LPG","BSY","BRT","BSM","BRM",
   "NET","NW","NRS","TF","PB","CL","CLM","CLK","CF","FC","FT","OL","SH","SHM","TCR","CX","CA","CXR","CXL","CXS","CXF",
-  "SQ","SQN","BPM","SPR","TAPV","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
+  "SQ","SQN","BPM","SPR","TAPV","FXN","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
 function supReport(){
   const names=$("supNames").checked;
   const red=t=>{ t=String(t||""); return names ? t : (t ? `<${t.length} chars>` : ""); };
@@ -7597,7 +7611,7 @@ function demoState(){
     "NCH=5;CHP=1;CHS=1;FR=1;"+`OFS=${demoF.ofsu||14};OFSU=${demoF.ofsu||0};`+   // Offset step: automatic 14 on a five-output rig, or the one set                  // the demo is a five-channel unit with the universe batons and a factory reset: no firmware greying
     "PWLIM=2000,25000;"+PWC+demoF.cpd.map((c,k)=>`CPD${k+1}=${c||"0"};`).join("")+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)).join("")+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
-    `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=${demoF.spr};TAPV=1;`+demoTxState()+
+    `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=${demoF.spr};TAPV=1;FXN=25;`+demoTxState()+
     "LPX=9;LPS=5;LPN=0;LPA=31;LPG=22;RR=1;BSY=0;BRT=3;"+
     "CN="+(demoF.cn!=null?demoF.cn:Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join(""))+";"+
     demoP.slice(0,demoF.var).map((d,i)=>P(i+1,d)).join(""));

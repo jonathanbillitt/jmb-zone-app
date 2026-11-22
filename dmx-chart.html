@@ -11,7 +11,7 @@ h1 { font-size: 21pt; color: #14203a; border-bottom: 3px solid #6a2cf5; padding-
 h1 + p { color: #667; margin-top: 2px; }
 h2 { font-size: 13.5pt; color: #2a1d66; margin: 22px 0 8px; border-bottom: 1px solid #d8d4ee; padding-bottom: 3px; }
 h3 { font-size: 11pt; color: #333; margin: 14px 0 6px; }
-h1, h2, h3 { scroll-margin-top: 64px; }  /* clear the sticky search bar when jumped to */
+h1, h2, h3, h4 { scroll-margin-top: 64px; }  /* clear the sticky search bar when jumped to */
 table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; font-size: 9.8pt; page-break-inside: avoid; }
 th { background: #eeeafb; color: #2a1d66; text-align: left; }
 th, td { border: 1px solid #cfc9e8; padding: 4px 8px; vertical-align: top; }
@@ -46,10 +46,28 @@ blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #b7ade6; 
 #jmbsearch .jrow:hover, #jmbsearch .jrow.on { background: #f2eefc; }
 #jmbsearch .jrow small { color: #99a; font-size: 8.5pt; }
 @media print { #jmbsearch { display: none !important; } }
+/* Per-setting cards (2026-11-22, Jonathan: "nicer layout for each function with explanation ... same principle for each
+   setting"): a #### heading, its italic where-line and its definition list (What it does / What it's for / Good to know),
+   wrapped by build() in div.set. Two columns on paper and wide screens, stacked on a phone. */
+.set { border: 1px solid #d8d4ee; border-left: 4px solid #6a2cf5; border-radius: 8px; background: #fcfbff;
+       padding: 2px 14px 6px; margin: 12px 0 14px; page-break-inside: avoid; }
+.set h4 { font-size: 11.5pt; color: #2a1d66; margin: 9px 0 0; scroll-margin-top: 78px; }  /* the card edge clears the sticky search too */
+.set h4 em { font-weight: 400; color: #6a2cf5; font-size: 9.5pt; font-style: normal; margin-left: 6px; }
+.set h4 + p { margin: 1px 0 6px; font-size: 9pt; color: #7a7890; }
+.set h4 + p em { font-style: normal; }
+.set dl { display: grid; grid-template-columns: 112px 1fr; gap: 5px 12px; margin: 4px 0 6px; }
+.set dt { font-weight: 600; color: #4636b8; font-size: 9.6pt; padding-top: 1px; }
+.set dd { margin: 0; }
+.set dd p { margin: 0; }
+.set dd ul { margin: 2px 0; }
+@media screen and (max-width: 520px) {
+  .set dl { grid-template-columns: 1fr; gap: 0; }
+  .set dt { margin-top: 7px; }
+}
 </style></head><body>
 <div id="jmbsearch"><div class="jsrow"><input type="search" placeholder="Search this manual — e.g. current limit" aria-label="Search this manual"><a class="jpdf" href="dmx-chart.pdf" download>PDF</a></div><div class="jr"></div></div>
 <h1>JMB Lighting — DMX Personality Chart</h1>
-<p>JMB Zone / 4our / 8ight · Hardware 3.0.0 · Firmware 3.2.0 · 2026-11-19</p>
+<p>JMB Zone / 4our / 8ight · Hardware 3.0.0 · Firmware 3.3.0 · 2026-11-21</p>
 <h2>Personalities (per port)</h2>
 <p>The number is the one the panel, the app and an RDM console all show. The
 RGBW and RGBWA personalities need a <strong>five-output port module</strong> (the .3
@@ -211,7 +229,7 @@ across an 8-port).</p>
 <tr>
 <td>next</td>
 <td>Effect speed</td>
-<td>128 = designed tempo; exponential — 0 ≈ ⅛×, 255 = 8×. Beat effects (Dim Chase, Club, Party, Pulse, Strobe, Police): 0 stop (Strobe/Police off) · 1–51 ¼× · 52–102 ½× · 103–153 1× · 154–204 2× · 205–255 4× the tempo</td>
+<td>0 = stop (Strobe/Police off); 128 = 1×, the designed tempo; exponential from 1 ≈ ⅛× to 255 = 8×. Beat effects (Dim Snap, Dim Fade, Club, Party, Pulse, Strobe, Police): 1–51 ¼× · 52–102 ½× · 103–153 1× · 154–204 2× · 205–255 4× the tempo. The app's Speed wheel and the panel show the same ×</td>
 </tr>
 <tr>
 <td>last</td>
@@ -227,102 +245,135 @@ scales last.</p>
 <div class="page-break"></div>
 
 <h2>Effect ranges (CH8)</h2>
-<p>23 effects, each an <strong>11-value band</strong> from 10 up (the last extends to 255):</p>
+<p>24 effects, each a <strong>10-value band</strong> from 10 up (the last extends to 255), numbered in the same order as the panel
+and the app list them:</p>
 <table>
 <thead>
 <tr>
+<th>#</th>
 <th>Range</th>
 <th>Effect</th>
+<th>#</th>
 <th>Range</th>
 <th>Effect</th>
 </tr>
 </thead>
 <tbody>
 <tr>
+<td>–</td>
 <td>0–9</td>
 <td>Off (safe park)</td>
-<td>120–130</td>
+<td>13</td>
+<td>130–139</td>
+<td>Aurora</td>
+</tr>
+<tr>
+<td>1</td>
+<td>10–19</td>
+<td><strong>Dim Snap</strong></td>
+<td>14</td>
+<td>140–149</td>
 <td>Sunset</td>
 </tr>
 <tr>
-<td>10–20</td>
-<td>Candle</td>
-<td>131–141</td>
+<td>2</td>
+<td>20–29</td>
+<td><strong>Dim Fade</strong></td>
+<td>15</td>
+<td>150–159</td>
 <td>TV Sim</td>
 </tr>
 <tr>
-<td>21–31</td>
-<td>Fire</td>
-<td>142–152</td>
+<td>3</td>
+<td>30–39</td>
+<td><strong>Dim Random</strong></td>
+<td>16</td>
+<td>160–169</td>
 <td>Strobe</td>
 </tr>
 <tr>
-<td>32–42</td>
-<td>Fireworks</td>
-<td>153–163</td>
+<td>4</td>
+<td>40–49</td>
+<td>Candle</td>
+<td>17</td>
+<td>170–179</td>
 <td>Police</td>
 </tr>
 <tr>
-<td>43–53</td>
-<td>Water</td>
-<td>164–174</td>
+<td>5</td>
+<td>50–59</td>
+<td>Fire</td>
+<td>18</td>
+<td>180–189</td>
 <td>Pulse</td>
 </tr>
 <tr>
-<td>54–64</td>
-<td>Siren</td>
-<td>175–185</td>
+<td>6</td>
+<td>60–69</td>
+<td>Fireworks</td>
+<td>19</td>
+<td>190–199</td>
 <td>Party</td>
 </tr>
 <tr>
-<td>65–75</td>
-<td>Laser</td>
-<td>186–196</td>
+<td>7</td>
+<td>70–79</td>
+<td>Water</td>
+<td>20</td>
+<td>200–209</td>
 <td>Traffic</td>
 </tr>
 <tr>
-<td>76–86</td>
-<td>Club</td>
-<td>197–207</td>
+<td>8</td>
+<td>80–89</td>
+<td>Siren</td>
+<td>21</td>
+<td>210–219</td>
 <td>Fluoro</td>
 </tr>
 <tr>
-<td>87–97</td>
-<td>Lightning</td>
-<td>208–218</td>
+<td>9</td>
+<td>90–99</td>
+<td>Laser</td>
+<td>22</td>
+<td>220–229</td>
 <td>Paparazzi</td>
 </tr>
 <tr>
-<td>98–108</td>
-<td>Rainbow</td>
-<td>219–229</td>
+<td>10</td>
+<td>100–109</td>
+<td>Club</td>
+<td>23</td>
+<td>230–239</td>
 <td>Explosion</td>
 </tr>
 <tr>
-<td>109–119</td>
-<td>Aurora</td>
-<td>230–240</td>
+<td>11</td>
+<td>110–119</td>
+<td>Lightning</td>
+<td>24</td>
+<td>240–255</td>
 <td>Clouds</td>
 </tr>
 <tr>
+<td>12</td>
+<td>120–129</td>
+<td>Rainbow</td>
 <td></td>
 <td></td>
-<td>241–251</td>
-<td>Dim Chase</td>
-</tr>
-<tr>
 <td></td>
-<td></td>
-<td>252–255</td>
-<td>Dim Random</td>
 </tr>
 </tbody>
 </table>
-<p>Notes: <strong>Dim Chase</strong> and <strong>Dim Random</strong> move only the level: the desk's
-colour channels stay the colour source (Dim Chase lights one port per beat
-in turn across the unit; Dim Random pulses each port softly at random).
+<p>Notes: <strong>Dim Snap</strong>, <strong>Dim Fade</strong> and <strong>Dim Random</strong> move only the level:
+the desk's colour channels stay the colour source (Dim Snap snaps one port
+on per beat in turn across the unit; Dim Fade runs the same chase smoothly,
+each port swelling up to its beat and down as the next rises; Dim Random
+pulses each port softly at random). From firmware 3.3.0 the bands are 10 wide
+and follow the list order, the three Dim effects first (before, they were 11
+wide in a different order, and Dim Snap was called Dim Chase).
 Siren and Police alternate phase across ports (lightbar feel);
-Dim Chase, Club, Party, Pulse, Strobe and Police run on the rig's beat clock (128 BPM
+Dim Snap, Dim Fade, Club, Party, Pulse, Strobe and Police run on the rig's beat clock (128 BPM
 by default; the app's tap tempo puts the downbeat on the music). Party hops
 hue every 4th beat and renders greens as teal — never black, never strobes;
 Club keeps to deep blue through crimson; Traffic
@@ -416,7 +467,7 @@ personality is settable at the root for sub-0-only consoles.</p>
 (function(){
   var box=document.getElementById('jmbsearch'), inp=box.querySelector('input'),
       res=box.querySelector('.jr'),
-      heads=[].slice.call(document.querySelectorAll('h1,h2,h3'));
+      heads=[].slice.call(document.querySelectorAll('h1,h2,h3,h4'));
   heads.forEach(function(h,i){ if(!h.id) h.id='sec'+i; });
   function flash(el){ var o=el.style.backgroundColor; el.style.transition='background-color .25s';
     el.style.backgroundColor='#fff3b0'; setTimeout(function(){el.style.backgroundColor=o||'';},1000); }
