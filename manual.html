@@ -852,7 +852,33 @@ port; <strong>Reset WB</strong>, at the end of the row of buttons at the top of 
 move if you change the curve. The trims live in the controller and apply to every source. A port with a trim in
 force shows an orange <strong>WB</strong> badge.</dd>
 <dt>See also</dt>
-<dd><a href="#curve">Curve</a> · <a href="#colour-order">Colour order</a> · <a href="#send-settings">Send settings</a></dd>
+<dd><a href="#curve">Curve</a> · <a href="#colour-order">Colour order</a> · <a href="#send-settings">Send settings</a> · <a href="#kelvin-cal">Kelvin calibration</a></dd>
+</dl></div>
+<div class="set"><h4 id="kelvin-cal">Kelvin calibration</h4>
+<p><em>App: port card → Output → Kelvin calibration (under White balance)</em></p>
+<dl>
+<dt>What it does</dt>
+<dd>Makes the app's Kelvin land where your colour meter says it should, on this port's own strip. Up to three points,
+2000, 4000 and 6000 K; each keeps how far the light was off, in colour temperature and in tint (Δuv). Every white
+the Colour tab sends this port goes out corrected; saturated colours pass untouched.</dd>
+<dt>What it's for</dt>
+<dd>Matching ports, units and different tapes to a meter, so that 4000 K in the app reads 4000 K on set.</dd>
+<dt>How to set it</dt>
+<dd>Set the <strong>Preview</strong> level under White balance, tap <strong>Show</strong> on a row to light the port at that Kelvin, hold the
+meter at the light and type its CCT and Δuv, then <strong>Apply</strong>. One row balances that Kelvin; all three correct the
+whole range. Show again to check: <strong>Off by</strong> shows what is left, and the next Apply adds it.</dd>
+<dt>Options</dt>
+<dd><strong>All ports</strong> copies this port's calibration to every port on the controller; <strong>Universe</strong> sends it to this unit's
+ports and every armed unit down the DMX line, arming each unit first as in <a href="#universe">The Universe</a>. Use them
+where the ports run the same tape. The calibration also travels in the
+<a href="#show-file">show file</a>.</dd>
+<dt>Good to know</dt>
+<dd>Kept in the controller, so it follows the unit to any phone. On a tuneable-white port only the Kelvin is
+corrected (two whites have no tint to move); a dimmer port has no Kelvin. Live DMX outranks Show: bring the port
+up at the desk to read it. Closing the sheet puts the port's own look back. <strong>Clear</strong> returns the port to the
+uncalibrated scale. Needs firmware 3.3.0.</dd>
+<dt>See also</dt>
+<dd><a href="#white-balance">White balance</a> · <a href="#colour-picker">Dim · Hue · Sat · Kelvin · ΔUV</a></dd>
 </dl></div>
 <h3 id="protection">Control — Protection sheet</h3>
 <div class="set"><h4 id="limit">Limit</h4>
@@ -1069,8 +1095,8 @@ together, a 4our or 8ight strobes its screens. <strong>It never touches the stri
 <p><em>App: Setup</em></p>
 <dl>
 <dt>What it does</dt>
-<dd>One <strong>.jmb</strong> file carrying the whole rig — addresses, heads, labels, looks and scenes — reloadable on any phone or
-controller.</dd>
+<dd>One <strong>.jmb</strong> file carrying the whole rig — addresses, heads, labels, looks and scenes, white balance and Kelvin
+calibration — reloadable on any phone or controller.</dd>
 <dt>Good to know</dt>
 <dd>A port whose Mode the receiving controller can't run keeps its own, and the app names those ports.</dd>
 </dl></div>

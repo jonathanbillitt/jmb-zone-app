@@ -396,6 +396,20 @@
                    background:var(--card2); color:var(--text); border:1px solid var(--line); border-radius:7px;
                    padding:5px 6px; box-sizing:border-box; }
   .wbline span.wbnum { background:none; border-color:transparent; color:var(--dim); }
+  /* Kelvin calibration (FW-97): a fixed five-column grid, the mock-up Jonathan passed 2026-11-22 */
+  .kcgrid { display:grid; grid-template-columns:62px 58px 1fr 1fr 52px; gap:6px; align-items:center; margin-top:8px; }
+  .kcgrid.kchead { font-size:11px; color:var(--dim); margin-top:10px; }
+  .kcgrid.kchead span:nth-child(n+3) { text-align:right; }
+  .kcgrid b { font-size:14px; font-variant-numeric:tabular-nums; }
+  .kcgrid button { padding:6px 0; }
+  .kcgrid button.lit { box-shadow:0 0 0 1.5px var(--acc) inset; color:var(--acc); }
+  .kcgrid .wbnum { width:100%; min-width:0; text-align:right; font-size:14px; font-variant-numeric:tabular-nums;
+                   background:var(--card2); color:var(--text); border:1px solid var(--line); border-radius:7px;
+                   padding:5px 6px; box-sizing:border-box; }
+  .kcgrid .wbnum:disabled { opacity:.45; }
+  .kcoff { text-align:right; font-size:12px; font-variant-numeric:tabular-nums; }
+  .kcoff.warm { color:#ffb27a; }   .kcoff.cool { color:#9fc3ff; }
+  #kcStat { font-size:12px; color:var(--dim); }   #kcStat.ok { color:#7fd99a; }
   .wbnote { border:1px solid var(--line); border-radius:9px; padding:8px 10px;
             font-size:12.5px; margin-top:12px; color:var(--dim); }
   .wbnote.live { border-color:var(--ok); color:var(--ok); }
@@ -1532,6 +1546,15 @@
     <button id="wbReset">Reset</button>
   </div>
   <div class="mini">Preview lights the port at that level while you adjust, never over live DMX. 255 = full. All ports copies these trims to every port here; Universe sends them to every armed unit down the line as well.</div>
+  <!-- Kelvin calibration (FW-97): three colour-meter points kept in the controller; the app's Kelvin picker applies them. -->
+  <div id="kcBlock">
+    <div class="wbhead" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px"><b>Kelvin calibration</b><span id="kcStat">Not calibrated</span></div>
+    <div class="kcgrid kchead"><span>Target</span><span></span><span>Meter K</span><span>Meter Δuv</span><span>Off by</span></div>
+    <div id="kcRows"></div>
+    <div class="ctlrow across" style="margin-top:12px"><button id="kcApply" style="flex:2 1 0">Apply</button><button id="kcClear" style="flex:1 1 0">Clear</button></div>
+    <div class="ctlrow across" style="margin-top:8px"><button id="kcAll">All ports</button><button id="kcChain">Universe</button></div>
+    <div class="mini">Show lights the port at that Kelvin; type your meter's reading and Apply (again to fine-tune). All ports and Universe copy it to the same tape.</div>
+  </div>
 </div></div>
 
 <!-- PWM library: the three custom entries (carrier + curve), controller-wide. -->
@@ -1769,7 +1792,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-22a.speed";
+const APP_VER="2026-11-22b.kelvin";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -2759,7 +2782,7 @@ function onState(str){
   renderControl(); renderPortInfo(); renderDiag(); renderSetup();
   renderProductMark(); renderOta();
   otaChainCheck();                          // one-tap update: the port step after the restart
-  wbPaintAll(); wbRefresh(); pwPaint();
+  wbPaintAll(); wbRefresh(); pwPaint(); kcPaint();
 }
 // (hexEnc lives later in the file — the printable-filtering version; a plain
 // duplicate here used to shadow-fight it.)
@@ -3926,15 +3949,17 @@ function pushColour(){
   const mix=cctMixOf(col.base);
   const list=colTargetList();
   const isCct=p=>{const pe=ports[p-1]&&ports[p-1].PE; return pe===2||pe===3;};
+  // A port with a Kelvin calibration (FW-97) gets its own corrected values, so the rig goes port by port.
+  const kcAny=list.some(p=>kcPts(p).length), look=p=>kcLook(p,col.base,col.duv);
   list.forEach(p=>{ for(const k of ["R","G","B","D","X"]) hot[p+"."+k]=Date.now();
-    colLast[p]={sent:isCct(p)?[mix.ww,mix.cw,0]:[pr,pg,pb], base:col.base.slice(), duv:col.duv}; });
+    colLast[p]={sent:look(p), base:col.base.slice(), duv:col.duv}; });
   // ALL + uniform personalities → the firmware's ALL.* commands: two radio
   // packets total instead of two per port (per-port bursts overflowed the
   // Android BLE queue and later ports silently missed writes).
   // A port on Dim Snap / Dim Fade / Dim Random keeps its effect: the picker sets the colour it pulses
   // (FW-86), so those ports go port by port without the FX=0 / MAN=1 takeover.
   const dimFx=p=>FX_DIM.has(+((ports[p-1]||{}).X||0));
-  const mixed = (list.some(isCct) && list.some(p=>!isCct(p))) || list.some(dimFx);
+  const mixed = (list.some(isCct) && list.some(p=>!isCct(p))) || list.some(dimFx) || kcAny;
   if(colAllOn() && !mixed){
     if(!colEngaged.all){ send("ALL.FX=0"); send("ALL.MAN=1"); colEngaged.all=true; }
     if(list.length && isCct(list[0]))
@@ -3949,10 +3974,8 @@ function pushColour(){
         send(`P${p}.MAN=1`);                   // take manual control
         colEngaged[p]=true;
       }
-      if(isCct(p))                             // CW/WW port: G=cool, R=warm
-        sendThrottled(p+".RGB",`P${p}.RGB=${mix.ww},${mix.cw},0`);
-      else
-        sendThrottled(p+".RGB",`P${p}.RGB=${pr},${pg},${pb}`);
+      const v=look(p);                         // CW/WW port: G=cool, R=warm; else R, G, B (through any calibration)
+      sendThrottled(p+".RGB",`P${p}.RGB=${v[0]},${v[1]},${v[2]}`);
       sendThrottled(p+".DIM",`P${p}.DIM=${col.dim}`);
     });
   }
@@ -6100,6 +6123,10 @@ function portQueue(list,skipped){
       if(t.wb.length===5 && wbOf(p).five) q.push(`P${p}.WBW=${c(t.wb[3])}`,`P${p}.WBA=${c(t.wb[4])}`);
       hot[p+".WB"]=Date.now()+4000;
     }
+    if(t.kc!==undefined && kcSupported()){      // Kelvin calibration (FW-97): the file's points, or "" = none
+      const kc=String(t.kc).trim();
+      if(kc==="" || /^\d{4,5}:-?\d{1,4}:-?\d{1,3}(,\d{4,5}:-?\d{1,4}:-?\d{1,3}){0,2}$/.test(kc)){ q.push(`P${p}.KC=${kc}`); kv["KC"+p]=kc; }
+    }
     if(t.oc!==undefined) q.push(`P${p}.OCP=${t.oc}`);
     if(t.ot!==undefined) q.push(`P${p}.OT=${t.ot}`);
     if(t.cv!==undefined) q.push(`P${p}.CURVE=${t.cv}`);
@@ -6143,6 +6170,7 @@ $("btnExport").onclick=async()=>{
     scenes:ctlSc||loadScenes() };
   // White balance and the PWM library's custom entries, when the firmware has them
   data.ports.forEach((t,i)=>{ const w=wbOf(i+1); if(w) t.wb=WB_CH(w).map(c=>w[c]); });
+  if(kcSupported()) data.ports.forEach((t,i)=>{ t.kc=String(kv["KC"+(i+1)]??"").trim(); });   // Kelvin calibration (FW-97), "" = none
   if(pwLim()) data.pwc=[0,1,2].map(k=>{ const c=pwCustom(k); return c?{hz:c.hz}:null; });
   if("CPD1" in kv) data.cpd=[1,2,3,4].map(k=>cpdOf(k)?kv["CPD"+k]:null);   // the four custom presets, as sent
   // octet-stream (not application/json) so the browser keeps the .jmb name as-is
@@ -6956,8 +6984,10 @@ function wbOpen(p){
   }
   const lv=$("wbLvl"); lv.value=wbLevel(); $("wbLvlV").textContent=lv.value+" %";
   wbNote();
+  kcOpen(p);                                  // Kelvin calibration, in the same sheet (FW-97)
 }
 function wbClose(){
+  kcClose();                                  // a lit Show row goes back to the port's own look
   clearInterval(wbKeep); wbKeep=null;
   if(wbPort && wbArmed) send(`P${wbPort}.WBP=0`);
   wbPort=0; wbArmed=false;
@@ -6970,6 +7000,158 @@ function wbMount(p){
   if(!host || !wbOf(p)){ blk.classList.add("hidden"); return; }
   host.appendChild(blk); blk.classList.remove("hidden"); wbOpen(p);
 }
+// ----- Kelvin calibration (FW-97; Jonathan 2026-11-22: "controller, three points"; the mock-up "looks fantastic") -----
+// Per port, up to three colour-meter points kept IN THE CONTROLLER: KC<n>=<t>:<e>:<d>,... = target Kelvin, the light's
+// error there in 0.1 mired (+ = warmer than asked) and in duv x 10000 (+ = green). The app applies them at send time: a
+// white asked for at K goes out as the Kelvin that lands on K (the mired error taken back off, interpolated between the
+// points, flat beyond them; the tape remap after it is a fixed ratio, so a mired shift here is the same shift in the
+// light) with the tint trim that cancels the duv error. Saturated colours pass untouched (the remap's Sat-0.75 blend).
+// Show lights the port THROUGH the current calibration, so a reading is what is left, and Apply adds it.
+const KC_TARGETS=[2000,4000,6000];
+const kcSupported=()=>demoOn || kv.KCV==="1";
+function kcPts(p){
+  const s=String(kv["KC"+p]??"").trim(); if(!s) return [];
+  return s.split(",").map(x=>x.split(":").map(Number)).filter(a=>a.length===3 && a.every(Number.isFinite))
+          .map(([t,e,d])=>({t,e,d}));
+}
+function kcErr(p,K){                          // {e: 0.1 mired, d: duv x 1e4} at Kelvin K
+  const pts=kcPts(p).map(q=>({m:1e6/q.t,e:q.e,d:q.d})).sort((a,b)=>a.m-b.m);
+  if(!pts.length) return {e:0,d:0};
+  const m=1e6/K, L=pts[pts.length-1];
+  if(m<=pts[0].m) return {e:pts[0].e,d:pts[0].d};
+  if(m>=L.m) return {e:L.e,d:L.d};
+  for(let i=1;i<pts.length;i++) if(m<=pts[i].m){ const a=pts[i-1],b=pts[i],f=(m-a.m)/(b.m-a.m);
+    return {e:a.e+(b.e-a.e)*f, d:a.d+(b.d-a.d)*f}; }
+  return {e:L.e,d:L.d};
+}
+const kcAsk=(K,e)=>Math.max(1000,Math.min(25000,1e6/Math.max(40,1e6/K-e/10)));   // the Kelvin that lands on K
+function kcCorrect(p,base,duvUI){             // a white's chroma and tint trim through port p's calibration
+  if(!kcPts(p).length) return {base,duv:duvUI};
+  const w=1-Math.min(rgb2hsv(base).s/0.75,1);
+  if(w<=0) return {base,duv:duvUI};
+  const K=rgb2cct(base).cct, {e,d}=kcErr(p,K), kb=kelvin2rgb(kcAsk(K,e));
+  const nb=base.map((v,i)=>v*(1-w)+kb[i]*w);
+  // the tint trim that moves this colour's duv by -d/10000 (the slope measured on the colour as it is sent)
+  const rem=ledWhiteRemap(nb), d0=rgb2cct(tintRGB(rem,0)).duv, sl=(rgb2cct(tintRGB(rem,10)).duv-d0)/10;
+  const trim=sl ? -(d/10000)/sl*w : 0;
+  return {base:nb, duv:Math.max(-100,Math.min(100,duvUI+trim))};
+}
+// What the Colour tab sends port p for a picker colour: [warm, cool, 0] on a CW/WW port, else R, G, B in %.
+// With no calibration it is exactly what pushColour always sent.
+function kcLook(p,base,duvUI){
+  const c=kcCorrect(p,base,duvUI), pe=(ports[p-1]||{}).PE;
+  if(pe===2||pe===3){ const m=cctMixOf(c.base); return [m.ww,m.cw,0]; }
+  return tintRGB(ledWhiteRemap(c.base),c.duv).map(v=>Math.max(0,Math.min(255,Math.round(v)))).map(v=>Math.round(v/2.55));
+}
+let kcPort=0, kcLit=0, kcSaved=null;
+const kcCct=p=>{ const pe=(ports[p-1]||{}).PE; return pe===2||pe===3; };
+const kcDimPort=p=>{ const pe=(ports[p-1]||{}).PE; return pe===5||pe===6; };
+function kcOpen(p){
+  kcPort=p; kcLit=0; kcSaved=null;
+  $("kcRows").innerHTML=KC_TARGETS.map(t=>`<div class="kcgrid">
+    <b>${t} K</b><button class="kcshow" data-t="${t}">Show</button>
+    <input class="wbnum" id="kcM${t}" type="number" inputmode="numeric" min="1000" max="20000" step="10" placeholder="K">
+    <input class="wbnum" id="kcD${t}" type="number" min="-0.05" max="0.05" step="0.001" placeholder="±0.000">
+    <span class="kcoff" id="kcO${t}"></span></div>`).join("");
+  for(const t of KC_TARGETS){
+    $("kcM"+t).addEventListener("input",()=>kcOff(t));
+    $("kcRows").querySelector(`.kcshow[data-t="${t}"]`).addEventListener("click",()=>kcShow(t));
+  }
+  kcPaint();
+}
+function kcOff(t){                            // "Off by": the reading against the target, warm or cool
+  const o=$("kcO"+t); if(!o) return;
+  const M=+$("kcM"+t).value, ok=M>=1000 && M<=20000, df=ok?Math.round(M-t):0;
+  o.textContent=ok?(df>0?"+":df<0?"−":"")+Math.abs(df)+" K":"";
+  o.classList.toggle("warm",ok && df<0); o.classList.toggle("cool",ok && df>0);
+}
+function kcShow(t){
+  const p=kcPort; if(!p || !kcSupported() || kcDimPort(p)) return;
+  if(kcLit===t){ kcRestore(); kcPaint(); return; }      // the lit row again: back to the port's own look
+  if(kv.DMX==="1" && !demoOn){ toast("Live DMX has this port: bring it up at the desk to read it."); return; }
+  if(wbArmed){ clearInterval(wbKeep); wbKeep=null; send(`P${p}.WBP=0`); wbArmed=false; }   // one preview at a time
+  if(!kcSaved || kcSaved.p!==p){ const m=ports[p-1]||{};
+    kcSaved={p, X:+(m.X||0), M:+(m.M??1), R:+(m.R||0), G:+(m.G||0), B:+(m.B||0), D:+(m.D??100)}; }
+  const v=kcLook(p,kelvin2rgb(t),0);
+  send(`P${p}.FX=0`); send(`P${p}.MAN=1`);
+  send(`P${p}.RGB=${v[0]},${v[1]},${v[2]}`); send(`P${p}.DIM=${wbLevel()||50}`);
+  kcLit=t; kcPaint();
+}
+function kcRestore(){                          // the look the port had before the first Show
+  const s=kcSaved; kcSaved=null; kcLit=0; if(!s) return;
+  send(`P${s.p}.RGB=${s.R},${s.G},${s.B}`); send(`P${s.p}.DIM=${s.D}`);
+  if(s.X>0) send(`P${s.p}.FX=${s.X}`); else if(!s.M) send(`P${s.p}.MAN=0`);
+}
+function kcClose(){ kcRestore(); kcPort=0; }
+const kcErrRound=(p,t)=>{ const r=kcErr(p,t); return {e:Math.round(r.e), d:Math.round(r.d)}; };
+function kcApply(){
+  const p=kcPort; if(!p || !kcSupported() || kcDimPort(p)) return;
+  const cur=kcPts(p), add={};
+  for(const t of KC_TARGETS){
+    const ms=$("kcM"+t).value.trim(); if(ms==="") continue;
+    const M=+ms; if(!(M>=1000 && M<=20000)){ toast(`The ${t} K reading should be 1000 to 20000 K.`); return; }
+    const ds=$("kcD"+t).value.trim(), D=ds===""?0:+ds;
+    if(!Number.isFinite(D) || Math.abs(D)>0.05){ toast(`The ${t} K Δuv should be between −0.050 and +0.050.`); return; }
+    add[t]={e:Math.round(10*(1e6/M-1e6/t)), d:kcCct(p)?0:Math.round(D*10000)};
+  }
+  if(!Object.keys(add).length){ toast("Type a meter reading first."); return; }
+  const pts=[];
+  for(const t of KC_TARGETS){
+    const have=cur.find(q=>q.t===t), from=have||(add[t]?{t,...kcErrRound(p,t)}:null);   // a new point starts from what the light got
+    if(!from) continue;
+    const a=add[t]||{e:0,d:0}, e=from.e+a.e, d=from.d+a.d;
+    if(Math.abs(e)>5000 || Math.abs(d)>500){ toast(`The ${t} K point is out of range: Clear and start again.`); return; }
+    pts.push({t,e,d});
+  }
+  for(const q of cur) if(!KC_TARGETS.includes(q.t) && pts.length<3) pts.push(q);   // never drop a point the controller had
+  const rec=pts.map(q=>`${q.t}:${q.e}:${q.d}`).join(",");
+  send(`P${p}.KC=${rec}`); kv["KC"+p]=rec;
+  for(const t of KC_TARGETS) if(add[t]){ $("kcM"+t).value=""; $("kcD"+t).value=""; kcOff(t); }
+  toast(`Calibrated: ${pts.length} point${pts.length>1?"s":""}. Show again to check.`);
+  if(kcLit){ const t=kcLit; kcLit=0; kcShow(t); }      // the lit row comes back through the new calibration
+  kcPaint();
+}
+async function kcClear(){
+  const p=kcPort; if(!p || !kcSupported() || !kcPts(p).length) return;
+  if(!await askConfirm(`Port ${p} goes back to the uncalibrated Kelvin scale.`,{title:"Clear the Kelvin calibration?",ok:"Clear",danger:true})) return;
+  send(`P${p}.KC=`); delete kv["KC"+p];
+  toast("Kelvin calibration cleared.");
+  if(kcLit){ const t=kcLit; kcLit=0; kcShow(t); }
+  kcPaint();
+}
+function kcPaint(){                            // status, greying and the lit row; never touches a typed value
+  const p=kcPort; if(!p || !$("kcRows")) return;
+  const sup=kcSupported(), dim=kcDimPort(p), n=kcPts(p).length, st=$("kcStat");
+  const txt=!sup?"Needs a firmware update":dim?"Not for a dimmer port":n?`Calibrated · ${n} point${n>1?"s":""}`:"Not calibrated";
+  if(st.textContent!==txt) st.textContent=txt;
+  st.classList.toggle("ok",sup && !dim && n>0);
+  const off=!sup||dim;
+  $("kcBlock").querySelectorAll("button,input").forEach(el=>{
+    const want=off || (["kcClear","kcAll","kcChain"].includes(el.id) && !n) || (el.id.startsWith("kcD") && kcCct(p));   // two whites have no tint to move
+    if(el.disabled!==want) el.disabled=want; });
+  $("kcRows").querySelectorAll(".kcshow").forEach(b=>{ const on=+b.dataset.t===kcLit, tx=on?"Lit":"Show";
+    b.classList.toggle("lit",on); if(b.textContent!==tx) b.textContent=tx; });
+}
+$("kcApply").addEventListener("click",kcApply);
+$("kcClear").addEventListener("click",kcClear);
+// This port's calibration to every port here (per-port commands), or down the DMX line (CHKC=: this unit's ports, then
+// a baton to every armed unit). For strips of the same tape (Jonathan 2026-11-22: "calibration needs to be in export/universe").
+$("kcAll").addEventListener("click",async()=>{
+  const p=kcPort, rec=String(kv["KC"+p]??"").trim(), n=kcPts(p).length; if(!p || !rec || !kcSupported()) return;
+  if(ports.length<2){ toast("Only one port here"); return; }
+  if(!await askConfirm(`Every port on this controller takes Port ${p}'s Kelvin calibration (${n} point${n>1?"s":""}). Use it where they run the same tape.`,
+        {title:"Kelvin calibration to all ports?",ok:"Send"})) return;
+  const q=[]; ports.forEach((_,i)=>{ const k=i+1; if(k!==p){ q.push(`P${k}.KC=${rec}`); kv["KC"+k]=rec; } });
+  await applyQueue(q,"Kelvin calibration");
+  toast("Kelvin calibration sent to all ports"); kcPaint();
+});
+$("kcChain").addEventListener("click",async()=>{
+  const p=kcPort, rec=String(kv["KC"+p]??"").trim(); if(!p || !rec || !kcSupported()) return;
+  if(!await askConfirm(`This unit's ports and every armed unit down the DMX line take Port ${p}'s Kelvin calibration. Arm each downstream unit first: Setup → Universe → Listen.`,
+        {title:"Kelvin calibration across the universe?",ok:"Send"})) return;
+  send(`CHKC=${rec}`); ports.forEach((_,i)=>{ kv["KC"+(i+1)]=rec; });
+  kcPaint(); setTimeout(()=>send("GET"),800);
+});
 function wbUnmount(){
   wbClose();
   const blk=$("wbBlock"), hold=$("wbHold");
@@ -7476,7 +7658,7 @@ const SUP_TO="support@jmblighting.co.uk";
 const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD","DLR","RDMEN","PWRF","CARD","BTM","UPE","UKF","RFW","PRS","CO","DK","DKT","DKN","OFS","OFSU",
   "RDM","ANS","RB","RBOK","STM","SPC","CHL","TSEQ","TXA","TXN","LPX","LPS","LPN","LPA","LPG","BSY","BRT","BSM","BRM",
   "NET","NW","NRS","TF","PB","CL","CLM","CLK","CF","FC","FT","OL","SH","SHM","TCR","CX","CA","CXR","CXL","CXS","CXF",
-  "SQ","SQN","BPM","SPR","TAPV","FXN","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
+  "SQ","SQN","BPM","SPR","TAPV","FXN","KCV","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
 function supReport(){
   const names=$("supNames").checked;
   const red=t=>{ t=String(t||""); return names ? t : (t ? `<${t.length} chars>` : ""); };
@@ -7609,9 +7791,9 @@ function demoState(){
     `NIP=192.168.1.42;NRS=-52;TF=${demoF.tf};PB=${demoF.cl};`+demoLimits()+`CX=${demoF.cx??3};CXF=${(demoF.cx??3)>=2?1:0};CA=1;`+   // CX follows Link / Unlink (user, 2026-10-04)
     `SH=${demoF.sh||5};SHM=${demoF.sh?1:0};`+     // 5 mΩ on every product since 2026-09-23: the ceiling reads 6.75 A
     "NCH=5;CHP=1;CHS=1;FR=1;"+`OFS=${demoF.ofsu||14};OFSU=${demoF.ofsu||0};`+   // Offset step: automatic 14 on a five-output rig, or the one set                  // the demo is a five-channel unit with the universe batons and a factory reset: no firmware greying
-    "PWLIM=2000,25000;"+PWC+demoF.cpd.map((c,k)=>`CPD${k+1}=${c||"0"};`).join("")+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)).join("")+
+    "PWLIM=2000,25000;"+PWC+demoF.cpd.map((c,k)=>`CPD${k+1}=${c||"0"};`).join("")+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)+`KC${i+1}=${d.kc||""};`).join("")+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
-    `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=${demoF.spr};TAPV=1;FXN=25;`+demoTxState()+
+    `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=${demoF.spr};TAPV=1;FXN=25;KCV=1;`+demoTxState()+
     "LPX=9;LPS=5;LPN=0;LPA=31;LPG=22;RR=1;BSY=0;BRT=3;"+
     "CN="+(demoF.cn!=null?demoF.cn:Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join(""))+";"+
     demoP.slice(0,demoF.var).map((d,i)=>P(i+1,d)).join(""));
@@ -7670,6 +7852,8 @@ function demoRdmScan(){
 }
 function demoCmd(s){
   let m;
+  if(m=s.match(/^P(\d)\.KC=(.*)$/)){ demoP[+m[1]-1].kc=(m[2]==="0"?"":m[2]); demoState(); return; }   // FW-97 calibration
+  if(m=s.match(/^CHKC=(.*)$/)){ demoP.forEach(d=>{ d.kc=(m[1]==="0"?"":m[1]); }); demoState(); return; }   // ... across the universe
   if(m=s.match(/^P(\d)\.PERS=(\d+)/)){ demoP[+m[1]-1].pe=+m[2]; demoState(); return; }
   if(m=s.match(/^P(\d)\.RGB=(\d+),(\d+),(\d+)/)){ const d=demoP[+m[1]-1];
     d.r=+m[2]; d.g=+m[3]; d.b=+m[4]; return; }
