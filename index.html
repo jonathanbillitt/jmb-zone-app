@@ -241,6 +241,21 @@
     padding:8px 10px; font-size:13px; line-height:1.3; }
   #pwrfBan.hidden { display:none; }
   #pwrfBan span { flex:1; }
+  /* DMX thru held (FW-99, state CHH=1): this unit is holding its thru for a Universe
+     patch, so the units after it get no DMX for the second or two it lasts. */
+  #thruBan { flex:1 1 100%; margin-top:6px; background:#3a2a10; color:#ffd08a;
+    border:1px solid #8a6420; border-radius:8px; padding:8px 10px; font-size:13px; line-height:1.3; }
+  #thruBan.hidden { display:none; }
+  /* Documents open INSIDE the app (user, 2026-11-22: "the phone's back button doesn't quit the
+     app, it just goes back to the relevant app page"): a full-screen viewer over the tab you came
+     from; back (the phone's or the header's) closes it. Under a confirm (12) and the toast (13). */
+  #docOv { position:fixed; inset:0; z-index:11; background:var(--bg); display:flex; flex-direction:column;
+    padding-top:env(safe-area-inset-top); }
+  #docOv.hidden { display:none; }
+  #docOv .dochead { display:flex; align-items:center; gap:10px; padding:8px 12px;
+    background:var(--card); border-bottom:1px solid var(--line); }
+  #docOv .dochead b { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #docFrame { flex:1; min-height:0; width:100%; border:0; background:#fff; }
   .row input[type=range] { flex:1; min-width:120px; accent-color:var(--acc); height:26px; }
   .row.r input[type=range] { accent-color:var(--r); }
   .row.g input[type=range] { accent-color:var(--g); }
@@ -926,6 +941,7 @@
     <span>Power fault (inrush board): outputs held. Check the mains side, then clear the fault.</span>
     <button id="pwrfClr" class="danger">Clear fault</button>
   </div>
+  <div id="thruBan" class="hidden" role="status">DMX thru held: a Universe patch is passing, the units after this one get no DMX for a moment.</div>
   <!-- No DEMO pill (user, 2026-10-04: "let's lose the demo pill"): Demo is
        marked by the header alone — the button reads Exit, the name Demo Rig. -->
 </div>
@@ -1345,8 +1361,8 @@
       <div class="mini" style="opacity:.7">CRMX&trade; is a trademark of LumenRadio AB.</div>
       <!-- Universe shares the card with CRMX: both are this unit's links to the
            rest of the rig (Setup tidy, user 2026-10-02). "Universe" = every
-           unit armed to Listen down the DMX line. Send settings needs the
-           settings baton in firmware (state CHS=1). -->
+           unit joined down the DMX line (FW-99, state CHJV=1; older firmware:
+           armed to Listen, one baton per arming). -->
       <div class="subhead">Universe</div>
       <div class="ctlrow" style="margin-top:6px">
         <button id="chBlack" class="danger">Blackout</button>
@@ -1356,22 +1372,21 @@
       <div class="ctlrow" style="margin-top:8px">
         <button id="chSet" style="flex:1">Send settings</button>
       </div>
-      <div class="row" style="margin-top:8px"><label style="width:auto">Listen</label>
+      <div class="row" style="margin-top:8px"><label style="width:auto" id="chArmL">Join</label>
         <label class="toggle"><input type="checkbox" id="chArm"><span></span></label>
         <span class="mini" id="chArmStat" style="margin:0"></span>
       </div>
-      <div class="mini">Sets a look, or sends this unit's settings, to every unit armed to
-      Listen down the DMX line. Arm each unit here or on its panel (Setup →
-      <b>Chain Listen</b>); one baton per arming, it disarms after.</div>
+      <div class="mini" id="chArmHint">Blackout, Full, Send settings and a Universe patch reach every unit
+      joined down the DMX line. Join each unit here or on its panel (Sources → <b>Join Universe</b>); it stays joined.</div>
     </div>
     <!-- Files: the settings file and the documents, one card, under CRMX so
          Firmware update and App are the last two (user, 2026-10-02). -->
     <div class="card">
       <div class="ctitle"><label>Documentation</label></div>
       <div class="ctlrow">
-        <a class="dbtn" href="./manual.html" target="_blank" rel="noopener">User manual</a>
-        <a class="dbtn" href="./dmx-chart.html" target="_blank" rel="noopener">DMX chart</a>
-        <a class="dbtn" href="./safety.html" target="_blank" rel="noopener">Safety guide</a>
+        <a class="dbtn" href="./manual.html" target="_blank" rel="noopener" data-doc="User manual">User manual</a>
+        <a class="dbtn" href="./dmx-chart.html" target="_blank" rel="noopener" data-doc="DMX chart">DMX chart</a>
+        <a class="dbtn" href="./safety.html" target="_blank" rel="noopener" data-doc="Safety guide">Safety guide</a>
       </div>
       <div class="mini">Each opens with a PDF button for printing. Bundled with the
         app — they open even with no internet, once the app has loaded once.
@@ -1545,7 +1560,7 @@
     <button id="wbChain">Universe</button>
     <button id="wbReset">Reset</button>
   </div>
-  <div class="mini">Preview lights the port at that level while you adjust, never over live DMX. 255 = full. All ports copies these trims to every port here; Universe sends them to every armed unit down the line as well.</div>
+  <div class="mini">Preview lights the port at that level while you adjust, never over live DMX. 255 = full. All ports copies these trims to every port here; Universe sends them to every joined unit down the line as well.</div>
   <!-- Kelvin calibration (FW-97): three colour-meter points kept in the controller; the app's Kelvin picker applies them. -->
   <div id="kcBlock">
     <div class="wbhead" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px"><b>Kelvin calibration</b><span id="kcStat">Not calibrated</span></div>
@@ -1643,6 +1658,13 @@
   <div class="mini" id="supMsg"></div>
 </div></div>
 
+<!-- Documents viewer (user, 2026-11-22): the manual, the DMX chart and the safety guide open
+     inside the app, so the phone's back button comes back to Setup instead of leaving the app
+     (and the Bluetooth link stays up). -->
+<div id="docOv" class="hidden" role="dialog" aria-label="Document">
+  <div class="dochead"><button id="docBack">&lsaquo; Back</button><b id="docTitle"></b></div>
+  <iframe id="docFrame" title="Document"></iframe>
+</div>
 <div id="overlay" class="hidden">
   <div class="box">
     <div id="pinUnit"></div>
@@ -1796,7 +1818,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-22d.cwfx";
+const APP_VER="2026-11-22f.docs";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -3166,7 +3188,7 @@ function buildCard(p){
         </div>
         <div class="mini">Address, head and mode are the desk patch. The label names the port across the app.</div>
         <div class="mini">Apply patches the later ports from this address: Seq by footprint, Offset every so many channels (blank = automatic). It asks if the Mode follows.</div>
-        <div class="mini">Universe carries the patch on to every unit armed to Listen, each following on from the last.</div>
+        <div class="mini">Universe carries the patch on to every joined unit down the line, each following on from the last.</div>
       </div>
       <div class="psheet rows" id="psOut${p}" data-title="Port ${p} · Output">
         <div class="row"><label>Curve</label>
@@ -5405,6 +5427,7 @@ function renderSetup(){
   { const off=kv.RDMEN==="0", b=$("btnRdmScan"); b.disabled=off && !rdmActive;
     $("rdmScanRow").classList.toggle("needfw",off && !rdmActive); }
   $("pwrfBan").classList.toggle("hidden",kv.PWRF!=="1");
+  $("thruBan").classList.toggle("hidden",kv.CHH!=="1");
   { const ok="DK" in kv, s=$("setDk");
     $("dkRow").classList.toggle("needfw",!ok); s.disabled=!ok;
     if(ok && document.activeElement!==s){
@@ -5484,9 +5507,7 @@ function renderSetup(){
   // notify can't snap the toggle back before the controller has applied it.
   if(kv.CHL!=null && Date.now()-chArmPend>2500){
     $("chArm").checked = kv.CHL==="1";
-    const st=$("chArmStat");
-    st.textContent = kv.CHL==="1" ? "ARMED — waiting for baton" : "off";
-    st.style.color = kv.CHL==="1" ? "var(--warn)" : "var(--dim)";
+    chArmPaint(kv.CHL==="1");
   }
   renderLink();
   renderPinNotice();
@@ -5706,6 +5727,22 @@ $("btnVariant").onclick=async()=>{
   send("VARIANT="+v);
 };
 // ---------- Chain broadcast (factory look index: 0=DMX In, 1=Off, 9=White) ----------
+// Universe consent (FW-99): firmware with CHJV=1 JOINS (saved, nothing held while it
+// waits); older firmware ARMS for one baton and holds its thru meanwhile.
+const uJoin = () => kv.CHJV==="1" || demoOn;
+const uWho  = () => uJoin() ? "joined" : "armed";
+const uHow  = () => uJoin() ? "Join each downstream unit first: Setup → Universe → Join."
+                            : "Arm each downstream unit first: Setup → Universe → Listen.";
+function chArmPaint(on){
+  const st=$("chArmStat"), j=uJoin();
+  $("chArmL").textContent = j ? "Join" : "Listen";
+  $("chArmHint").innerHTML = j
+    ? "Blackout, Full, Send settings and a Universe patch reach every unit joined down the DMX line. Join each unit here or on its panel (Sources → <b>Join Universe</b>); it stays joined."
+    : "Sets a look, or sends this unit's settings, to every unit armed to Listen down the DMX line. Arm each unit here or on its panel (Sources → <b>Universe Listen</b>); one baton per arming, it disarms after.";
+  if(j && kv.CHH==="1"){ st.textContent="DMX thru held: Universe patch passing"; st.style.color="var(--warn)"; return; }
+  st.textContent = on ? (j ? "joined" : "ARMED — waiting for baton") : "off";
+  st.style.color = on ? (j ? "var(--acc)" : "var(--warn)") : "var(--dim)";
+}
 let chArmPend=0;
 $("chArm").addEventListener("change",async e=>{
   const on=e.target.checked;
@@ -5713,14 +5750,12 @@ $("chArm").addEventListener("change",async e=>{
   // after it loses the desk until a baton arrives (app review 2026-10-29, D3).
   // The state repaint stays off the toggle while the question is open.
   chArmPend=Date.now()+86400000;
-  if(on && kv.DMX==="1" && !demoOn &&
+  if(on && !uJoin() && kv.DMX==="1" && !demoOn &&
      !await askConfirm("While this unit waits for a baton, every fixture after it on the DMX line loses the desk's signal.",
                        {title:"Listen with DMX live?",ok:"Listen",danger:true})){ e.target.checked=false; chArmPend=0; return; }
   chArmPend=Date.now();
   send("CHARM="+(on?1:0));
-  const st=$("chArmStat");                 // optimistic — firmware confirms
-  st.textContent = on ? "ARMED — waiting for baton" : "off";
-  st.style.color = on ? "var(--warn)" : "var(--dim)";
+  chArmPaint(on);                          // optimistic — firmware confirms
 });
 // WIRING CHECK — measured during Step, which drives one output at a time.
 // The port's current sense is a total, so each step's reading IS that output's
@@ -5873,14 +5908,14 @@ $("tsStep").onclick=()=>testSeq(2);
 $("tsOff").onclick =()=>send("TESTSEQ=0");
 // Each look button says what it did (user, 2026-10-02: "DMX In seems to do
 // nothing" — it sent the baton with no sign of it).
-$("chBlack").onclick=async()=>{ if(await askConfirm("This unit and every armed unit down the DMX line go dark.",{title:"Blackout the universe?",ok:"Blackout",danger:true})){ send("CHLOOK=1"); toast("Universe: blackout sent"); } };
-$("chFull").onclick=async()=>{ if(await askConfirm("This unit and every armed unit down the DMX line go to full.",{title:"Full on across the universe?",ok:"Full on"})){ send("CHLOOK=9"); toast("Universe: full on sent"); } };
+$("chBlack").onclick=async()=>{ if(await askConfirm(`This unit and every ${uWho()} unit down the DMX line go dark.`,{title:"Blackout the universe?",ok:"Blackout",danger:true})){ send("CHLOOK=1"); toast("Universe: blackout sent"); } };
+$("chFull").onclick=async()=>{ if(await askConfirm(`This unit and every ${uWho()} unit down the DMX line go to full.`,{title:"Full on across the universe?",ok:"Full on"})){ send("CHLOOK=9"); toast("Universe: full on sent"); } };
 $("chDmx").onclick=()=>{ send("CHLOOK=0"); toast("Universe: back to DMX in"); };
 // Settings down the universe (user, 2026-10-02, APP-25): everything except
 // what identifies or patches a unit. The firmware builds the baton from its
 // own config on CHSET=1; the list here is the contract in words.
 $("chSet").onclick=async()=>{
-  if(!await askConfirm("Every unit armed to Listen takes this unit's curve, PWM, white balance, limit and trip per port, and its current limit and lock, folds, DMX loss release, Apply mode, tempo and spread, with the custom PWM entries. Addresses, modes, heads, numbers, names, labels, PIN and presets stay as they are.",
+  if(!await askConfirm((uJoin()?"Every joined unit takes":"Every unit armed to Listen takes")+" this unit's curve, PWM, white balance, limit and trip per port, and its current limit and lock, folds, DMX loss release, Apply mode, tempo and spread, with the custom PWM entries. Addresses, modes, heads, numbers, names, labels, PIN and presets stay as they are.",
                        {title:"Send settings to the universe?",ok:"Send"})) return;
   send("CHSET=1"); toast("Settings sent to the universe");
 };
@@ -7166,7 +7201,7 @@ $("kcAll").addEventListener("click",async()=>{
 });
 $("kcChain").addEventListener("click",async()=>{
   const p=kcPort, rec=String(kv["KC"+p]??"").trim(); if(!p || !rec || !kcSupported()) return;
-  if(!await askConfirm(`This unit's ports and every armed unit down the DMX line take Port ${p}'s Kelvin calibration. Arm each downstream unit first: Setup → Universe → Listen.`,
+  if(!await askConfirm(`This unit's ports and every ${uWho()} unit down the DMX line take Port ${p}'s Kelvin calibration. ${uHow()}`,
         {title:"Kelvin calibration across the universe?",ok:"Send"})) return;
   send(`CHKC=${rec}`); ports.forEach((_,i)=>{ kv["KC"+(i+1)]=rec; });
   kcPaint(); setTimeout(()=>send("GET"),800);
@@ -7250,7 +7285,7 @@ $("wbAll").onclick=async()=>{
 };
 $("wbChain").onclick=async()=>{
   const p=wbPort; if(!p) return;
-  if(!await askConfirm(`This unit's ports and every armed unit down the DMX line take Port ${p}'s white balance (${wbTrio()}). Arm each downstream unit first: Setup → Universe → Listen.`,
+  if(!await askConfirm(`This unit's ports and every ${uWho()} unit down the DMX line take Port ${p}'s white balance (${wbTrio()}). ${uHow()}`,
         {title:"White balance across the universe?",ok:"Send"})) return;
   send(wbFive() ? `CHWB=${wbVals.R},${wbVals.G},${wbVals.B},${wbVals.W},${wbVals.A}`
                  : `CHWB=${wbVals.R},${wbVals.G},${wbVals.B}`);
@@ -7378,7 +7413,7 @@ async function fanOut(p,chain){
   const pe0=cur.PE||0, cp0=isCustPe(pe0)?cpdOf(pe0-12):null;
   const modeName=cp0?cp0.name:(PERS_NAMES[pe0]||"this Mode");
   const list=p+1===n?`port ${n}`:`ports ${p+1}–${n}`;
-  const ans=await askConfirm(`DMX address and head from port ${p}, ${AMODES[mode]||"Same"}.`+(chain?" Armed units down the line follow on.":"")+` Set their Mode to ${modeName} as well?`,
+  const ans=await askConfirm(`DMX address and head from port ${p}, ${AMODES[mode]||"Same"}.`+(chain?(uJoin()?" Joined units down the line follow on; each holds its DMX thru for about a second while it passes.":" Armed units down the line follow on."):"")+` Set their Mode to ${modeName} as well?`,
                              {title:chain?`Patch ${list} and the universe`:`Patch ${list}`, ok:"DMX + Mode", alt:"DMX only"});
   if(ans===false) return;
   const withMode=ans===true;
@@ -7675,7 +7710,7 @@ const SUP_TO="support@jmblighting.co.uk";
 // stays out until it is added here on purpose. Never listed: NIP (network
 // address). Names (CN, BTN), the ID and port labels go in only with the tick.
 const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD","DLR","RDMEN","PWRF","CARD","BTM","UPE","UKF","RFW","PRS","CO","DK","DKT","DKN","OFS","OFSU",
-  "RDM","ANS","RB","RBOK","STM","SPC","CHL","TSEQ","TXA","TXN","LPX","LPS","LPN","LPA","LPG","BSY","BRT","BSM","BRM",
+  "RDM","ANS","RB","RBOK","STM","SPC","CHL","CHJV","CHH","TSEQ","TXA","TXN","LPX","LPS","LPN","LPA","LPG","BSY","BRT","BSM","BRM",
   "NET","NW","NRS","TF","PB","CL","CLM","CLK","CF","FC","FT","OL","SH","SHM","TCR","CX","CA","CXR","CXL","CXS","CXF",
   "SQ","SQN","BPM","SPR","TAPV","FXN","KCV","PNC","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
 function supReport(){
@@ -7811,7 +7846,7 @@ function demoState(){
     `SH=${demoF.sh||5};SHM=${demoF.sh?1:0};`+     // 5 mΩ on every product since 2026-09-23: the ceiling reads 6.75 A
     "NCH=5;CHP=1;CHS=1;FR=1;"+`OFS=${demoF.ofsu||14};OFSU=${demoF.ofsu||0};`+   // Offset step: automatic 14 on a five-output rig, or the one set                  // the demo is a five-channel unit with the universe batons and a factory reset: no firmware greying
     "PWLIM=2000,25000;"+PWC+demoF.cpd.map((c,k)=>`CPD${k+1}=${c||"0"};`).join("")+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)+`KC${i+1}=${d.kc||""};`).join("")+
-    `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
+    `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};CHJV=1;CHH=0;`+
     `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=${demoF.spr};TAPV=1;FXN=25;KCV=1;PNC=14;`+demoTxState()+
     "LPX=9;LPS=5;LPN=0;LPA=31;LPG=22;RR=1;BSY=0;BRT=3;"+
     "CN="+(demoF.cn!=null?demoF.cn:Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join(""))+";"+
@@ -7896,7 +7931,7 @@ function demoCmd(s){
     d.a=Math.max(1,Math.min(513-(PERS_CH[d.pe]||3),+m[2])); demoState(); return; }   // clamps like the firmware: no overspill past 512
   if(m=s.match(/^P(\d)\.HEAD=(\d+)/)){ demoP[+m[1]-1].h=+m[2]; demoState(); return; }
   if(m=s.match(/^AMODE=(\d)/)){ demoF.am=+m[1]%3; demoState(); return; }   // the Patch sheet's Apply mode
-  if(s.startsWith("CHPATCH=")||s.startsWith("CHSET=")){ demoF.chl=0; demoState(); return; }   // a baton leaves; an armed demo unit would disarm
+  if(s.startsWith("CHPATCH=")||s.startsWith("CHSET=")){ demoState(); return; }   // a baton leaves; a joined demo unit stays joined (FW-99)
   if(s.startsWith("FACTORY=")){ setTimeout(()=>location.reload(),900); return; }   // the unit restarts: back to the connect screen
   if(m=s.match(/^P(\d)\.OCP=(\d+)/)){ demoP[+m[1]-1].oc=Math.max(250,Math.min(6750,+m[2])); demoState(); return; }
   if(m=s.match(/^P(\d)\.OT=(\d+)/)){ demoP[+m[1]-1].ot=Math.max(40,Math.min(110,+m[2])); demoState(); return; }
@@ -8012,9 +8047,43 @@ $("btnDemo").onclick=()=>{
 // does (demo: exits the demo) (user, 2026-11-14: "back out to connect screen not close"); only on
 // the connect screen does back leave the app. One guard entry sits in the history while a tab is
 // showing or a pop-up is open; it is taken out when the connect screen comes back by any route.
+// ---------- Documents inside the app (user, 2026-11-22) ----------
+// Every navigation inside the viewer REPLACES (location.replace, links intercepted below), so
+// the iframe never adds a history entry: one back press always closes the viewer, back to the tab
+// it was opened from, and the next open finds the page where it was left.
+function docOpen(href,title){
+  const f=$("docFrame"), u=new URL(href,location.href);
+  $("docTitle").textContent=title;
+  let cur=""; try{ cur=f.contentWindow.location.pathname; }catch(_){}
+  if(cur!==u.pathname) f.contentWindow.location.replace(u.href);
+  $("docOv").classList.remove("hidden");
+}
+function docClose(){ $("docOv").classList.add("hidden"); }
+$("docBack").onclick=docClose;
+document.querySelectorAll("a[data-doc]").forEach(a=>a.addEventListener("click",e=>{
+  e.preventDefault(); docOpen(a.getAttribute("href"),a.dataset.doc); }));
+$("docFrame").addEventListener("load",()=>{
+  const w=$("docFrame").contentWindow; let d=null; try{ d=w.document; }catch(_){}
+  if(!d || d.jmbDoc) return; d.jmbDoc=1;
+  d.addEventListener("click",e=>{
+    const a=e.target.closest && e.target.closest("a[href]"); if(!a) return;
+    let u; try{ u=new URL(a.getAttribute("href"),w.location.href); }catch(_){ return; }
+    const pdf=/\.pdf$/i.test(u.pathname);
+    if(pdf && !NBLE()) return;                         // the PDF button downloads, as it always has
+    e.preventDefault();
+    if(u.origin!==location.origin){ window.open(u.href,"_blank","noopener"); return; }   // the web, outside
+    if(!pdf && u.pathname===w.location.pathname){      // See also / contents: scroll, no history entry
+      const id=decodeURIComponent(u.hash.slice(1)), t=id && d.getElementById(id);
+      if(t) t.scrollIntoView({block:"start"});
+      return;
+    }
+    w.location.replace(u.href);                        // another document (the iPhone app: the PDF too)
+  },true);
+});
 const BACK_POPS=[                       // topmost first: the pop-up, and how it closes itself
   ["cfOv",    ()=>$("cfNo").click()],   // a confirm: back = Cancel
   ["overlay", ()=>$("pinCancel").click()],   // the PIN prompt: back = its Disconnect
+  ["docOv",   ()=>docClose()],          // a document: back to the tab it was opened from
   ["cpOv",    ()=>cpDone()],            // the preset builder: as a tap outside it
   ["pwOv",    ()=>$("pwClose").click()],
   ["fxOv",    ()=>$("fxClose").click()],

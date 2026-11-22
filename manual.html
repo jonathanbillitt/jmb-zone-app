@@ -94,7 +94,7 @@ reads <strong>No Data</strong>, whatever the CRMX link state, so a linked-but-si
 </tr>
 <tr>
 <td>Sources</td>
-<td><strong>the input hub</strong> — wired DMX and CRMX each with live status (the active source + Hz shows inline and in the header); Universe Listen arms here</td>
+<td><strong>the input hub</strong> — wired DMX and CRMX each with live status (the active source + Hz shows inline and in the header); Join Universe is here</td>
 </tr>
 <tr>
 <td>Health</td>
@@ -132,12 +132,12 @@ tempo exactly as on the app's wheel.</dd>
 <p><em>Panel: Port Settings → All Ports → Universe</em></p>
 <dl>
 <dt>What it does</dt>
-<dd><strong>Local</strong> edits this unit. <strong>Send</strong> also passes a baton, after you commit, to every unit armed to Listen down the
-DMX line: addresses, the dimmer master, a look, or the white balance (<strong>SEND WB?</strong>).</dd>
+<dd><strong>Local</strong> edits this unit. <strong>Send</strong> also passes a baton, after you commit, to every unit joined down the DMX
+line: addresses, the dimmer master, a look, or the white balance (<strong>SEND WB?</strong>).</dd>
 <dt>What it's for</dt>
 <dd>Setting a whole line of units from one panel.</dd>
 <dt>See also</dt>
-<dd><a href="#universe">The Universe</a> · <a href="#universe-listen">Universe Listen</a></dd>
+<dd><a href="#universe">The Universe</a> · <a href="#universe-join">Join Universe</a></dd>
 </dl></div>
 <h3 id="presets">Presets (Port Settings → Presets)</h3>
 <div class="set"><h4 id="dimmer">Dimmer</h4>
@@ -156,7 +156,7 @@ Hold = cancel and restore the levels you started with.</dd>
 <p><em>Panel: Port Settings → Presets → Colours</em></p>
 <dl>
 <dt>What it does</dt>
-<dd>The factory colour / CCT looks. On All Ports with Universe: Send, a look goes to every armed unit
+<dd>The factory colour / CCT looks. On All Ports with Universe: Send, a look goes to every joined unit
 (<strong><a href="#universe-looks">SEND LOOK?</a></strong>).</dd>
 </dl></div>
 <div class="set"><h4 id="panel-scenes">Scenes</h4>
@@ -193,15 +193,20 @@ carries live status.</p>
 </tr>
 </tbody>
 </table>
-<div class="set"><h4 id="universe-listen">Universe Listen</h4>
-<p><em>Panel: Sources → Universe Listen · App: Setup → Universe → Listen</em></p>
+<div class="set"><h4 id="universe-join">Join Universe</h4>
+<p><em>Panel: Sources → Join Universe · App: Setup → Universe → Join</em></p>
 <dl>
 <dt>What it does</dt>
-<dd>Arms this unit to accept ONE baton from up the line.</dd>
+<dd>Puts this unit in the <a href="#universe">Universe</a>: it takes the patch, dimmer, looks, white balance, settings and Kelvin
+calibration sent from a unit up the DMX line. It stays joined until you switch it off.</dd>
 <dt>What it's for</dt>
-<dd>Taking part in a <a href="#universe">Universe</a> send. Units left Off are untouched, so preset rigs are safe.</dd>
+<dd>Running a line of units from the first one. Units left Off are untouched, so preset rigs are safe.</dd>
 <dt>Good to know</dt>
-<dd>Always Off at power-up; disarms itself after use. The same switch as the app's Listen.</dd>
+<dd>Off from the factory and after a <a href="#factory-reset">factory reset</a>, and only the unit itself can join: no send ever
+joins or leaves a unit. A patch holds each joined unit's <strong>DMX thru</strong> for about a second while it passes, so the
+units after it lose DMX for that moment; the panel flashes <strong>DMX THRU HELD</strong> and the app shows a banner.</dd>
+<dt>See also</dt>
+<dd><a href="#universe">The Universe</a> · <a href="#universe-send">Universe: Local / Send</a></dd>
 </dl></div>
 <h3 id="panel-setup">Setup</h3>
 <p>System settings only. <a href="#controller-name">Controller ID</a>, <a href="#dmx-loss">DMX Loss Release</a> and
@@ -511,15 +516,16 @@ part of a scene. A scene recalls with a crossfade from either surface and rides 
 </dl></div>
 <hr />
 <h2 id="universe">4. The Universe (one screen addresses every unit down the line)</h2>
-<p>"Universe" is the set of units armed to <strong>Listen</strong> down the DMX line — the app's word, used on the panel too. A unit
-accepts one baton per arming and only a downstream unit hears it, so send from the <strong>first</strong> controller in the line to
-reach the whole rig.</p>
+<p>"Universe" is the set of units <strong>joined</strong> down the DMX line — the app's word, used on the panel too. Only a
+downstream unit hears a send, so send from the <strong>first</strong> controller in the line to reach the whole rig. Every unit in
+the line needs firmware 3.3.0 or later.</p>
 <ol>
-<li>On <strong>every unit that should take part</strong>: Sources → <strong>Universe Listen → ARMED</strong> (or the app's Setup → Universe →
-   Listen). Units left Off are untouched — preset rigs are safe.</li>
+<li>On <strong>every unit that should take part</strong>, once: Sources → <strong>Join Universe → Joined</strong> (or the app's Setup → Universe →
+   Join). It stays joined through power cycles. Units left Off are untouched — preset rigs are safe.</li>
 <li>On unit 1: Port Settings → All Ports → Universe: <strong>Send</strong>, choose Apply mode, open Address, enter the base, SAVE.</li>
-<li>Confirm the <strong>SEND PATCH?</strong> warning. Unit 1 addresses itself, then each armed unit down the line takes the
-   follow-on addresses <strong>and the next controller ID</strong>, shows a receipt, disarms, and relays onward.</li>
+<li>Confirm the <strong>SEND PATCH?</strong> warning. Unit 1 addresses itself, then each joined unit down the line takes the
+   follow-on addresses <strong>and the next controller ID</strong>, shows a receipt, and passes it on. While it passes, each joined
+   unit holds its DMX thru for about a second (<strong>DMX THRU HELD</strong> on its panel, a banner in the app).</li>
 </ol>
 <p>Head numbers travel the same way; the app's Patch sheet does the same with its <strong>Universe</strong> button and can send a
 <strong>Mode</strong> with the addresses (<a href="#apply">Apply</a>). White balance travels too: the app's <a href="#white-balance">White balance</a> →
@@ -530,20 +536,20 @@ never re-address or renumber; they only change the output.</p>
 <dl>
 <dt>What it does</dt>
 <dd>A single level for the whole universe: set it, confirm <strong>SEND DIMMER?</strong>, and every port on this unit <em>and</em> every
-armed unit down the line takes the same brightness. Addresses are untouched; it only moves the dimmer.</dd>
+joined unit down the line takes the same brightness. Addresses are untouched; it only moves the dimmer.</dd>
 </dl></div>
 <div class="set"><h4 id="universe-looks">Looks, Blackout and Full</h4>
 <p><em>Panel: Port Settings → All Ports → Universe: Send → Presets → Colours · App: Setup → Universe (under CRMX)</em></p>
 <dl>
 <dt>What it does</dt>
-<dd>Sets one look on every armed unit: pick a colour/CCT and confirm <strong>SEND LOOK?</strong>. <strong>Off</strong> blacks out the whole
+<dd>Sets one look on every joined unit: pick a colour/CCT and confirm <strong>SEND LOOK?</strong>. <strong>Off</strong> blacks out the whole
 universe; <strong>White</strong> takes it to full. The app's one-tap <strong>Blackout / Full / DMX In</strong> buttons do the same thing.</dd>
 </dl></div>
 <div class="set"><h4 id="send-settings">Send settings</h4>
 <p><em>App: Setup → Universe → Send settings</em></p>
 <dl>
 <dt>What it does</dt>
-<dd>Sends this unit's settings to every armed unit: curve, PWM, white balance, limit and trip per port, the
+<dd>Sends this unit's settings to every joined unit: curve, PWM, white balance, limit and trip per port, the
 controller's current limit and lock, folds, DMX loss release, Apply mode, tempo and spread, and the custom PWM
 entries.</dd>
 <dt>Good to know</dt>
@@ -779,7 +785,7 @@ takes the same mode.</dd>
 footprint. <strong>Offset</strong>: every so many channels.</dd>
 <dt>How to set it</dt>
 <dd>In port 1's sheet pick Same / Seq / Offset, then <strong>Ports 2–4</strong> (2–8 on an 8ight) to patch the other ports from port
-1's address, or <strong>Universe</strong> to do the same and send the patch on down the DMX line to every unit armed to Listen,
+1's address, or <strong>Universe</strong> to do the same and send the patch on down the DMX line to every joined unit,
 each following on from the last. A pop-up first asks <strong>DMX only</strong> or <strong>DMX + Mode</strong>; the sheet then closes and a
 message confirms what was set. For Offset, type the step beside it (e.g. a 16-channel mode every 20 or every 50
 channels), or leave it blank for the automatic step.</dd>
@@ -849,7 +855,7 @@ then <strong>Reset</strong> (no trim anywhere) and <strong>Save</strong>. The po
 drops back on Save or a hold (cancel).</dd>
 <dt>Options</dt>
 <dd><strong>All ports</strong> copies this port's trims to every port on the controller; <strong>Universe</strong> sends them to this unit and
-every armed unit down the DMX line, arming each unit first as in <a href="#universe">The Universe</a>; <strong>Reset</strong> clears this
+every joined unit down the DMX line, joining each unit first as in <a href="#universe">The Universe</a>; <strong>Reset</strong> clears this
 port; <strong>Reset WB</strong>, at the end of the row of buttons at the top of the Control tab, clears every port.</dd>
 <dt>Good to know</dt>
 <dd>The trim is applied after the dimmer curve, so the balance holds from full to the bottom of a fade and does not
@@ -873,7 +879,7 @@ meter at the light and type its CCT and Δuv, then <strong>Apply</strong>. One r
 whole range. Show again to check: <strong>Off by</strong> shows what is left, and the next Apply adds it.</dd>
 <dt>Options</dt>
 <dd><strong>All ports</strong> copies this port's calibration to every port on the controller; <strong>Universe</strong> sends it to this unit's
-ports and every armed unit down the DMX line, arming each unit first as in <a href="#universe">The Universe</a>. Use them
+ports and every joined unit down the DMX line, joining each unit first as in <a href="#universe">The Universe</a>. Use them
 where the ports run the same tape. The calibration also travels in the
 <a href="#show-file">show file</a>.</dd>
 <dt>Good to know</dt>
@@ -1444,7 +1450,7 @@ before 2.9.</dd>
 <li>Start address caps at 513 − footprint so the whole personality fits the
   universe (FX 10ch → max 503); it drops automatically if you switch a port
   to a larger personality</li>
-<li>Universe Listen is always Off after power-up — arming is deliberate</li>
+<li>Join Universe is Off from the factory, and only the unit itself can join</li>
 <li>The app's Undo restores the looks (colour, level, effect) from before the
   last Clear all, on that controller only</li>
 <li>The app starts with no signal once it has been opened online after installing</li>
