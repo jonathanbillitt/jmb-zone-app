@@ -690,7 +690,7 @@
   .tgt.sel { background:#123a5e; border-color:var(--acc); color:var(--acc); }
 
   /* ── glow-up ── */
-  body { background:radial-gradient(1200px 600px at 50% -120px,#151d2a,var(--bg)); }
+  body { background:var(--bg) radial-gradient(1200px 600px at 50% -120px,#151d2a,var(--bg)) no-repeat; }   /* no-repeat: a tab shorter than the screen showed the gradient start again as a seam (2026-11-22) */
   .card { background:linear-gradient(180deg,#1a2029,#141920);
           box-shadow:0 10px 26px rgba(0,0,0,.38); }
   header { backdrop-filter:blur(8px); background:rgba(22,27,35,.92); }
@@ -1679,11 +1679,14 @@ let otacChar=null, otadChar=null, otasChar=null;         // null until connected
 // until a firmware reports five channels (NCH=5) or the presets (CPD<k>).
 const PERS_NAMES = ["RGB 8-bit","RGB 16-bit","CW/WW 8-bit","CW/WW 16-bit","RGB FX","Dim 1ch","Dim 2ch (16-bit)",
                     "RGBW 8-bit","RGBW 16-bit","RGBWA 8-bit","RGBWA 16-bit","RGBW FX","RGBWA FX",
-                    "Custom 1","Custom 2","Custom 3","Custom 4"];
+                    "Custom 1","Custom 2","Custom 3","Custom 4","CW/WW FX"];
+// Code 17 = CW/WW FX (FW-98, 2026-11-22), after the customs because codes never move.
+const isCustPe = pe => pe>=13 && pe<=16;          // the four custom presets (FW-52)
+const isCctPe  = pe => pe===2 || pe===3 || pe===17;   // tuneable white: CW/WW 8-bit, 16-bit, FX
 // Swatch colour for a port: RGB ports show the mix; CW/WW ports blend warm
 // (2700K-ish) and cool (6500K-ish) white tones (WW rides the R value, CW the G).
 function swatchRGB(pe, r, g, b){          // r,g,b in 0-100
-  if(pe===2||pe===3){
+  if(isCctPe(pe)){
     const w=r/100, c=g/100, t=w+c;
     if(t<=0.001) return [0,0,0];
     const k=Math.min(1,t);                 // brightness from total drive
@@ -1702,11 +1705,11 @@ const ROLE_RGB=[[0,0,0],[255,0,0],[0,255,0],[0,0,255],[201,226,255],[255,180,107
 function portRows(m){
   const pe=m.PE??0;
   if(pe===5||pe===6) return [{key:"R",label:"Level",cls:"uv"}];
-  if(pe===2||pe===3) return [{key:"G",label:"Cool",cls:"cw"},{key:"R",label:"Warm",cls:"ww"}];   // CW = G output, WW = R output
+  if(isCctPe(pe)) return [{key:"G",label:"Cool",cls:"cw"},{key:"R",label:"Warm",cls:"ww"}];   // CW = G output, WW = R output
   const rgb=[{key:"R",label:"Red",cls:"r"},{key:"G",label:"Green",cls:"g"},{key:"B",label:"Blue",cls:"b"}];
   if(pe===7||pe===8||pe===11) return rgb.concat([{key:"WH",label:"White",cls:"wt"}]);
   if(pe===9||pe===10||pe===12) return rgb.concat([{key:"WH",label:"White",cls:"wt"},{key:"AM",label:"Amber",cls:"am"}]);
-  if(pe>=13){ const c=cpdOf(pe-12);
+  if(isCustPe(pe)){ const c=cpdOf(pe-12);
     if(c){ const rows=[]; c.out.forEach((o,i)=>{ if(o.role) rows.push({key:CH_KEYS[i],label:ROLE_NAMES[o.role],cls:ROLE_CLS[o.role]}); });
       if(rows.length) return rows; } }
   return rgb;
@@ -1725,10 +1728,10 @@ function paintRows(p,m){
 // Swatch = the additive mix of what each shown output carries at its level.
 function swatchMix(m,lv){
   const pe=m.PE??0;
-  if(pe<=6) return swatchRGB(pe, lv.R??0, lv.G??0, lv.B??0);
+  if(pe<=6||pe===17) return swatchRGB(pe, lv.R??0, lv.G??0, lv.B??0);
   let acc=[0,0,0];
   const add=(rgb,v)=>{ const k=Math.max(0,Math.min(100,+v||0))/100; acc=acc.map((a,i)=>a+rgb[i]*k); };
-  if(pe>=13){ const c=cpdOf(pe-12);
+  if(isCustPe(pe)){ const c=cpdOf(pe-12);
     if(c){ c.out.forEach((o,i)=>{ if(o.role) add(ROLE_RGB[o.role], lv[CH_KEYS[i]]); });
       return acc.map(v=>Math.min(255,Math.round(v))); } }
   add(ROLE_RGB[1],lv.R); add(ROLE_RGB[2],lv.G); add(ROLE_RGB[3],lv.B);
@@ -1738,25 +1741,26 @@ function swatchMix(m,lv){
 }
 // Channels per personality (index = PE). The whole footprint must fit the
 // universe, so the last legal start address is 513 - footprint (10ch → 503).
-const PERS_CH = [3,6,2,4,10,1,2, 4,8,5,10,12,14, 5,5,5,5];   // customs: five until a preset says otherwise
+const PERS_CH = [3,6,2,4,10,1,2, 4,8,5,10,12,14, 5,5,5,5, 8];   // customs: five until a preset says otherwise; 17 CW/WW FX
 // Display order for the Mode list (user, 2026-10-01, chore 24): grouped by
 // type, each type in channel order — Dim, CW/WW, RGB, RGBW, RGBWA, then the
-// four customs. The list numbers follow this order and become the RDM
-// personality numbers with the five-channel firmware (today's firmware still
-// counts the first seven 1-7).
-const PERS_ORDER = [5,6,2,3,0,1,4,7,8,11,9,10,12,13,14,15,16];
+// four customs. The list numbers follow this order and are the RDM personality
+// numbers. CW/WW FX is number 5 with the CW/WWs (FW-98, firmware 3.3.0).
+const PERS_ORDER = [5,6,2,3,17,0,1,4,7,8,11,9,10,12,13,14,15,16];
 // Can the connected firmware run this personality? Today's codes always;
 // the five-channel set once the state carries NCH=5. A custom preset (13-16)
 // only in the demo: no firmware runs one yet (FW-52), and 2.0.0 clamps any
 // code it doesn't know to 6, Dim 2ch 16-bit (app review 2026-10-29, B1).
 // Demo mode is a three-channel unit.
-const persAvail = c => c<=6 || (c<=12 && +(kv.NCH||3)>=5) || (c>=13 && demoOn && !!cpdOf(c-12));
+// CW/WW FX once the state carries PNC >= 14 (firmware 3.3.0).
+const persAvail = c => c<=6 || (c<=12 && +(kv.NCH||3)>=5) || (c===17 && (demoOn || +kv.PNC>=14)) ||
+                       (isCustPe(c) && demoOn && !!cpdOf(c-12));
 const maxAddr = pe => 513 - (PERS_CH[pe] ?? 1);
 function persOptionText(c){
   const n=PERS_ORDER.indexOf(c)+1;
-  if(c>=13){ const k=c-12, cp=cpdOf(k);
+  if(isCustPe(c)){ const k=c-12, cp=cpdOf(k);
     return `${n}. Custom ${k}${cp?` "${cp.name}"`:""} · ${cpdFoot(cp)} ch`+(cp?"":" (preset not set)"); }
-  return `${n}. ${PERS_NAMES[c]} · ${PERS_CH[c]} ch`+(persAvail(c)?"":" (five-channel firmware)");
+  return `${n}. ${PERS_NAMES[c]} · ${PERS_CH[c]} ch`+(persAvail(c)?"":c===17?" (firmware 3.3)":" (five-channel firmware)");
 }
 // Write an <option> property only when it differs. An open picker redraws on
 // every mutation, even a same-value one, so a state echo re-writing the PWM
@@ -1792,7 +1796,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-22b.kelvin";
+const APP_VER="2026-11-22d.cwfx";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -1888,7 +1892,7 @@ const LOOP_SECS=["mcp","ble","dmx","net","misc","out","bus","recon","ind","nvs",
 // Register the service worker so the app works offline once installed to the
 // home screen — no signal needed at the gig. Network-first (see sw.js) keeps it
 // fresh when online, cached when not. Safe no-op where SW isn't supported.
-if("serviceWorker" in navigator){
+if("serviceWorker" in navigator && !window.JmbNativeBle){   // the native shell ships its files: no worker
   addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
   // The manual, chart and safety PDFs (~900 KB) are precached only once the
   // page has settled, so the first load after an update is not fighting them
@@ -2092,6 +2096,10 @@ function stateHandler(ev){ onState(dec.decode(ev.target.value)); }
 // the bundled ble-native.js). When absent (the PWA / Chrome / Bluefy), every
 // call below falls through to the original Web Bluetooth path — unchanged.
 const NBLE=()=>window.JmbNativeBle||null;
+// The native shell serves the app from its own bundle, so the hosted firmware (firmware.json and the sealed images)
+// comes from the published app site; GitHub Pages answers cross-origin. The web app keeps its relative paths.
+const APP_HOST="https://app.jmblighting.co.uk/";
+const hostUrl=f=>(NBLE() && !/^https?:/i.test(f) ? APP_HOST : "")+f;
 const devName=()=>NBLE()?NBLE().name:((dev&&dev.name)||"");
 // (A "controllers this phone knows" list lived here for one build, 2026-09-14d;
 // the user did not need it — the answer is distinct Bluetooth names/IDs.)
@@ -2108,7 +2116,18 @@ const savePin=v=>{ try{ const k=pinKey(); if(k) localStorage.setItem(k,v); }catc
 const bleAvailable=()=>!!(navigator.bluetooth||NBLE());
 const bleConnected=()=>NBLE()?!!NBLE().connected:!!cmdChar;
 async function gattSetup(){
-  if(NBLE()){ await NBLE().openAndSubscribe(s=>onState(s),onDisconnected); return; }
+  if(NBLE()){
+    await NBLE().openAndSubscribe(s=>onState(s),onDisconnected);
+    // Firmware updates through the native bridge (the App Store build, 2026-11-22): stand-ins with the same
+    // writeValueWithResponse the update code calls, so runOta and the port step run unchanged.
+    otacChar=otadChar=otasChar=null;
+    if(NBLE().otaOpen && await NBLE().otaOpen(dv=>otaStatHandler({target:{value:dv}}))){
+      otacChar={writeValueWithResponse:b=>NBLE().otaWrite("ctrl",b)};
+      otadChar={writeValueWithResponse:b=>NBLE().otaWrite("data",b)};
+      otasChar={};
+    }
+    return;
+  }
   let lastErr=null;
   for(let i=0;i<4;i++){
     try{
@@ -2971,7 +2990,7 @@ function renderControl(){
     // the set changes, so a slider under a finger is never replaced).
     paintRows(p,m);
     {
-      const cct=(m.PE===2||m.PE===3), dim1=(m.PE===5||m.PE===6);
+      const cct=isCctPe(m.PE), dim1=(m.PE===5||m.PE===6);
       // Monochrome ports (CCT + Dim) only offer effects that read on them.
       const xs=$("x"+p);
       if(xs) for(const o of xs.options) optSet(o,"hidden",((cct||dim1) && !CCT_FX.has(+o.value)) || !fxKnown(o.value));
@@ -3025,7 +3044,7 @@ function renderControl(){
     for(let j=0;j<ports.length && !clash;j++){
       if(j===i) continue;
       const pj=ports[j].PE||0, b=+(ports[j].A||0), g=PERS_FOOT[pj]||3;
-      if(pi<13 && pj<13){ if(a && b && b!==a && a<b+g && b<a+f) clash=true; continue; }
+      if(!isCustPe(pi) && !isCustPe(pj)){ if(a && b && b!==a && a<b+g && b<a+f) clash=true; continue; }
       const B=portChans(ports[j]);
       const same=A.length===B.length && A.every((v,x)=>v===B[x]);
       if(!same && A.some(v=>B.includes(v))) clash=true;
@@ -3044,7 +3063,7 @@ function renderControl(){
 // start address, a custom preset from its own address list.
 function portChans(m){
   const pe=m.PE||0;
-  if(pe>=13){ const c=cpdOf(pe-12); return c?cpdChannels(c):[]; }
+  if(isCustPe(pe)){ const c=cpdOf(pe-12); return c?cpdChannels(c):[]; }
   const a=+(m.A||0), f=PERS_FOOT[pe]||3; if(!a) return [];
   return Array.from({length:f},(_,k)=>a+k);
 }
@@ -3158,7 +3177,7 @@ function buildCard(p){
              Shown when the unit reports CO=; hidden on a custom patch, whose roles say it already. -->
         <div class="row hidden" id="cor${p}"><label style="line-height:1.15">Colour order</label>
           <select id="co${p}" style="width:130px"></select></div>
-        <div class="mini" id="con${p}" data-help style="display:none">Pick the order that makes Red show red on the strip; the sliders and white balance stay per colour.</div>
+        <div class="mini" id="con${p}" data-help style="display:none">Pick the order that makes Red show red on the fixture; the sliders and white balance stay per colour.</div>
         <div class="row"><label>PWM</label>
           <select id="pwm${p}" style="width:230px">
             <option value="0">Smooth 8 kHz (50 Hz)</option>
@@ -3289,7 +3308,7 @@ function buildCard(p){
     // hidden option can stay SELECTED, leaving e.g. Rainbow silently running
     // on a white strip. Stop any effect the new personality doesn't offer.
     {
-      const cct=(pe===2||pe===3||pe===5||pe===6), xs=$("x"+p);
+      const cct=(isCctPe(pe)||pe===5||pe===6), xs=$("x"+p);
       if(cct && xs && !CCT_FX.has(+xs.value)){
         xs.value=0; touch("X"); if(ports[p-1]) ports[p-1].X=0;
         send(`P${p}.FX=0`);
@@ -3948,7 +3967,7 @@ function pushColour(){
   const pr=Math.round(r/2.55), pg=Math.round(g/2.55), pb=Math.round(b/2.55);
   const mix=cctMixOf(col.base);
   const list=colTargetList();
-  const isCct=p=>{const pe=ports[p-1]&&ports[p-1].PE; return pe===2||pe===3;};
+  const isCct=p=>{const pe=ports[p-1]&&ports[p-1].PE; return isCctPe(pe);};
   // A port with a Kelvin calibration (FW-97) gets its own corrected values, so the rig goes port by port.
   const kcAny=list.some(p=>kcPts(p).length), look=p=>kcLook(p,col.base,col.duv);
   list.forEach(p=>{ for(const k of ["R","G","B","D","X"]) hot[p+"."+k]=Date.now();
@@ -3993,7 +4012,7 @@ function seedColour(){
     col.base=L.base.slice(); col.duv=L.duv; col.dim=Math.round(portDim(t));   // the picker's own colour, not a re-read
   }else if(m){
     const pe=m.PE;
-    if(pe===2||pe===3){                 // CW/WW port: derive CCT from the mix
+    if(isCctPe(pe)){                     // CW/WW port: derive CCT from the mix
       const ww=m.R??0, cw=m.G??0, tot=ww+cw;
       if(tot>0){
         col.base=kelvin2rgb(2700+(cw/tot)*3800);
@@ -4050,7 +4069,7 @@ function targetsAllCct(){
   const l=colTargetList();
   return l.length>0 && l.every(p=>{
     const pe=ports[p-1]&&ports[p-1].PE;
-    return pe===2||pe===3;
+    return isCctPe(pe);
   });
 }
 function cctMixOf(base){                       // fixture range 2700-6500K
@@ -5759,7 +5778,7 @@ function renderIdentMsg(){
   const el=$("identMsg"); if(!el) return;
   el.textContent = "Flash identifies this controller for 5 seconds — tap it "
     + "after connecting to check you're on the right unit. "
-    + "Its screen strobes and its indicators pulse; the strip is never touched.";   // the same on every model now the Zone has a screen (firmware render_main + ind_pulse)
+    + "Its screen strobes and its indicators pulse; the fixtures are never touched.";   // the same on every model now the Zone has a screen (firmware render_main + ind_pulse)
 }
 
 // Shown on the unlock screen, where someone is already waiting — better than
@@ -6278,7 +6297,7 @@ function otaNoteDrop(){
 async function loadOtaManifest(){
   otaManifestTried=Date.now();
   try{
-    const r=await fetch("firmware.json",{cache:"no-cache"});
+    const r=await fetch(hostUrl("firmware.json"),{cache:"no-cache"});
     if(!r.ok) throw new Error("HTTP "+r.status);
     const m=await r.json();
     if(!m||!m.size||!m.crc32) throw new Error("incomplete manifest");
@@ -6459,7 +6478,7 @@ async function fetchVerified(info, fallbackName){
   // straight from the origin if the first copy still disagrees.
   const name=info.file||fallbackName;
   const get=async(bust)=>{
-    const r=await fetch(name+"?v="+(info.crc32||info.build||Date.now())+(bust?"&r="+Date.now():""),
+    const r=await fetch(hostUrl(name)+"?v="+(info.crc32||info.build||Date.now())+(bust?"&r="+Date.now():""),
                         {cache:bust?"no-store":"default"});
     if(!r.ok) throw new Error("HTTP "+r.status);
     return await r.arrayBuffer();
@@ -6517,7 +6536,7 @@ async function runStmUpdate(){
   setStmState("downloading…");
   let buf;
   try{
-    const r=await fetch(info.file||"stm_port.bin");
+    const r=await fetch(hostUrl(info.file||"stm_port.bin"));
     if(!r.ok) throw new Error("HTTP "+r.status);
     buf=await r.arrayBuffer();
   }catch(e){ setStmState("download failed");
@@ -6913,11 +6932,11 @@ const WB_ROWS={ rgb:[["R","Red","r"],["G","Green","g"],["B","Blue","b"]],
                 dim:[["ALL","Level","uv"]] };
 function wbKind(pe,p){
   const five=!!(wbOf(p||wbPort)||{}).five;
-  if(pe===2||pe===3) return five?"cct5":"cct";
+  if(isCctPe(pe)) return five?"cct5":"cct";
   if(pe===5||pe===6) return "dim";
   if(!five) return "rgb";
   if(pe===7||pe===8||pe===11) return "rgbw";
-  if(pe===9||pe===10||pe===12||pe>=13) return "rgbwa";
+  if(pe===9||pe===10||pe===12||isCustPe(pe)) return "rgbwa";
   return "rgb";
 }
 function wbSend(ch,v){
@@ -7040,11 +7059,11 @@ function kcCorrect(p,base,duvUI){             // a white's chroma and tint trim 
 // With no calibration it is exactly what pushColour always sent.
 function kcLook(p,base,duvUI){
   const c=kcCorrect(p,base,duvUI), pe=(ports[p-1]||{}).PE;
-  if(pe===2||pe===3){ const m=cctMixOf(c.base); return [m.ww,m.cw,0]; }
+  if(isCctPe(pe)){ const m=cctMixOf(c.base); return [m.ww,m.cw,0]; }
   return tintRGB(ledWhiteRemap(c.base),c.duv).map(v=>Math.max(0,Math.min(255,Math.round(v)))).map(v=>Math.round(v/2.55));
 }
 let kcPort=0, kcLit=0, kcSaved=null;
-const kcCct=p=>{ const pe=(ports[p-1]||{}).PE; return pe===2||pe===3; };
+const kcCct=p=>{ const pe=(ports[p-1]||{}).PE; return isCctPe(pe); };
 const kcDimPort=p=>{ const pe=(ports[p-1]||{}).PE; return pe===5||pe===6; };
 function kcOpen(p){
   kcPort=p; kcLit=0; kcSaved=null;
@@ -7290,7 +7309,7 @@ function pcPaintSet(p,m){
   // Same words as the sheet's field labels: Mode / Address / Head, Curve / PWM /
   // WB, Limit / Trip / faults — so a value on the card names the field it came from.
   persPaintOptions(p);                    // grey what this firmware cannot run
-  { const pe=m.PE??0, cp=pe>=13?cpdOf(pe-12):null;
+  { const pe=m.PE??0, cp=isCustPe(pe)?cpdOf(pe-12):null;
     put("pvMode"+p, cp ? cp.name : (PERS_NAMES[pe]??"?"));
     // On a preset the port listens on the preset's own addresses: the card
     // shows their range and the Address field steps aside.
@@ -7327,7 +7346,7 @@ function pcPaintSet(p,m){
 // app's copy of the automatic rule for firmware that does not report it.
 function fanStride(){
   if(+kv.OFS>0) return Math.min(512,+kv.OFS);
-  let s=0; for(let c=0;c<13;c++) if(persAvail(c)) s=Math.max(s,PERS_CH[c]||0);
+  let s=0; for(const c of PERS_ORDER) if(!isCustPe(c) && persAvail(c)) s=Math.max(s,PERS_CH[c]||0);
   return s||10;
 }
 // Offset's step beside the Apply select (user 2026-11-17: "a 16ch mode every 20 channels or 50"):
@@ -7356,7 +7375,7 @@ async function fanOut(p,chain){
   // Mode too? (user, 2026-10-02): the pop-up asks whether the later ports
   // also take this port's Mode. With it, each port is set to the Mode first,
   // so Seq follows on by that footprint and the address clamp is right.
-  const pe0=cur.PE||0, cp0=pe0>=13?cpdOf(pe0-12):null;
+  const pe0=cur.PE||0, cp0=isCustPe(pe0)?cpdOf(pe0-12):null;
   const modeName=cp0?cp0.name:(PERS_NAMES[pe0]||"this Mode");
   const list=p+1===n?`port ${n}`:`ports ${p+1}–${n}`;
   const ans=await askConfirm(`DMX address and head from port ${p}, ${AMODES[mode]||"Same"}.`+(chain?" Armed units down the line follow on.":"")+` Set their Mode to ${modeName} as well?`,
@@ -7370,7 +7389,7 @@ async function fanOut(p,chain){
     if(mode===1){ const ch=portChans(cur); if(ch.length) a=ch[ch.length-1]+1; }
     else if(mode===2) a+=stride;
     if(mode!==0) h=(h+1)%10000;
-    if(pe>=13 && cpdOf(pe-12)){                 // on a preset: its own channels, Address unused
+    if(isCustPe(pe) && cpdOf(pe-12)){                 // on a preset: its own channels, Address unused
       if(withMode){ await send(`P${i}.HEAD=${h}`); done.push("preset"); }
       cur={PE:pe,A:+(m.A||1)}; continue; }
     const aa=Math.max(1,Math.min(maxAddr(pe),a));
@@ -7658,7 +7677,7 @@ const SUP_TO="support@jmblighting.co.uk";
 const SUP_KEYS=["FW","FWB","PORTS","VAR","VARM","UP","RR","CRS","BRS","DMX","FPS","DI","SRC","SL","SC","ASC","ERR","AGE","HOLD","DLR","RDMEN","PWRF","CARD","BTM","UPE","UKF","RFW","PRS","CO","DK","DKT","DKN","OFS","OFSU",
   "RDM","ANS","RB","RBOK","STM","SPC","CHL","TSEQ","TXA","TXN","LPX","LPS","LPN","LPA","LPG","BSY","BRT","BSM","BRM",
   "NET","NW","NRS","TF","PB","CL","CLM","CLK","CF","FC","FT","OL","SH","SHM","TCR","CX","CA","CXR","CXL","CXS","CXF",
-  "SQ","SQN","BPM","SPR","TAPV","FXN","KCV","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
+  "SQ","SQN","BPM","SPR","TAPV","FXN","KCV","PNC","CRV","AM","HRS","PWLIM","PWC1","PWC2","PWC3","CAPON","FLKON","FLKL"];
 function supReport(){
   const names=$("supNames").checked;
   const red=t=>{ t=String(t||""); return names ? t : (t ? `<${t.length} chars>` : ""); };
@@ -7793,7 +7812,7 @@ function demoState(){
     "NCH=5;CHP=1;CHS=1;FR=1;"+`OFS=${demoF.ofsu||14};OFSU=${demoF.ofsu||0};`+   // Offset step: automatic 14 on a five-output rig, or the one set                  // the demo is a five-channel unit with the universe batons and a factory reset: no firmware greying
     "PWLIM=2000,25000;"+PWC+demoF.cpd.map((c,k)=>`CPD${k+1}=${c||"0"};`).join("")+demoP.slice(0,demoF.var).map((d,i)=>W(i+1,d)+`KC${i+1}=${d.kc||""};`).join("")+
     `TSEQ=${demoF.test|0};CHL=${demoF.chl|0};`+
-    `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=${demoF.spr};TAPV=1;FXN=25;KCV=1;`+demoTxState()+
+    `SQ=0;SQN=3;SQS=2:20:30,5:20:30,7:20:30;BPM=${demoF.bpm};SPR=${demoF.spr};TAPV=1;FXN=25;KCV=1;PNC=14;`+demoTxState()+
     "LPX=9;LPS=5;LPN=0;LPA=31;LPG=22;RR=1;BSY=0;BRT=3;"+
     "CN="+(demoF.cn!=null?demoF.cn:Array.from("Demo Rig").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join(""))+";"+
     demoP.slice(0,demoF.var).map((d,i)=>P(i+1,d)).join(""));
@@ -8076,6 +8095,7 @@ $("appVerTxt").textContent = APP_VER;
 // this additionally asks the browser to re-check the worker itself, which is
 // what actually replaces a cached shell.
 (async () => {
+  if(NBLE()){ const b=$("appRefresh"); if(b) b.classList.add("hidden"); return; }   // the App Store updates the native app
   try{
     const live = await publishedAppVersion();
     if(live && live !== APP_VER){

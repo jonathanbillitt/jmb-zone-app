@@ -235,7 +235,7 @@ carries live status.</p>
 <p>Live DMX always outranks manual and effects. When the desk vanishes, the last DMX look holds until you set something
 else, or until a set <a href="#dmx-loss">DMX loss release</a> time runs out and the outputs fade to black. All sources pass the
 dimmer curve. At power-up the outputs stay dark for just over a second, so the supply's inrush bypass has closed before
-the strips draw current, then fade up over half a second.</p>
+the fixtures draw current, then fade up over half a second.</p>
 <p><strong>"Live DMX" is the wired input <em>or</em> the CRMX radio</strong>, merged into one universe, so everything downstream (patch, FX
 personality, the diagnostics viewer, RDM) treats the radio exactly like a cable. The header on every screen names the
 winner: <strong>DMX</strong> or <strong>CRMX</strong>.</p>
@@ -283,9 +283,10 @@ wait until the update has finished.</p>
 <hr />
 <h2 id="effects">3. Effects</h2>
 <p>Twenty-four built-in dynamic looks per port: quick looks, so for more advanced effects run them from a lighting
-console. Set one from Port Settings → Effect, the app, or DMX channel 8 of the FX personality. <strong>Speed</strong> reads the same on
+console. Set one from Port Settings → Effect, the app, or the effect channel of an FX personality (channel 8 on RGB FX,
+6 on CW/WW FX). <strong>Speed</strong> reads the same on
 the app's wheel and the panel, as × the designed tempo: <strong>Stop</strong>, then 0.13× through 1.0× to 8.0×, and on the beat
-effects musical bands, ¼× to 4× (Strobe in flashes per beat). From a desk it is DMX channel 9, 0–255, with 128 = 1×. While an effect runs, the app's <strong>RGB sliders are greyed out</strong> (except
+effects musical bands, ¼× to 4× (Strobe in flashes per beat). From a desk it is the next channel, 0–255, with 128 = 1×. While an effect runs, the app's <strong>RGB sliders are greyed out</strong> (except
 the three Dim effects): the effect owns the colour; clear the effect to get them back (the dimmer and speed wheels stay
 live). <strong>Speed 0 stops an effect</strong>: a continuous look freezes on its current frame, Strobe and Police go dark.</p>
 <p><strong>Effects never start on their own.</strong> When DMX is absent, an effect runs only from the moment you deliberately pick it
@@ -453,7 +454,8 @@ so every flash is exact at every speed. <strong>CW/WW</strong> marks the effects
 </tbody>
 </table>
 <p><strong>On tuneable-white ports</strong> the colour-only effects are hidden, so you can't pick one that would do nothing; the
-personality drives the white (cool) and amber (warm) terminals. <strong>On RGBW and RGBWA ports</strong> the effects are written in
+personality drives the white (cool) and amber (warm) terminals. A desk on <strong>CW/WW FX</strong> gets the same twelve, on effect
+ranges of their own (the DMX chart). <strong>On RGBW and RGBWA ports</strong> the effects are written in
 red, green and blue: the white output follows the white already in the mix (a white strobe uses it, a saturated
 rainbow leaves it dark) and amber stays dark under an effect. The three Dim effects are the exception: they light your
 own colour, white and amber included. Your own white and amber levels come back when the
@@ -757,11 +759,13 @@ mirroring and are not marked.</dd>
 <dl>
 <dt>What it does</dt>
 <dd>Sets the port's personality: RGB, RGBW or RGBWA, each 8-bit, 16-bit or with the effect channels; tuneable white
-8- or 16-bit; or a <strong>single-channel dimmer</strong>, one DMX level over the port's set colour.</dd>
+the same three ways (<strong>CW/WW FX</strong> adds dimmer, effect, speed and strobe); or a <strong>single-channel dimmer</strong>, one DMX
+level over the port's set colour.</dd>
 <dt>What it's for</dt>
-<dd>Matching the port to its strip and the desk; the single-channel dimmer is ideal for single-colour and IR strips.</dd>
+<dd>Matching the port to its fixture and the desk; the single-channel dimmer is ideal for single-colour and IR fixtures.</dd>
 <dt>How to set it</dt>
-<dd>On the panel, Mode cycles the list in the DMX chart's order: Dim 1ch / Dim 2ch / CW/WW 8 / CW/WW 16 / RGB 8 /
+<dd>On the panel, Mode cycles the list in the DMX chart's order: Dim 1ch / Dim 2ch / CW/WW 8 / CW/WW 16 /
+<strong>CW/WW FX</strong> / RGB 8 /
 RGB 16 / <strong>RGB FX</strong> / RGBW 8 / RGBW 16 / <strong>RGBW FX</strong> / RGBWA 8 / RGBWA 16 / <strong>RGBWA FX</strong>. On All Ports every port
 takes the same mode.</dd>
 <dt>See also</dt>
@@ -820,7 +824,7 @@ keeps its own curve. White balance is applied after the curve, so changing the c
 <p><em>App: port card → Output → Colour order (under the curve)</em></p>
 <dl>
 <dt>What it does</dt>
-<dd>Sets the order the strip's colours are wired in. Pick the one that makes Red show red.</dd>
+<dd>Sets the order the fixture's colours are wired in. Pick the one that makes Red show red.</dd>
 <dt>What it's for</dt>
 <dd>Tape whose terminals don't run red, green, blue: GRB, BRG and so on; on the five-output modules with white and
 amber too, e.g. BRGAW.</dd>
@@ -858,7 +862,7 @@ force shows an orange <strong>WB</strong> badge.</dd>
 <p><em>App: port card → Output → Kelvin calibration (under White balance)</em></p>
 <dl>
 <dt>What it does</dt>
-<dd>Makes the app's Kelvin land where your colour meter says it should, on this port's own strip. Up to three points,
+<dd>Makes the app's Kelvin land where your colour meter says it should, on this port's own fixture. Up to three points,
 2000, 4000 and 6000 K; each keeps how far the light was off, in colour temperature and in tint (Δuv). Every white
 the Colour tab sends this port goes out corrected; saturated colours pass untouched.</dd>
 <dt>What it's for</dt>
@@ -889,7 +893,7 @@ uncalibrated scale. Needs firmware 3.3.0.</dd>
 <dt>What it's for</dt>
 <dd>Sizing the trip to the run that is connected.</dd>
 <dt>How to set it</dt>
-<dd><strong>Tape</strong> (the strip's watts per metre, and 12 V or 24 V) and <strong>Length</strong>, above it, work it out: the Limit becomes
+<dd><strong>Tape</strong> (the fixture's watts per metre, and 12 V or 24 V) and <strong>Length</strong>, above it, work it out: the Limit becomes
 what the run draws at full white, rounded up to the next 0.25 A. Type a Limit instead to see the longest run it
 covers. On the panel: from 0.25 A in 0.25 A steps to 2 A, then 0.5 A steps to the cap.</dd>
 <dt>Good to know</dt>
@@ -917,7 +921,7 @@ hardware immediately.</dd>
 <dt>Good to know</dt>
 <dd>A latched port shows its fault in red on the card and on the header badge; tapping the badge opens the sheet.</dd>
 <dt>See also</dt>
-<dd><a href="#faults">Fault handling</a> · <a href="#wiring-fault">Wiring fault</a></dd>
+<dd><a href="#faults">Fault handling</a> · <a href="#ground-leak">Ground leak</a> · <a href="#wiring-fault">Wiring fault</a></dd>
 </dl></div>
 <h3 id="colour">Colour — dial a look, don't push channels</h3>
 <div class="set"><h4 id="colour-picker">Dim · Hue · Sat · Kelvin · ΔUV</h4>
@@ -1088,7 +1092,7 @@ holding it for more than 3 seconds unlinks too; a short tap is ignored. The exte
 <dl>
 <dt>What it does</dt>
 <dd>Identifies this controller for 5 s so you can pick it out of a rack: a Zone pulses all its indicator lights
-together, a 4our or 8ight strobes its screens. <strong>It never touches the strip</strong>, unlike
+together, a 4our or 8ight strobes its screens. <strong>It never touches the fixtures</strong>, unlike
 <a href="#rdm">RDM discovery and Identify</a>.</dd>
 </dl></div>
 <div class="set"><h4 id="show-file">Show-file export / import</h4>
@@ -1213,8 +1217,8 @@ controller present. Nothing a demo user touches goes anywhere.</dd>
 <td>shuts the output down at its <a href="#trip">Trip</a> temperature; thermal fold eases it first (below)</td>
 </tr>
 <tr>
-<td>Ground-leak imbalance</td>
-<td>—</td>
+<td>Ground leak</td>
+<td>latches at once: outputs and the port's 24 V off, <em>GROUND</em> on the panel and in the app (<a href="#ground-leak">below</a>)</td>
 </tr>
 <tr>
 <td>Comms loss</td>
@@ -1223,7 +1227,27 @@ controller present. Nothing a demo user touches goes anywhere.</dd>
 </tbody>
 </table>
 <p>Latched ports show a flashing fault banner on their screen, the fault word appears in the menu and the app, and
-<a href="#clear-fault">Clear fault &amp; re-enable</a> re-arms the port (in its Protection sheet; Clear Fault on the panel). The controller raises two faults of its own:</p>
+<a href="#clear-fault">Clear fault &amp; re-enable</a> re-arms the port (in its Protection sheet; Clear Fault on the panel).</p>
+<div class="set"><h4 id="ground-leak">Ground leak</h4>
+<p><em>Panel: GROUND · App: GROUND on the port card</em></p>
+<dl>
+<dt>What it does</dt>
+<dd>Each port measures its current twice: where it leaves on the 24 V side and where it comes back. On a healthy
+fixture the two match. If they differ by more than 1.5 A for about a second (longer at the lowest PWM
+frequencies), with more than 0.5 A flowing, some current is finding another way home, and the port latches at
+once: its outputs and its 24 V go off, with no retries.</dd>
+<dt>What it's for</dt>
+<dd>Catching a chafed or pinched cable, a fixture shorting to a metal frame or the case, or a lead touching the
+chassis, before it heats a cable or livens metalwork. Over-current can't see these: the total can still look
+normal.</dd>
+<dt>Good to know</dt>
+<dd>Find the leak before you clear it: unplug the fixture, then check its cable and body for damage or a bare lead
+touching metal. <a href="#clear-fault">Clear fault &amp; re-enable</a> re-arms the port, and it latches again if the leak is
+still there. Loads under 0.5 A never trip it.</dd>
+<dt>See also</dt>
+<dd><a href="#clear-fault">Clear fault &amp; re-enable</a> · <a href="#wiring-fault">Wiring fault</a></dd>
+</dl></div>
+<p>The controller raises two faults of its own:</p>
 <div class="set"><h4 id="power-fault">Power fault (inrush board)</h4>
 <p><em>Panel: PWR FLT · App: a red banner on every tab</em></p>
 <dl>
@@ -1389,9 +1413,9 @@ carrier divides by 100.</dd>
 <dt>What it's for</dt>
 <dd>Matching a camera or another fixture.</dd>
 <dt>Good to know</dt>
-<dd>Custom entries are outside the tested set, so check the result on the strip and on camera before a show: below
+<dd>Custom entries are outside the tested set, so check the result on the fixture and on camera before a show: below
 3 kHz can show on camera and as strobing on fast movement, and anything below 20 kHz is in the audible range, where
-some strips and supplies sing. Clearing a custom entry that ports are using (or a port finding its entry empty when
+some fixtures and supplies sing. Clearing a custom entry that ports are using (or a port finding its entry empty when
 the unit starts) puts those ports back on the default carrier: Camera 19.2k, or Camera 15.6 kHz on port firmware
 before 2.9.</dd>
 <dt>See also</dt>
@@ -1424,13 +1448,13 @@ before 2.9.</dd>
 <li>The app's Undo restores the looks (colour, level, effect) from before the
   last Clear all, on that controller only</li>
 <li>The app starts with no signal once it has been opened online after installing</li>
-<li>Supply: 24 V standard (12 V supported — match the strip voltage). All
+<li>Supply: 24 V standard (12 V supported — match the fixture voltage). All
   protections are current- and temperature-based, so they work identically
   on either rail; at 12 V each port delivers half the wattage for the same
   current limit</li>
 <li>Current limit ceiling: 6.75 A per port</li>
 <li>Power link: up to 16 Zones / 4 4ours / 2 8ights on one 16 A supply</li>
-<li>Flash to find never lights the strip; RDM discovery and Identify from a
+<li>Flash to find never lights the fixtures; RDM discovery and Identify from a
   desk do — that is the RDM standard</li>
 <li>An RDM scan left open releases the DMX output after 3 minutes idle</li>
 </ul>

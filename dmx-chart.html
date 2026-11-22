@@ -67,7 +67,7 @@ blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #b7ade6; 
 </style></head><body>
 <div id="jmbsearch"><div class="jsrow"><input type="search" placeholder="Search this manual — e.g. current limit" aria-label="Search this manual"><a class="jpdf" href="dmx-chart.pdf" download>PDF</a></div><div class="jr"></div></div>
 <h1>JMB Lighting — DMX Personality Chart</h1>
-<p>JMB Zone / 4our / 8ight · Hardware 3.0.0 · Firmware 3.3.0 · 2026-11-21</p>
+<p>JMB Zone / 4our / 8ight · Hardware 3.0.0 · Firmware 3.3.0 · 2026-11-22</p>
 <h2>Personalities (per port)</h2>
 <p>The number is the one the panel, the app and an RDM console all show. The
 RGBW and RGBWA personalities need a <strong>five-output port module</strong> (the .3
@@ -110,60 +110,69 @@ cannot be selected.</p>
 </tr>
 <tr>
 <td>5</td>
+<td><strong>CW/WW FX</strong></td>
+<td>8</td>
+<td>see below</td>
+</tr>
+<tr>
+<td>6</td>
 <td>RGB 8-bit</td>
 <td>3</td>
 <td>R, G, B</td>
 </tr>
 <tr>
-<td>6</td>
+<td>7</td>
 <td>RGB 16-bit</td>
 <td>6</td>
 <td>R, Rf, G, Gf, B, Bf</td>
 </tr>
 <tr>
-<td>7</td>
+<td>8</td>
 <td><strong>RGB FX</strong></td>
 <td>10</td>
 <td>see below</td>
 </tr>
 <tr>
-<td>8</td>
+<td>9</td>
 <td>RGBW 8-bit</td>
 <td>4</td>
 <td>R, G, B, W</td>
 </tr>
 <tr>
-<td>9</td>
+<td>10</td>
 <td>RGBW 16-bit</td>
 <td>8</td>
 <td>R, Rf, G, Gf, B, Bf, W, Wf</td>
 </tr>
 <tr>
-<td>10</td>
+<td>11</td>
 <td><strong>RGBW FX</strong></td>
 <td>12</td>
 <td>see below</td>
 </tr>
 <tr>
-<td>11</td>
+<td>12</td>
 <td>RGBWA 8-bit</td>
 <td>5</td>
 <td>R, G, B, W, A</td>
 </tr>
 <tr>
-<td>12</td>
+<td>13</td>
 <td>RGBWA 16-bit</td>
 <td>10</td>
 <td>R, Rf, G, Gf, B, Bf, W, Wf, A, Af</td>
 </tr>
 <tr>
-<td>13</td>
+<td>14</td>
 <td><strong>RGBWA FX</strong></td>
 <td>14</td>
 <td>see below</td>
 </tr>
 </tbody>
 </table>
+<p><strong>New in firmware 3.3.0:</strong> CW/WW FX, number 5. RGB 8-bit to RGBWA FX moved up
+one (6–14), on the panel, in the app and on an RDM console; a console that
+stored a personality number from an earlier firmware should be re-patched.</p>
 <p><strong>CW/WW on a five-output module</strong> puts cool white on W (pin 5) and warm white
 on A (pin 6), and leaves red, green and blue dark. Wire a tuneable-white tape's
 cool lead to W and its warm lead to A. On a three-output module cool rides the
@@ -171,17 +180,17 @@ green terminal and warm the red one, as it always has.</p>
 <p><strong>Dim personalities</strong> patch a port like a classic dimmer channel: the one
 DMX level scales the port's <em>set colour</em> (chosen in the app). With no colour
 set it acts as white — every output carries the level — so a single-colour
-or <strong>IR strip</strong> lights straight from its one patched channel, whichever
+or <strong>IR fixture</strong> lights straight from its one patched channel, whichever
 output terminal it's wired to.</p>
 <p>Each port's whole footprint must fit inside the universe, so the start
 address caps at <strong>513 − footprint</strong>: Dim 1ch → 512, Dim 2ch → 511, CW/WW
-8-bit → 511, CW/WW 16-bit → 509, RGB 8-bit → 510, RGB 16-bit → 507, RGB FX →
+8-bit → 511, CW/WW 16-bit → 509, CW/WW FX → 505, RGB 8-bit → 510, RGB 16-bit → 507, RGB FX →
 503, RGBW 8-bit → 509, RGBW 16-bit → 505, RGBW FX → 501, RGBWA 8-bit → 508,
 RGBWA 16-bit → 503, <strong>RGBWA FX → 499</strong>. Changing a port to a larger
 personality re-clamps its start down if it would overhang. Offset apply mode
 spaces ports by the widest footprint (14ch → 56ch across a 4-port, 112ch
 across an 8-port).</p>
-<h2>FX personalities (RGB FX 10ch, RGBW FX 12ch, RGBWA FX 14ch)</h2>
+<h2>FX personalities (RGB FX 10ch, RGBW FX 12ch, RGBWA FX 14ch, CW/WW FX 8ch)</h2>
 <table>
 <thead>
 <tr>
@@ -224,7 +233,7 @@ across an 8-port).</p>
 <tr>
 <td>next</td>
 <td>Effect select</td>
-<td>ranges below (CH8 on RGB FX, CH10 on RGBW FX, CH12 on RGBWA FX)</td>
+<td>ranges below (CH8 on RGB FX, CH10 on RGBW FX, CH12 on RGBWA FX, CH6 on CW/WW FX)</td>
 </tr>
 <tr>
 <td>next</td>
@@ -242,10 +251,110 @@ across an 8-port).</p>
 the colour source (white then follows the white in the effect's mix and
 amber stays dark); the strobe shutter chops whatever is playing; the dimmer
 scales last.</p>
+<p><strong>CW/WW FX</strong> (8ch) is the same idea for tuneable-white tape:</p>
+<table>
+<thead>
+<tr>
+<th>CH</th>
+<th>Function</th>
+<th>Values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Dimmer</td>
+<td>0–255 master</td>
+</tr>
+<tr>
+<td>2–3</td>
+<td>Cool white coarse + fine</td>
+<td>16-bit</td>
+</tr>
+<tr>
+<td>4–5</td>
+<td>Warm white coarse + fine</td>
+<td>16-bit</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Effect select</td>
+<td>its own ranges, tuneable-white effects only (below)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Effect speed</td>
+<td>as above</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Strobe</td>
+<td>as above</td>
+</tr>
+</tbody>
+</table>
+<p>Cool and warm land on the same terminals as CW/WW 8-bit and 16-bit (W and A
+on a five-output module, G and R on a three-output one). The effect channel
+carries only the twelve effects made for tuneable white (the ones the app
+offers on a CW/WW port), 20 values each:</p>
+<table>
+<thead>
+<tr>
+<th>Range</th>
+<th>Effect</th>
+<th>Range</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0–9</td>
+<td>Off (safe park)</td>
+<td>130–149</td>
+<td>TV Sim</td>
+</tr>
+<tr>
+<td>10–29</td>
+<td><strong>Dim Snap</strong></td>
+<td>150–169</td>
+<td>Strobe</td>
+</tr>
+<tr>
+<td>30–49</td>
+<td><strong>Dim Fade</strong></td>
+<td>170–189</td>
+<td>Pulse</td>
+</tr>
+<tr>
+<td>50–69</td>
+<td><strong>Dim Random</strong></td>
+<td>190–209</td>
+<td>Fluoro</td>
+</tr>
+<tr>
+<td>70–89</td>
+<td>Candle</td>
+<td>210–229</td>
+<td>Paparazzi</td>
+</tr>
+<tr>
+<td>90–109</td>
+<td>Fire</td>
+<td>230–255</td>
+<td>Explosion</td>
+</tr>
+<tr>
+<td>110–129</td>
+<td>Lightning</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <div class="page-break"></div>
 
-<h2>Effect ranges (CH8)</h2>
-<p>24 effects, each a <strong>10-value band</strong> from 10 up (the last extends to 255), numbered in the same order as the panel
+<h2>Effect ranges (the effect select channel)</h2>
+<p>On RGB FX, RGBW FX and RGBWA FX (CW/WW FX has its own, above): 24 effects, each a <strong>10-value band</strong> from 10 up (the last extends to 255), numbered in the same order as the panel
 and the app list them:</p>
 <table>
 <thead>
@@ -379,7 +488,7 @@ hue every 4th beat and renders greens as teal — never black, never strobes;
 Club keeps to deep blue through crimson; Traffic
 plays passing-headlight sweeps with independent random timing per port;
 Water, Pulse and Clouds never go fully dark; effect speed (CH9) does not
-affect the CH10 strobe rate. The film gags: <strong>Fluoro</strong> is a failing
+affect the strobe rate. The film gags: <strong>Fluoro</strong> is a failing
 fluorescent tube (rapid failed strikes, then it catches and holds with a
 faint mains buzz); <strong>Paparazzi</strong> fires irregular hard white pops,
 independent per port, like a press pit; <strong>Explosion</strong> is a white-hot
