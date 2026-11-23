@@ -1361,7 +1361,7 @@
       <div class="mini" style="opacity:.7">CRMX&trade; is a trademark of LumenRadio AB.</div>
       <!-- Universe shares the card with CRMX: both are this unit's links to the
            rest of the rig (Setup tidy, user 2026-10-02). "Universe" = every
-           unit joined down the DMX line (FW-99, state CHJV=1; older firmware:
+           Remote unit down the DMX line (FW-99, state CHJV=1; older firmware:
            armed to Listen, one baton per arming). -->
       <div class="subhead">Universe</div>
       <div class="ctlrow" style="margin-top:6px">
@@ -1372,12 +1372,12 @@
       <div class="ctlrow" style="margin-top:8px">
         <button id="chSet" style="flex:1">Send settings</button>
       </div>
-      <div class="row" style="margin-top:8px"><label style="width:auto" id="chArmL">Join</label>
+      <div class="row" style="margin-top:8px"><label style="width:auto" id="chArmL">Remote</label>
         <label class="toggle"><input type="checkbox" id="chArm"><span></span></label>
         <span class="mini" id="chArmStat" style="margin:0"></span>
       </div>
-      <div class="mini" id="chArmHint">Blackout, Full, Send settings and a Universe patch reach every unit
-      joined down the DMX line. Join each unit here or on its panel (Sources → <b>Join Universe</b>); it stays joined.</div>
+      <div class="mini" id="chArmHint">Blackout, Full, Send settings and a Universe patch reach every Remote
+      unit down the DMX line. Set each unit to Remote here or on its panel (Sources → <b>Remote</b>); it stays on.</div>
     </div>
     <!-- Files: the settings file and the documents, one card, under CRMX so
          Firmware update and App are the last two (user, 2026-10-02). -->
@@ -1560,7 +1560,7 @@
     <button id="wbChain">Universe</button>
     <button id="wbReset">Reset</button>
   </div>
-  <div class="mini">Preview lights the port at that level while you adjust, never over live DMX. 255 = full. All ports copies these trims to every port here; Universe sends them to every joined unit down the line as well.</div>
+  <div class="mini">Preview lights the port at that level while you adjust, never over live DMX. 255 = full. All ports copies these trims to every port here; Universe sends them to every Remote unit down the line as well.</div>
   <!-- Kelvin calibration (FW-97): three colour-meter points kept in the controller; the app's Kelvin picker applies them. -->
   <div id="kcBlock">
     <div class="wbhead" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px"><b>Kelvin calibration</b><span id="kcStat">Not calibrated</span></div>
@@ -1818,7 +1818,7 @@ const FAULTS = [[0x01,"OCP"],[0x02,"TEMP"],[0x04,"TEMP B"],[0x08,"SHORT"],
 let dev=null, cmdChar=null, stateChar=null, authed=false, authTimer=null;
 // Bump on every deploy — shown in Setup, the fastest way to spot a stale
 // cached copy on a phone.
-const APP_VER="2026-11-22f.docs";
+const APP_VER="2026-11-22g.remote";
 // Over-current ceiling in amps, from the controller's fitted-shunt key (SH):
 // 6.5 A on 10 mΩ boards (sense chain clips at 6.59 A), 6.75 A on 5 mΩ.
 function ocpCapA(){ return (typeof kv!=="undefined" && kv.SH==="5") ? 6.75 : 6.5; }
@@ -3188,7 +3188,7 @@ function buildCard(p){
         </div>
         <div class="mini">Address, head and mode are the desk patch. The label names the port across the app.</div>
         <div class="mini">Apply patches the later ports from this address: Seq by footprint, Offset every so many channels (blank = automatic). It asks if the Mode follows.</div>
-        <div class="mini">Universe carries the patch on to every joined unit down the line, each following on from the last.</div>
+        <div class="mini">Universe carries the patch on to every Remote unit down the line, each following on from the last.</div>
       </div>
       <div class="psheet rows" id="psOut${p}" data-title="Port ${p} · Output">
         <div class="row"><label>Curve</label>
@@ -5727,20 +5727,21 @@ $("btnVariant").onclick=async()=>{
   send("VARIANT="+v);
 };
 // ---------- Chain broadcast (factory look index: 0=DMX In, 1=Off, 9=White) ----------
-// Universe consent (FW-99): firmware with CHJV=1 JOINS (saved, nothing held while it
-// waits); older firmware ARMS for one baton and holds its thru meanwhile.
+// Universe consent (FW-99): firmware with CHJV=1 has REMOTE (saved, nothing held while it
+// waits; one word everywhere, Jonathan 2026-11-22); older firmware ARMS for one baton and
+// holds its thru meanwhile.
 const uJoin = () => kv.CHJV==="1" || demoOn;
-const uWho  = () => uJoin() ? "joined" : "armed";
-const uHow  = () => uJoin() ? "Join each downstream unit first: Setup → Universe → Join."
+const uWho  = () => uJoin() ? "Remote" : "armed";
+const uHow  = () => uJoin() ? "Set each downstream unit to Remote first: Setup → Universe → Remote."
                             : "Arm each downstream unit first: Setup → Universe → Listen.";
 function chArmPaint(on){
   const st=$("chArmStat"), j=uJoin();
-  $("chArmL").textContent = j ? "Join" : "Listen";
+  $("chArmL").textContent = j ? "Remote" : "Listen";
   $("chArmHint").innerHTML = j
-    ? "Blackout, Full, Send settings and a Universe patch reach every unit joined down the DMX line. Join each unit here or on its panel (Sources → <b>Join Universe</b>); it stays joined."
+    ? "Blackout, Full, Send settings and a Universe patch reach every Remote unit down the DMX line. Set each unit to Remote here or on its panel (Sources → <b>Remote</b>); it stays on."
     : "Sets a look, or sends this unit's settings, to every unit armed to Listen down the DMX line. Arm each unit here or on its panel (Sources → <b>Universe Listen</b>); one baton per arming, it disarms after.";
   if(j && kv.CHH==="1"){ st.textContent="DMX thru held: Universe patch passing"; st.style.color="var(--warn)"; return; }
-  st.textContent = on ? (j ? "joined" : "ARMED — waiting for baton") : "off";
+  st.textContent = on ? (j ? "on" : "ARMED — waiting for baton") : "off";
   st.style.color = on ? (j ? "var(--acc)" : "var(--warn)") : "var(--dim)";
 }
 let chArmPend=0;
@@ -5915,7 +5916,7 @@ $("chDmx").onclick=()=>{ send("CHLOOK=0"); toast("Universe: back to DMX in"); };
 // what identifies or patches a unit. The firmware builds the baton from its
 // own config on CHSET=1; the list here is the contract in words.
 $("chSet").onclick=async()=>{
-  if(!await askConfirm((uJoin()?"Every joined unit takes":"Every unit armed to Listen takes")+" this unit's curve, PWM, white balance, limit and trip per port, and its current limit and lock, folds, DMX loss release, Apply mode, tempo and spread, with the custom PWM entries. Addresses, modes, heads, numbers, names, labels, PIN and presets stay as they are.",
+  if(!await askConfirm((uJoin()?"Every Remote unit takes":"Every unit armed to Listen takes")+" this unit's curve, PWM, white balance, limit and trip per port, and its current limit and lock, folds, DMX loss release, Apply mode, tempo and spread, with the custom PWM entries. Addresses, modes, heads, numbers, names, labels, PIN and presets stay as they are.",
                        {title:"Send settings to the universe?",ok:"Send"})) return;
   send("CHSET=1"); toast("Settings sent to the universe");
 };
@@ -7413,7 +7414,7 @@ async function fanOut(p,chain){
   const pe0=cur.PE||0, cp0=isCustPe(pe0)?cpdOf(pe0-12):null;
   const modeName=cp0?cp0.name:(PERS_NAMES[pe0]||"this Mode");
   const list=p+1===n?`port ${n}`:`ports ${p+1}–${n}`;
-  const ans=await askConfirm(`DMX address and head from port ${p}, ${AMODES[mode]||"Same"}.`+(chain?(uJoin()?" Joined units down the line follow on; each holds its DMX thru for about a second while it passes.":" Armed units down the line follow on."):"")+` Set their Mode to ${modeName} as well?`,
+  const ans=await askConfirm(`DMX address and head from port ${p}, ${AMODES[mode]||"Same"}.`+(chain?(uJoin()?" Remote units down the line follow on; each holds its DMX thru for about a second while it passes.":" Armed units down the line follow on."):"")+` Set their Mode to ${modeName} as well?`,
                              {title:chain?`Patch ${list} and the universe`:`Patch ${list}`, ok:"DMX + Mode", alt:"DMX only"});
   if(ans===false) return;
   const withMode=ans===true;
@@ -7931,7 +7932,7 @@ function demoCmd(s){
     d.a=Math.max(1,Math.min(513-(PERS_CH[d.pe]||3),+m[2])); demoState(); return; }   // clamps like the firmware: no overspill past 512
   if(m=s.match(/^P(\d)\.HEAD=(\d+)/)){ demoP[+m[1]-1].h=+m[2]; demoState(); return; }
   if(m=s.match(/^AMODE=(\d)/)){ demoF.am=+m[1]%3; demoState(); return; }   // the Patch sheet's Apply mode
-  if(s.startsWith("CHPATCH=")||s.startsWith("CHSET=")){ demoState(); return; }   // a baton leaves; a joined demo unit stays joined (FW-99)
+  if(s.startsWith("CHPATCH=")||s.startsWith("CHSET=")){ demoState(); return; }   // a baton leaves; a Remote demo unit stays Remote (FW-99)
   if(s.startsWith("FACTORY=")){ setTimeout(()=>location.reload(),900); return; }   // the unit restarts: back to the connect screen
   if(m=s.match(/^P(\d)\.OCP=(\d+)/)){ demoP[+m[1]-1].oc=Math.max(250,Math.min(6750,+m[2])); demoState(); return; }
   if(m=s.match(/^P(\d)\.OT=(\d+)/)){ demoP[+m[1]-1].ot=Math.max(40,Math.min(110,+m[2])); demoState(); return; }
